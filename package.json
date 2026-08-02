@@ -42,8 +42,8 @@
     "dev": "concurrently \"node server/index.js\" \"vite\"",
     "build": "vite build",
     "electron:dev": "concurrently \"node server/index.js\" \"vite\" \"electron .\"",
-    "electron:build": "vite build && electron-builder --win",
-    "electron:build:win": "vite build && electron-builder --win",
+    "electron:build": "vite build && electron-builder --win --publish always",
+    "electron:build:win": "vite build && electron-builder --win --publish always",
     "start": "node server/index.js"
   },
   "build": {
