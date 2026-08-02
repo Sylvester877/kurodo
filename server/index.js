@@ -840,6 +840,97 @@ app.get('/api/discover/recent', async (req, res) => {
   }
 })
 
+// ────────── TMDB episode stills (real per-episode thumbnails) ─────────
+// AniZip only ships episode screenshots for a handful of episodes of long
+// shows (Bleach: 21/366) and Jikan's episodes endpoint carries no images.
+// TMDB has a real still for EVERY episode (e.g. Bleach 366/366) and its
+// season endpoint returns them all in one request. The API key lives in
+// .env.local (server-side only — never in the client bundle or repo).
+//
+//   GET /api/episode-thumbs/:malId → { eps: { "1": "https://image.tmdb.org/t/p/w500/x.jpg", … } }
+//
+// Resolution chain: AniZip mapping → themoviedb_id → TMDB /tv/{id}/season/N.
+// Seasons 1-4 are merged by running episode count (handles multi-season
+// TMDB entries where episode numbers restart per season). Cached 24h.
+const TMDB_API_KEY = (process.env.TMDB_API_KEY || '').trim()
+const tmdbThumbCache = new Map() // malId → { at, eps }
+const TMDB_THUMB_TTL = 24 * 60 * 60 * 1000
+const TMDB_EMPTY_TTL = 60 * 60 * 1000 // short TTL for no-mapping results
+const tmdbIdCache = new Map() // malId → { at, id } (from AniZip)
+const TMDB_ID_TTL = 24 * 60 * 60 * 1000
+
+async function getTmdbIdFromMal(malId) {
+  const hit = tmdbIdCache.get(malId)
+  if (hit && Date.now() - hit.at < TMDB_ID_TTL) return hit.id
+  try {
+    const r = await axios.get(`https://api.ani.zip/mappings?mal_id=${malId}`, {
+      timeout: 10_000,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      validateStatus: (s) => s >= 200 && s < 300,
+    })
+    const id = r.data?.mappings?.themoviedb_id || null
+    tmdbIdCache.set(malId, { at: Date.now(), id })
+    return id
+  } catch {
+    return null
+  }
+}
+
+/** Fetch TMDB stills for all episodes of an anime (seasons 1-4 merged). */
+async function fetchTmdbStills(malId) {
+  if (!TMDB_API_KEY) return {}
+  const tmdbId = await getTmdbIdFromMal(malId)
+  if (!tmdbId) return {}
+
+  const out = {}
+  let running = 0
+  for (let s = 1; s <= 4; s++) {
+    let data
+    try {
+      const r = await axios.get(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${s}`, {
+        params: { api_key: TMDB_API_KEY },
+        timeout: 10_000,
+        validateStatus: (code) => code >= 200 && code < 300,
+      })
+      data = r.data
+    } catch {
+      break // season doesn't exist — done
+    }
+    const eps = data?.episodes
+    if (!Array.isArray(eps) || eps.length === 0) break
+    for (const e of eps) {
+      if (e?.still_path && e.episode_number) {
+        out[running + e.episode_number] =
+          `https://image.tmdb.org/t/p/w500${e.still_path}`
+      }
+    }
+    running += eps.length
+  }
+  return out
+}
+
+// Real per-episode thumbnail map for an anime (all episodes in one call).
+app.get('/api/episode-thumbs/:malId', async (req, res) => {
+  try {
+    const malId = Number(req.params.malId)
+    if (!malId || isNaN(malId)) return res.status(400).json({ ok: false, error: 'Invalid MAL id' })
+    const hit = tmdbThumbCache.get(malId)
+    if (hit) {
+      const ttl = Object.keys(hit.eps).length > 0 ? TMDB_THUMB_TTL : TMDB_EMPTY_TTL
+      if (Date.now() - hit.at < ttl) return ok(res, { eps: hit.eps })
+    }
+    const eps = await fetchTmdbStills(malId)
+    tmdbThumbCache.set(malId, { at: Date.now(), eps })
+    if (tmdbThumbCache.size > 200) {
+      const n = Date.now()
+      for (const [k, v] of tmdbThumbCache) if (n - v.at > TMDB_THUMB_TTL) tmdbThumbCache.delete(k)
+    }
+    return ok(res, { eps })
+  } catch (e) {
+    fail(res, e)
+  }
+})
+
 // ---------- HLS proxy (manifest rewriter + CORS bypass) ----------
 // Optimizations: manifest cache (30s), segment cache headers, keep-alive,
 // direct CDN routing (skip proxy for CDNs with CORS *).
@@ -2497,45 +2588,78 @@ const PLACEHOLDER_SVG = (label = '?') => Buffer.from(
  * for long-running shounen like One Piece, Bleach, HxH). Each episode gets
  * a visually distinct card instead of every one showing the same cover.
  */
-const CARD_SVG = (coverUrl, epNum, accent) => {
-  // Use the anime's accent colour for the EP pill; fall back to a purple default.
+// ── Card-mode tiles: cover-embedded numbered episode cards ──
+// The card SVG embeds the cover as a base64 data-URL (fetched server-side),
+// making it fully self-contained — external <image href> URLs inside an SVG
+// loaded via <img> are refused by many browsers (blank tiles), data-URLs
+// render everywhere. The COVER data-URL is cached once per show (not per
+// episode) and the tiny per-episode SVG string is built on the fly, so a
+// 366-episode show costs ONE cached cover, not 366 × 700KB copies.
+const coverDataCache = new Map() // coverUrl → { at, dataUrl }
+const COVER_DATA_TTL = 24 * 60 * 60 * 1000
+
+/** Fetch the cover bytes and return a base64 data-URL (cached per cover). */
+async function getCoverDataUrl(coverUrl) {
+  if (!coverUrl) return null
+  const hit = coverDataCache.get(coverUrl)
+  if (hit && Date.now() - hit.at < COVER_DATA_TTL) return hit.dataUrl
+  let bytes = null
+  let mime = 'image/jpeg'
+  try {
+    const r = await axios.get(coverUrl, {
+      timeout: IMG_FETCH_TIMEOUT,
+      responseType: 'arraybuffer',
+      validateStatus: (s) => s >= 200 && s < 300,
+      headers: {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+        accept: 'image/avif,image/webp,image/*,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.9',
+      },
+      maxRedirects: 3,
+    })
+    const ct = r.headers['content-type'] || ''
+    if (ct.startsWith('image/') && r.data.length >= 200) {
+      bytes = Buffer.from(r.data)
+      mime = ct
+    }
+  } catch { /* fall through to placeholder */ }
+  if (!bytes) return null
+  const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpeg'
+  const dataUrl = `data:image/${ext};base64,${bytes.toString('base64')}`
+  coverDataCache.set(coverUrl, { at: Date.now(), dataUrl })
+  if (coverDataCache.size > 300) {
+    const n = Date.now()
+    for (const [k, v] of coverDataCache) if (n - v.at > COVER_DATA_TTL) coverDataCache.delete(k)
+    if (coverDataCache.size > 300) coverDataCache.delete(coverDataCache.keys().next().value)
+  }
+  return dataUrl
+}
+
+/** Build a self-contained numbered card SVG from an embedded cover data-URL. */
+function buildCardSvg(dataUrl, epNum, accent, rawLabel) {
+  const label = String(rawLabel || (epNum ? `EP ${epNum}` : '?')).slice(0, 24)
+  if (!dataUrl) return PLACEHOLDER_SVG(label)
   const pillColor = accent && /^#[0-9a-fA-F]{6}$/.test(accent)
     ? accent
     : 'hsl(245,75%,60%)'
   return Buffer.from(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 128">
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 128">
     <defs>
-      <clipPath id="c">
-        <rect x="0" y="0" width="224" height="128" rx="6"/>
-      </clipPath>
+      <clipPath id="c"><rect x="0" y="0" width="224" height="128" rx="6"/></clipPath>
+      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="hsla(0,0%,4%,0.15)"/>
+        <stop offset="65%" stop-color="hsla(0,0%,4%,0.35)"/>
+        <stop offset="100%" stop-color="hsla(0,0%,4%,0.75)"/>
+      </linearGradient>
     </defs>
     <rect width="224" height="128" rx="6" fill="hsl(0,0%,8%)"/>
-    <image href="${coverUrl}" width="224" height="128"
+    <image href="${dataUrl}" width="224" height="128"
       preserveAspectRatio="xMidYMid slice" clip-path="url(#c)"/>
-    <rect x="0" y="0" width="224" height="128" rx="6"
-      fill="url(#cardGrad)"/>
-    <defs>
-      <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="hsla(0,0%,4%,0.15)"/>
-        <stop offset="65%" stop-color="hsla(0,0%,4%,0.3)"/>
-        <stop offset="100%" stop-color="hsla(0,0%,4%,0.7)"/>
-      </linearGradient>
-    </defs>
-    <!-- Episode number pill (per-show accent colour) -->
-    <rect x="6" y="100" width="44" height="22" rx="4"
-      fill="${pillColor}" opacity="0.85"/>
-    <text x="28" y="115" font-family="system-ui,sans-serif" font-size="11"
+    <rect x="0" y="0" width="224" height="128" rx="6" fill="url(#g)"/>
+    <rect x="6" y="100" width="46" height="22" rx="4" fill="${pillColor}" opacity="0.9"/>
+    <text x="29" y="115" font-family="system-ui,sans-serif" font-size="11"
       font-weight="700" fill="white" text-anchor="middle"
-      dominant-baseline="central">EP ${epNum}</text>
-    <!-- Subtle bottom gradient for readability -->
-    <rect x="0" y="96" width="224" height="32" rx="6"
-      fill="url(#bottomFade)" opacity="0.5"/>
-    <defs>
-      <linearGradient id="bottomFade" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="transparent"/>
-        <stop offset="100%" stop-color="hsla(0,0%,0%,0.8)"/>
-      </linearGradient>
-    </defs>
+      dominant-baseline="central">${label}</text>
   </svg>`, 'utf-8',
   )
 }
@@ -2543,21 +2667,19 @@ const CARD_SVG = (coverUrl, epNum, accent) => {
 app.get('/img', async (req, res) => {
   // ── Card mode: generate a numbered episode thumbnail card ──
   // /img?card=1&url=COVER_URL&ep=85
-  // Returns an SVG with the cover image + episode number pill.
-  // Used for shows without per-episode AniZip screenshots.
+  // Returns a SELF-CONTAINED SVG (cover embedded as data-URL) so browsers
+  // render it reliably inside <img>. Used only as the last-resort fallback
+  // when no real per-episode screenshot exists.
   if (req.query.card === '1') {
     const cover = String(req.query.url || '')
     const ep = String(req.query.ep || '')
     const accent = String(req.query.accent || '')
-    if (!cover) {
-      res.set('content-type', 'image/svg+xml')
-      res.set('cache-control', 'public, max-age=3600')
-      return res.send(PLACEHOLDER_SVG(req.query.label ? String(req.query.label).slice(0, 24) : '?'))
-    }
+    const dataUrl = await getCoverDataUrl(cover)
+    const body = buildCardSvg(dataUrl, ep, accent, req.query.label ? String(req.query.label) : '')
     res.set('content-type', 'image/svg+xml')
     res.set('cache-control', 'public, max-age=86400, immutable')
     res.set('access-control-allow-origin', '*')
-    return res.send(CARD_SVG(cover, ep, accent))
+    return res.send(body)
   }
 
   const urls = []
@@ -2595,7 +2717,8 @@ app.get('/img', async (req, res) => {
       const match = (label || '').match(/EP\s+(\d+)/i)
       const epNum = match ? match[1] : '?'
       const accent = String(req.query.accent || '')
-      return res.send(CARD_SVG(coverUrl, epNum, accent))
+      const dataUrl = await getCoverDataUrl(coverUrl)
+      return res.send(buildCardSvg(dataUrl, epNum, accent, label))
     }
     return res.send(PLACEHOLDER_SVG(label || '?'))
   }
@@ -2662,8 +2785,9 @@ app.get('/img', async (req, res) => {
     const match = (label || '').match(/EP\s+(\d+)/i)
     const epNum = match ? match[1] : '?'
     const accent = String(req.query.accent || '')
+    const dataUrl = await getCoverDataUrl(coverUrl)
     res.set('cache-control', 'public, max-age=3600')
-    return res.send(CARD_SVG(coverUrl, epNum, accent))
+    return res.send(buildCardSvg(dataUrl, epNum, accent, label))
   }
 
   res.set('cache-control', 'public, max-age=600')

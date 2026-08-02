@@ -116,6 +116,11 @@ vi.mock('../api/anizip', () => ({
   default: vi.fn(noop),
   getAniZipMappings: vi.fn().mockResolvedValue({ episodes: {} }),
   getAniZipEpisode: vi.fn().mockResolvedValue(null),
+  getEpisodesByMalId: vi.fn().mockResolvedValue([]),
+  getEpisodesByAniListId: vi.fn().mockResolvedValue([]),
+  getAniListIdFromMal: vi.fn().mockResolvedValue(null),
+  getJikanEpisodeMeta: vi.fn().mockResolvedValue(new Map()),
+  mergeJikanEpisodeMeta: vi.fn((eps) => eps),
 }))
 
 

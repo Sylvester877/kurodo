@@ -8,7 +8,8 @@ import { Star, Calendar, Heart, Film, Users, Globe, Hash, ArrowLeft,
 } from 'lucide-react'
 import { getAnimeById, getAnimeRecommendations, ANIME_LOAD_STUB_TITLE } from '../api/anime'
 import { getEpisodeInfoFromMal } from '../api/anilist'
-import { getEpisodesByMalId, type AniZipEpisode } from '../api/anizip'
+import { getEpisodesByMalId, mergeJikanEpisodeMeta, type AniZipEpisode } from '../api/anizip'
+import { useJikanEpisodeImages } from '../hooks/useJikanEpisodeImages'
 import type { Anime } from '../types'
 import { getSkipTimes, type SkipTimes } from '../api/aniskip'
 import { useWatchListStore } from '../store/useWatchListStore'
@@ -150,9 +151,13 @@ export default function AnimeDetails() {
   }, [anime?.episodes])
 
   const isLoadingEpisodes = episodesQuery.isLoading || epInfoQuery.isLoading
-  const episodes: AniZipEpisode[] = episodesQuery.data?.length
-    ? episodesQuery.data
-    : stubEpisodes
+  // Merge real MAL screenshots (Jikan) into the AniZip list — fills the
+  // thumbnail gap for long shows (Bleach: AniZip only covers eps 1–21).
+  const jikanEpImages = useJikanEpisodeImages(malId, episodesQuery.isSuccess)
+  const episodes: AniZipEpisode[] = useMemo(() => {
+    const base = episodesQuery.data?.length ? episodesQuery.data : stubEpisodes
+    return mergeJikanEpisodeMeta(base, jikanEpImages.data)
+  }, [episodesQuery.data, stubEpisodes, jikanEpImages.data])
 
   // AniSkip probe for EP 1 — non-critical for first paint; delay briefly
   // so the initial details/episode network requests get bandwidth first.

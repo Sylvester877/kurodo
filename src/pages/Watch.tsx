@@ -10,7 +10,8 @@ import {
 import { useTitle } from '../hooks/useTitle'
 import { getAnimeById, getAnimeRecommendations } from '../api/anime'
 import { getEpisodeInfoFromMal } from '../api/anilist'
-import { getEpisodesByMalId, getAniListIdFromMal, type AniZipEpisode } from '../api/anizip'
+import { getEpisodesByMalId, getAniListIdFromMal, mergeJikanEpisodeMeta, type AniZipEpisode } from '../api/anizip'
+import { useJikanEpisodeImages } from '../hooks/useJikanEpisodeImages'
 import {
   fetchAnidapInfo, fetchAnidapServers, fetchAnidapStream,
   type AnidapProvider, type AnidapStream,
@@ -284,7 +285,13 @@ export default function Watch() {
     placeholderData: (prev) => prev,
     meta: { persist: true },
   })
-  const episodes: AniZipEpisode[] = episodesQuery.data ?? []
+  // Merge real MAL screenshots (Jikan) into the AniZip list — fills the
+  // thumbnail gap for long shows (Bleach: AniZip only covers eps 1–21).
+  const jikanEpImages = useJikanEpisodeImages(malId, episodesQuery.isSuccess)
+  const episodes: AniZipEpisode[] = useMemo(
+    () => mergeJikanEpisodeMeta(episodesQuery.data ?? [], jikanEpImages.data),
+    [episodesQuery.data, jikanEpImages.data],
+  )
 
   // ── Memoize episode filtering so we don't re-compute on every render.
   // Critical for 100+ ep anime (One Piece etc.) where re-filtering the

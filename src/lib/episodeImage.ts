@@ -27,29 +27,27 @@ export function buildEpisodeImageUrl(
   ep: AniZipEpisode | null | undefined,
   opts: Options = {},
 ): string {
-  // ── No AniZip image? Proxy-fetch the cover and return REAL image bytes. ──
-  // Card mode (`card=1`) returns an SVG that embeds the cover as an external
-  // <image href>, which many browsers refuse to render inside an SVG loaded
-  // via <img> — leaving episodes with no AniZip screenshot looking blank
-  // (long shows like Bleach only have AniZip images for the first ~20 eps).
-  // Instead, hit the normal /img chain: the server fetches the cover and
-  // returns actual PNG/JPEG bytes (identical rendering reliability to the
-  // episodes that DO have AniZip images). We still pass `coverUrl` so the
-  // server can generate the numbered card SVG as its last-resort fallback
-  // if even the cover fetch fails.
+  // ── No real screenshot? Generate a numbered episode card. ──
+  // /img?card=1 fetches the cover server-side, embeds it as a base64
+  // data-URL in the SVG, and returns a fully self-contained numbered tile
+  // (cover + "EP N" pill + accent colour). Self-contained data-URL SVGs
+  // render reliably inside <img> — unlike external <image href> URLs which
+  // browsers refuse, and unlike plain cover bytes which look like a generic
+  // banner instead of an episode thumbnail.
   const origin = getBackendOrigin()
   if (!ep?.image && opts.showCover && opts.label != null) {
     const params = new URLSearchParams()
+    params.append('card', '1')
     params.append('url', opts.showCover)
-    params.append('coverUrl', opts.showCover)
-    params.append('label', `EP ${opts.label}`)
+    params.append('ep', String(opts.label))
     if (opts.accent) params.append('accent', opts.accent)
     return `${origin}/img?${params.toString()}`
   }
 
   const params = new URLSearchParams()
 
-  // Tier 1: AniZip's primary image (may be a working old-style or broken v4)
+  // Tier 1: AniZip/Jikan's real episode screenshot (may be a working
+  // old-style or broken v4 URL)
   if (ep?.image) {
     params.append('url', ep.image)
     // Tier 2: if it's a v4 URL, also try the .jpg-suffixed variant
