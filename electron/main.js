@@ -974,6 +974,12 @@ const torrentStreamServer = http.createServer((req, res) => {
     })
     try {
       res.end(fs.readFileSync(subFile))
+      // CRITICAL: return here — without it, execution falls through to the
+      // /stream regex below, which calls res.writeHead(404) AFTER res.end()
+      // already sent the 200 + subtitle body. That throws
+      // ERR_HTTP_HEADERS_SENT as an uncaught exception on every successful
+      // Wyzie subtitle request.
+      return
     } catch {
       res.writeHead(500)
       return res.end('Subtitle read failed')
