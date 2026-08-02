@@ -607,7 +607,12 @@ async function puppeteerInit() {
     const totalBudgetMs = options.maxDurationMs ?? 30_000
     const remainingBudget = makeRemainingBudget(Date.now(), totalBudgetMs)
     const isGogo = watchUrl.includes('gogoanime')
-    const pg = await ensureBrowser(false)
+    // Gogoanime rides the rotating residential proxy pool; anidap always
+    // goes direct. The retry loop in _doExtractStream closes the browser
+    // between attempts, so each relaunch here picks a FRESH random proxy
+    // (previously we passed `false` unconditionally, which meant every
+    // retry reused the same direct IP — the rotation was a no-op).
+    const pg = await ensureBrowser(isGogo)
     console.log(`[cf-harvester] DOM extraction: ${watchUrl.slice(0, 100)}`)
     await safeGoto(pg, watchUrl)
 
