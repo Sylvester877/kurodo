@@ -173,13 +173,21 @@ function EpisodeCard({ item }: { item: Awaited<ReturnType<typeof getRecentEpisod
       className="group block relative rounded-2xl overflow-hidden border border-white/[0.06] bg-black/50 hover:border-white/[0.15] hover:bg-black/65 transition-all duration-200"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-black">
-        <img
-          src={cover}
-          alt={title}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-400"
-        />
+        {cover ? (
+          <img
+            src={cover}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-400"
+          />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/15 via-zinc-900 to-zinc-950">
+            <span className="text-white/20 font-black text-3xl select-none">
+              {(title || '?').charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
         <div
           className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"
           aria-hidden

@@ -3,6 +3,20 @@ import { persist } from 'zustand/middleware'
 import type { Anime } from '../types'
 import { toast } from '../components/Toaster'
 
+/**
+ * True when the anime carries a real remote poster URL. The details-page
+ * stub (used when every upstream is down) fills images with a `data:`
+ * placeholder SVG that renders the literal text "No Image" — saving those
+ * stub objects into continue-watching poisoned the Home rail with
+ * permanently-broken "No Image" cards. Never persist them.
+ */
+function hasUsablePoster(anime: Anime): boolean {
+  // Guard against legacy/corrupt persisted entries with a missing anime object.
+  if (!anime) return false
+  const img = anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url
+  return typeof img === 'string' && img.startsWith('http')
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Per-anime playlist status — populated when importing from AniList
 // (CURRENT/PLANNING/COMPLETED/DROPPED/PAUSED/REPEATING) or MAL XML
@@ -113,8 +127,11 @@ export const useWatchListStore = create<WatchListStore>()(
 
       setLastWatched: (anime, episode) =>
         set((state) => {
+          // Never persist stub anime (placeholder/no poster) — they'd show
+          // "No Image" on the dashboard forever.
+          if (!hasUsablePoster(anime)) return state
           const filtered = state.continueWatching.filter(
-            (c) => c.anime.mal_id !== anime.mal_id,
+            (c) => hasUsablePoster(c?.anime) && c?.anime?.mal_id !== anime.mal_id,
           )
           const entry: ContinueEntry = {
             anime,
@@ -284,6 +301,19 @@ export const useWatchListStore = create<WatchListStore>()(
           return { watchlist: next }
         }),
     }),
-    { name: 'kurodo-watchlist' }
+    {
+      name: 'kurodo-watchlist',
+      // Boot-time cleanup: silently drop any continue-watching entries saved
+      // by older builds that stored stub anime (placeholder "No Image"
+      // posters) during upstream outages.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        const existing = state.continueWatching ?? []
+        const clean = existing.filter((c) => hasUsablePoster(c?.anime))
+        if (clean.length !== existing.length) {
+          useWatchListStore.setState({ continueWatching: clean })
+        }
+      },
+    }
   )
 )

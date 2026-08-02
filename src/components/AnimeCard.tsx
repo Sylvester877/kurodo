@@ -26,6 +26,10 @@ interface Props {
 export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magnetic = true, quickActions = true }: Props) {
   const titleLang = useSettings((s) => s.titleLang)
   const displayTitle = pickTitle(anime, titleLang)
+  // '' when the anime has no real poster (placeholder data-URL stubs or
+  // missing images) — the card then shows a styled gradient + initial
+  // instead of a broken "No Image" placeholder.
+  const posterSrc = getImageUrl(anime)
   const [isHovered, setIsHovered] = useState(false)
   const cardRef = useRef<HTMLAnchorElement>(null)
   const [spotlight, setSpotlight] = useState({ x: 50, y: 50 })
@@ -98,12 +102,13 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
             aria-hidden
             className="absolute inset-0 bg-gradient-to-br from-primary/20 via-zinc-800 to-zinc-950"
           />
+          {posterSrc ? (
           <ImageWithBlur
-            src={getImageUrl(anime)}
+            src={posterSrc}
             alt={anime.title}
             lazy
             className="relative h-full w-full object-cover bg-zinc-900 transition-transform duration-300 group-hover:scale-103"
-            srcSet={buildPosterSrcSet(getImageUrl(anime))}
+            srcSet={buildPosterSrcSet(posterSrc)}
             sizes="(min-width: 1280px) 220px, (min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
             placeholderBlur={12}
             fadeDuration={300}
@@ -123,6 +128,13 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
               img.style.opacity = '0'
             }}
           />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center">
+              <span className="text-white/20 font-black text-3xl select-none">
+                {(anime.title_english || anime.title || '?').trim().charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
 
           {/* ── Top-right: ⭐ score ── */}
           {anime.score && !badge && (
@@ -209,4 +221,4 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
   prev.magnetic === next.magnetic &&
   prev.quickActions === next.quickActions &&
   prev.hoverPreview === next.hoverPreview &&
-  prev.anime.images.webp.large_image_url === next.anime.images.webp.large_image_url)
+  prev.anime.images?.webp?.large_image_url === next.anime.images?.webp?.large_image_url)

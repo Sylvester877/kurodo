@@ -27,13 +27,24 @@ export function buildEpisodeImageUrl(
   ep: AniZipEpisode | null | undefined,
   opts: Options = {},
 ): string {
-  // ── No AniZip image? Generate a numbered card from the cover. ──
-  // Each episode gets a distinct thumbnail instead of the same cover art.
-  // Pass accent colour so the EP pill matches the show's palette.
+  // ── No AniZip image? Proxy-fetch the cover and return REAL image bytes. ──
+  // Card mode (`card=1`) returns an SVG that embeds the cover as an external
+  // <image href>, which many browsers refuse to render inside an SVG loaded
+  // via <img> — leaving episodes with no AniZip screenshot looking blank
+  // (long shows like Bleach only have AniZip images for the first ~20 eps).
+  // Instead, hit the normal /img chain: the server fetches the cover and
+  // returns actual PNG/JPEG bytes (identical rendering reliability to the
+  // episodes that DO have AniZip images). We still pass `coverUrl` so the
+  // server can generate the numbered card SVG as its last-resort fallback
+  // if even the cover fetch fails.
   const origin = getBackendOrigin()
   if (!ep?.image && opts.showCover && opts.label != null) {
-    const accent = opts.accent ? `&accent=${encodeURIComponent(opts.accent)}` : ''
-    return `${origin}/img?card=1&url=${encodeURIComponent(opts.showCover)}&ep=${encodeURIComponent(String(opts.label))}${accent}`
+    const params = new URLSearchParams()
+    params.append('url', opts.showCover)
+    params.append('coverUrl', opts.showCover)
+    params.append('label', `EP ${opts.label}`)
+    if (opts.accent) params.append('accent', opts.accent)
+    return `${origin}/img?${params.toString()}`
   }
 
   const params = new URLSearchParams()

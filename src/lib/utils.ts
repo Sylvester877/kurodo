@@ -125,10 +125,24 @@ export function safeBase64(input: string): string {
  *     `maximum_image_url` (1280px YouTube thumbnail) when available.
  *   • Fall back to MAL's `large_image_url` (400×600 webp ≈ 30 KB).
  */
+/**
+ * True when a URL is a usable remote image (not empty, not a data: URL).
+ * `data:` URLs are only ever the app's "No Image" placeholder SVG — routing
+ * them through card/proxy fallbacks just reproduces the placeholder. Treat
+ * them as "no image" so callers fall back to gradients instead.
+ */
+export function isRealImageUrl(url: string | undefined | null): url is string {
+  return !!url && url.startsWith('http')
+}
+
 export function getImageUrl(anime: {
   images: { webp: { large_image_url: string }; jpg: { large_image_url: string } }
 }): string {
-  return anime.images.webp.large_image_url || anime.images.jpg.large_image_url
+  const webp = anime.images.webp.large_image_url
+  const jpg = anime.images.jpg.large_image_url
+  if (isRealImageUrl(webp)) return webp
+  if (isRealImageUrl(jpg)) return jpg
+  return ''
 }
 
 export function getSmallImageUrl(anime: {
@@ -152,11 +166,11 @@ export function getHeroImageUrl(anime: {
   } | null
   images: { webp: { large_image_url: string }; jpg: { large_image_url: string } }
 }): string {
-  return (
-    anime.trailer?.images?.maximum_image_url ||
-    anime.trailer?.images?.large_image_url ||
-    getImageUrl(anime)
-  )
+  const trailerMax = anime.trailer?.images?.maximum_image_url
+  const trailerLarge = anime.trailer?.images?.large_image_url
+  if (isRealImageUrl(trailerMax)) return trailerMax
+  if (isRealImageUrl(trailerLarge)) return trailerLarge
+  return getImageUrl(anime)
 }
 
 /**
