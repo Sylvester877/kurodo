@@ -59,6 +59,13 @@ function loadFromStorage<T>(key: string): T | null {
       localStorage.removeItem(STORAGE_PREFIX + key)
       return null
     }
+    // Never serve cached placeholder stubs — they get saved during Jikan
+    // outages and would keep showing grey boxes even after the API recovers.
+    const s = JSON.stringify(parsed.data)
+    if (s.includes(PLACEHOLDER_IMAGE) || s.includes('Unable to load details')) {
+      localStorage.removeItem(STORAGE_PREFIX + key)
+      return null
+    }
     return parsed.data
   } catch {
     return null
@@ -103,17 +110,20 @@ async function cachedGet<T>(url: string, params?: Record<string, unknown>): Prom
 
   // 3. Existing in-flight request → share it
   const existing = inFlight.get(key)
-  if (existing) return existing as Promise<T>
-
-  // 4. Fresh request
-  const p = enqueue(async () => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const { data } = await api.get<T>(url, { params })
-        memCache.set(key, { at: Date.now(), data })
-        saveToStorage(key, data)
-        return data
-      } catch (err: unknown) {
+  if (existing) return existing as Promise<T>    // 4. Fresh request
+    const p = enqueue(async () => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const { data } = await api.get<T>(url, { params })
+          // Never cache placeholder stubs — they'd poison the cache
+          // and show grey boxes even after the upstream API recovers.
+          const s = JSON.stringify(data)
+          if (!s.includes(PLACEHOLDER_IMAGE) && !s.includes('Unable to load details')) {
+            memCache.set(key, { at: Date.now(), data })
+            saveToStorage(key, data)
+          }
+          return data
+        } catch (err: unknown) {
         const status = (err as { response?: { status?: number }; code?: string }).response?.status
         const code = (err as { code?: string }).code
         // 429 — rate limited. Wait and retry.
