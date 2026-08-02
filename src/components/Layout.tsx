@@ -16,7 +16,6 @@ import UpdateNotification from './UpdateNotification'
 import CompletionDialog from './CompletionDialog'
 import SetupWizard from './SetupWizard'
 import AuroraBackground from './AuroraBackground'
-import Sidebar from './Sidebar'
 import { useAuthStore } from '../store/useAuthStore'
 import { useSettings } from '../store/useSettings'
 import { useReaderStore } from '../store/useReaderStore'
@@ -142,9 +141,7 @@ export default function Layout() {
       </a>
       <TopLoadingBar />
       <Navbar />
-      <Sidebar />
-      {/* Add left padding on desktop so page content sits beside the sidebar rail. */}
-      <main id="main-content" className="flex-1 relative z-[1] lg:pl-[var(--sidebar-rail-width)]">
+      <main id="main-content" className="flex-1 relative z-[1]">
         {/* ═══ No route-level page transitions ═══
              Route-level keyed wrappers / AnimatePresence opacity fades were
              causing black screens during navigation: forcing a full remount
@@ -155,9 +152,7 @@ export default function Layout() {
              risking the whole route. */}
         <Outlet />
       </main>
-      {/* Footer is a sibling (not inside <main>) so it remains a top-level
-          landmark. We still pad it on desktop so it clears the rail. */}
-      <div className="relative z-[1] lg:pl-[var(--sidebar-rail-width)]">
+      <div className="relative z-[1]">
         <Footer />
       </div>
       {/* ── PWA/browser-only features — hidden in Electron (desktop app) ── */}

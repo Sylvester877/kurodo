@@ -662,7 +662,7 @@ export default function AnimeDetails() {
             animate={reduceMotion ? {} : { y: 0, opacity: 1 }}
             exit={reduceMotion ? {} : { y: -64, opacity: 0 }}
             transition={reduceMotion ? { duration: 0 } : { duration: 0.1, ease: [0.23, 1, 0.32, 1] }}
-            className="fixed top-16 left-0 right-0 z-30 bg-black/92 border-b border-white/[0.06] shadow-md shadow-black/50 lg:pl-[var(--sidebar-rail-width)]"
+            className="fixed top-16 left-0 right-0 z-30 bg-black/92 border-b border-white/[0.06] shadow-md shadow-black/50"
           >
             <div className="max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-3">
               {/* Mini poster */}

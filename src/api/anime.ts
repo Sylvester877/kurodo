@@ -276,12 +276,6 @@ export async function searchAnime(
     page,
     limit,
   }
-  // Only force a sort order when the user explicitly chose one, or when
-  // there's no search query (browse/filter mode). When there IS a query,
-  // let Jikan use its native relevance sorting — forcing score sort makes
-  // "My Dress-Up Darling" return "My Hero Academia" because "My" matches
-  // every high-scored show with that word. Relevance sorting puts the
-  // actual match first.
   if (filters.orderBy != null || filters.sort != null || !query.trim()) {
     params.order_by = filters.orderBy ?? 'score'
     params.sort = filters.sort ?? 'desc'
@@ -293,17 +287,46 @@ export async function searchAnime(
   if (filters.yearFrom != null) params.start_date = `${filters.yearFrom}-01-01`
   if (filters.yearTo != null) params.end_date = `${filters.yearTo}-12-31`
   if (filters.sfw) params.sfw = true
-  try {
-    const res = await cachedGet<AnimeSearchResponse>('/anime', params)
-    // Jikan may return an empty result set while being up; don't blank the UI.
-    if (res.data && res.data.length > 0) return res
-    throw new Error('Jikan returned empty results')
-  } catch (err) {
-    // Fallback to AniList search when Jikan is down (504) or empty.
-    // This keeps the search page usable during Jikan outages.
-    console.warn('[searchAnime] Jikan failed/empty, falling back to AniList', err)
-    return searchAnimeAniList(query, page, limit)
+
+  // Race Jikan vs AniList — return whichever responds first so the user
+  // never waits 20s for a slow/504 upstream. Jikan provides richer data
+  // (scores, ranks, pagination) but AniList is consistently faster.
+  const hasActiveFilters = !!(filters.format || filters.status || (filters.genres?.length) || filters.minScore || filters.yearFrom || filters.yearTo)
+
+  if (hasActiveFilters) {
+    // Filters only work with Jikan — AniList fallback is title-only.
+    try {
+      const res = await cachedGet<AnimeSearchResponse>('/anime', params)
+      if (res.data && res.data.length > 0) return res
+      throw new Error('Jikan returned empty results')
+    } catch (err) {
+      console.warn('[searchAnime] Jikan filtered search failed, falling back to AniList', err)
+      return searchAnimeAniList(query, page, limit)
+    }
   }
+
+  // No filters: race Jikan and AniList — first one with data wins.
+  return new Promise((resolve) => {
+    let settled = false
+    const jikanPromise = cachedGet<AnimeSearchResponse>('/anime', params)
+      .then((r) => { if (!settled && r.data?.length > 0) { settled = true; resolve(r) } })
+      .catch(() => {})
+    const anilistPromise = searchAnimeAniList(query, page, limit)
+      .then((r) => { if (!settled) { settled = true; resolve(r) } })
+      .catch(() => {})
+    // 8s hard cap — neither source should take longer than this.
+    setTimeout(() => {
+      if (!settled) {
+        settled = true
+        console.warn('[searchAnime] Both sources timed out — returning empty')
+        resolve({ data: [], pagination: { last_visible_page: 0, has_next_page: false, current_page: 1, items: { count: 0, total: 0, per_page: limit } } })
+      }
+    }, 8000)
+    // If both promises reject, settle empty.
+    Promise.allSettled([jikanPromise, anilistPromise]).then(() => {
+      if (!settled) { settled = true; resolve({ data: [], pagination: { last_visible_page: 0, has_next_page: false, current_page: 1, items: { count: 0, total: 0, per_page: limit } } }) }
+    })
+  })
 }
 
 export async function getAnimeGenres(): Promise<{ data: Genre[] }> {

@@ -67,10 +67,6 @@
 
 @layer base {
   :root {
-    /* ── Sidebar rail width ─────────────────────────────────────────
-       Shared across Layout, Hero, and Sidebar so the width can be
-       changed in one place. Used for left padding on desktop. */
-    --sidebar-rail-width: 4.5rem;
   }
 
   html {

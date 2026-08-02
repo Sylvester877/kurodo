@@ -297,7 +297,7 @@ export default function Hero(_props: Props = {}) {
       </motion.div>
 
       {/* ── Foreground content ─────────────────────────────────────── */}
-      <div className="relative z-10 h-full flex flex-col pt-8 lg:pl-[var(--sidebar-rail-width)]">
+      <div className="relative z-10 h-full flex flex-col pt-8">
         <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-8 lg:px-14 flex flex-col justify-end pb-28 sm:pb-32">
           {/* ── Tab switcher ────────────────────────────────────── */}
           <div className="flex items-center gap-1 mb-4">
@@ -588,7 +588,7 @@ export default function Hero(_props: Props = {}) {
           {/* Bottom-left: progress dashes */}
           <div
             className={cn(
-              'absolute left-4 sm:left-8 lg:left-14 z-20 flex items-center gap-1.5 lg:pl-[var(--sidebar-rail-width)]',
+              'absolute left-4 sm:left-8 lg:left-14 z-20 flex items-center gap-1.5',
               upcomingEpisodes.length > 0 ? 'bottom-[72px] sm:bottom-[80px]' : 'bottom-6 sm:bottom-8',
             )}
           >
@@ -609,7 +609,7 @@ export default function Hero(_props: Props = {}) {
           {/* Bottom-right: counter + prev/next arrows */}
           <div
             className={cn(
-              'absolute right-4 sm:right-8 lg:right-14 z-20 flex items-center gap-3 lg:pr-[var(--sidebar-rail-width)]',
+              'absolute right-4 sm:right-8 lg:right-14 z-20 flex items-center gap-3',
               upcomingEpisodes.length > 0 ? 'bottom-[68px] sm:bottom-[76px]' : 'bottom-5 sm:bottom-7',
             )}
           >
@@ -642,7 +642,7 @@ export default function Hero(_props: Props = {}) {
 
       {/* ── Compact schedule ribbon (anidap signature) ─────────────── */}
       {upcomingEpisodes.length > 0 && (
-        <div className="absolute bottom-0 left-0 w-full h-14 bg-black/85 border-t border-white/[0.06] flex items-center px-4 sm:px-8 z-30 overflow-x-auto custom-scrollbar lg:pl-[var(--sidebar-rail-width)]">
+        <div className="absolute bottom-0 left-0 w-full h-14 bg-black/85 border-t border-white/[0.06] flex items-center px-4 sm:px-8 z-30 overflow-x-auto custom-scrollbar">
           <div className="flex items-center gap-5 w-max min-w-full">
             <div className="shrink-0 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40">
               <Clock className="h-3.5 w-3.5" />

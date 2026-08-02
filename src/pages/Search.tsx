@@ -352,17 +352,15 @@ function SearchPageContent() {
         </div>
         </ScrollReveal>
 
-        {/* ───── Sidebar + Content grid ───── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-6 items-start">
-          {/* ── Desktop filter sidebar (anime only) ── */}
-          {activeTab === 'anime' && (
-            <aside className="hidden lg:block lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto custom-scrollbar space-y-4">
-              <FilterSidebar filters={filters} onChange={setFilters} />
-            </aside>
-          )}
+        {/* ── Search filters (always visible at top, no sidebar) ── */}
+        {activeTab === 'anime' && (trimmed || filtersActive) && (
+          <div className="hidden lg:block mb-5 glass-card rounded-2xl p-4 space-y-4">
+            <FilterSidebar filters={filters} onChange={setFilters} />
+          </div>
+        )}
 
-          {/* ── Main content ── */}
-          <div className="min-w-0">
+        {/* ── Main content ── */}
+        <div className="min-w-0">
 
             {/* ───── Tabs ───── */}
             {(trimmed || filtersActive) && (
@@ -931,7 +929,6 @@ function SearchPageContent() {
             </>
             )}
           </div>
-        </div>
       </div>
     </div>
     </ErrorBoundary>

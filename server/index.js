@@ -447,12 +447,12 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
   try {
     // 30s hard cap on stream extraction — the chad API is capped at 5s and
     // the DOM fallback needs up to 16s, so 20s was killing the request before
-    // extraction could finish. 30s gives the DOM fallback room to run while
-    // still failing fast enough that the UI doesn't spin indefinitely.
+    // extraction could finish. 15s gives the chad API + DOM fallback room
+    // to run while ensuring the UI never spins for more than ~15 seconds.
     const data = await Promise.race([
       routedGetStream(anilistId, slug, Number(ep), provider, type, req.query, title),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Stream extraction timed out')), 30_000),
+        setTimeout(() => reject(new Error('Stream extraction timed out')), 15_000),
       ),
     ])
     if (!data) {
