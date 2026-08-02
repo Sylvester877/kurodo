@@ -981,7 +981,10 @@ const torrentStreamServer = http.createServer((req, res) => {
       // Wyzie subtitle request.
       return
     } catch {
-      res.writeHead(500)
+      // writeHead(200) already sent the headers — never call writeHead again
+      // here (throws ERR_HTTP_HEADERS_SENT if readFileSync raced a temp-folder
+      // cleanup between existsSync and the read). Just end the response.
+      if (!res.headersSent) res.writeHead(500)
       return res.end('Subtitle read failed')
     }
   }
@@ -1004,7 +1007,9 @@ const torrentStreamServer = http.createServer((req, res) => {
       })
       return res.end(vttContent)
     } catch {
-      res.writeHead(500)
+      // writeHead(200) above may have already flushed headers — don't call
+      // writeHead again (would throw ERR_HTTP_HEADERS_SENT).
+      if (!res.headersSent) res.writeHead(500)
       return res.end('Subtitle read failed')
     }
   }
