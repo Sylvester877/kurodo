@@ -852,7 +852,11 @@ app.get('/api/discover/recent', async (req, res) => {
 // Resolution chain: AniZip mapping → themoviedb_id → TMDB /tv/{id}/season/N.
 // Seasons 1-4 are merged by running episode count (handles multi-season
 // TMDB entries where episode numbers restart per season). Cached 24h.
-const TMDB_API_KEY = (process.env.TMDB_API_KEY || '').trim()
+// TMDB key lookup order: explicit server var → VITE_ var (Vite embeds it
+// in the client bundle and dotenv loads it here too in dev) → empty. In
+// packaged builds electron/main.js pre-loads .env.local from resources/
+// into process.env before importing this module, so TMDB_API_KEY is set.
+const TMDB_API_KEY = (process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '').trim()
 const tmdbThumbCache = new Map() // malId → { at, eps }
 const TMDB_THUMB_TTL = 24 * 60 * 60 * 1000
 const TMDB_EMPTY_TTL = 60 * 60 * 1000 // short TTL for no-mapping results

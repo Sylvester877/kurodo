@@ -1,7 +1,7 @@
 {
   "name": "kurodo",
   "private": true,
-  "version": "0.3.12",
+  "version": "0.3.13",
   "type": "module",
   "main": "electron/main.js",
   "dependencies": {
@@ -55,6 +55,9 @@
     "asar": true,
     "asarUnpack": [
       "server/**/*"
+    ],
+    "extraResources": [
+      { "from": ".env.local", "to": ".env.local" }
     ],
     "win": {
       "target": "nsis",

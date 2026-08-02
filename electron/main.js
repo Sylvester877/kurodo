@@ -1508,6 +1508,41 @@ app.whenReady().then(async () => {
   // window.__KURODO_BACKEND_ORIGIN__.
   process.env.KURODO_BACKEND_ORIGIN = `http://localhost:${process.env.PORT}`
 
+  // ── Server-side env (.env.local) for the in-process backend ─────
+  // The Express server is imported in-process below. Its own dotenv
+  // loader resolves .env.local relative to server/index.js — a path that
+  // doesn't exist inside the packaged asar. .env.local is shipped via
+  // electron-builder extraResources to <resources>/.env.local in
+  // packaged builds; in dev it sits next to electron/. Load it here so
+  // keys like TMDB_API_KEY land in process.env BEFORE the server module
+  // is imported (same-process env sharing). Never overrides variables
+  // the launcher/shell already set explicitly.
+  try {
+    const envCandidates = app.isPackaged
+      ? [path.join(process.resourcesPath, '.env.local')]
+      : [path.join(__dirname, '..', '.env.local')]
+    for (const envPath of envCandidates) {
+      if (!fs.existsSync(envPath)) continue
+      const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/)
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith('#')) continue
+        const eq = trimmed.indexOf('=')
+        if (eq === -1) continue
+        const key = trimmed.slice(0, eq).trim()
+        // Only forward server-side keys (TMDB + proxy config). Never
+        // touch PORT/KURODO_BACKEND_ORIGIN which we set above.
+        if (!/^(TMDB_|RESIDENTIAL_PROXY_URL|GOGO_PROXIES|ANIWATCH_DOMAIN)/.test(key)) continue
+        if (process.env[key] !== undefined) continue
+        process.env[key] = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+      }
+      console.log('[electron] Loaded server env from:', envPath)
+      break
+    }
+  } catch (err) {
+    console.warn('[electron] Could not load .env.local:', err.message)
+  }
+
   // ── Create splash window ───────────────────────────────────────
   // Shows immediately — the Netflix-style animation starts right away.
   const splashWin = createSplashWindow()
