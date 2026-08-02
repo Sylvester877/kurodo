@@ -98,8 +98,14 @@ for (const [label, rel, needle] of checks) {
 const pkgContent = get('package.json')
 if (pkgContent) {
   const v = JSON.parse(pkgContent).version
-  console.log(`${v === '0.3.9' ? '✅' : '❌'} packaged version = ${v} (expect 0.3.9)`)
-  if (v !== '0.3.9') ok = false
+  // Read the expected version from package.json so future releases don't
+  // false-fail this check with a stale hardcoded number.
+  let expectedVersion = 'unknown'
+  try {
+    expectedVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version
+  } catch {}
+  console.log(`${v === expectedVersion ? '✅' : '❌'} packaged version = ${v} (expect ${expectedVersion})`)
+  if (v !== expectedVersion) ok = false
 } else {
   console.log('❌ package.json not found in asar')
   ok = false
