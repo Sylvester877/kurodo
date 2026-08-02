@@ -290,7 +290,11 @@ export function mergeJikanEpisodeMeta(
   if (!meta || meta.size === 0 || episodes.length === 0) return episodes
   let changed = false
   const merged = episodes.map((ep) => {
-    const j = meta.get(ep.episode)
+    // AniZip returns `episode` as a STRING ("351") while getJikanEpisodeMeta
+    // keys the map with NUMBERS (351). Map.get is strict, so a raw lookup
+    // missed every episode — silently dropping TMDB images AND filler/recap
+    // flags. Normalize to a number before lookup.
+    const j = meta.get(Number(ep.episode))
     if (!j) return ep
     // Apply Jikan's filler/recap flags REGARDLESS of whether the episode
     // already has an image — Jikan's episodes endpoint never returns

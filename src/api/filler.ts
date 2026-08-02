@@ -76,5 +76,9 @@ export async function getFillerInfo(malId: number, title: string): Promise<Fille
 
 export function isFiller(episode: number, fillerInfo: FillerInfo | null): boolean {
   if (!fillerInfo) return false
-  return fillerInfo.filler.includes(episode)
+  // AniZip episode lists return `episode` as a STRING ("351") while the
+  // filler arrays hold numbers — `.includes` is strict, so raw lookups
+  // silently missed every episode. Coerce before checking.
+  const n = Number(episode)
+  return Number.isFinite(n) && fillerInfo.filler.includes(n)
 }

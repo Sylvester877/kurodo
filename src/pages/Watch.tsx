@@ -1772,7 +1772,7 @@ export default function Watch() {
                           const isCurrent = ep.episode === currentEp
                           const epTitle = ep.title?.en || ep.title?.['x-jat'] || null
                           const filler = isFiller(ep.episode, fillerInfo)
-                          const isMixed = fillerInfo?.mixed?.includes(ep.episode) ?? false
+                          const isMixed = fillerInfo?.mixed?.includes(Number(ep.episode)) ?? false
                           const progress = malId ? getEpisodeProgress(malId, ep.episode) : null
                           const progressPct = progress && progress.duration > 0 ? Math.min((progress.time / progress.duration) * 100, 100) : 0
                           const isMostlyDone = progressPct >= 90
@@ -1809,7 +1809,7 @@ export default function Watch() {
                         const isCurrent = ep.episode === currentEp
                         const epTitle = ep.title?.en || ep.title?.['x-jat'] || null
                         const filler = isFiller(ep.episode, fillerInfo)
-                        const isMixed = fillerInfo?.mixed?.includes(ep.episode) ?? false
+                        const isMixed = fillerInfo?.mixed?.includes(Number(ep.episode)) ?? false
                         const progress = malId ? getEpisodeProgress(malId, ep.episode) : null
                         const progressPct = progress && progress.duration > 0 ? Math.min((progress.time / progress.duration) * 100, 100) : 0
                         const isMostlyDone = progressPct >= 90
