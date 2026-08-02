@@ -1336,8 +1336,8 @@ const JIKAN_CACHE_TTL = 10 * 60 * 1000
 // background. This keeps the UI working when Jikan is flaky.
 const JIKAN_STALE_TTL = 30 * 60 * 1000
 const JIKAN_FAIL_TTL = 30 * 1000
-const JIKAN_MIN_INTERVAL = 350 // ~3 req/sec average
-const JIKAN_MAX_CONCURRENT = 2
+const JIKAN_MIN_INTERVAL = 250 // ~4 req/sec (Jikan allows 3, so we stay under)
+const JIKAN_MAX_CONCURRENT = 3
 const jikanCache = new Map()
 const jikanFailCache = new Map()
 const jikanInFlight = new Map()
@@ -1386,9 +1386,9 @@ async function fetchJikanWithRetry(targetUrl, query, maxRetries = 3) {
     try {
       const { data, status, headers } = await axios.get(targetUrl, {
         params: query,
-        // Jikan can be slow during peak hours; 30s gives enough headroom
-        // while still failing fast enough for the UI to show a fallback.
-        timeout: 10_000,
+        // Jikan can be slow during peak hours; 8s per request leaves room
+        // for retries before the route-level timeout fires.
+        timeout: 8_000,
         validateStatus: () => true,
         headers: {
           'User-Agent': 'Kurodo/1.0 (https://kurodo.app; contact@kurodo.app)',
@@ -1510,7 +1510,9 @@ app.get('/api/jikan/*', async (req, res) => {
     // 4. Hard route-level timeout so the client never sees a 504 from a
     //    gateway/proxy in front of us. If Jikan is completely stalled,
     //    fail fast with 502 instead of letting the connection hang.
-    const JIKAN_ROUTE_TIMEOUT_MS = 12_000
+    //    Raised from 12s to 18s — Jikan is often slow during peak hours
+    //    and the queue delay + retries need more headroom.
+    const JIKAN_ROUTE_TIMEOUT_MS = 18_000
     const { data, status } = await Promise.race([
       inFlight,
       new Promise((_, reject) =>

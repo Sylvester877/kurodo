@@ -65,7 +65,14 @@ export default defineConfig({
       },
       workbox: {
         // Don't precache the giant Watch chunk (HLS.js); load it on demand.
-        globPatterns: ['**/*.{js,css,html,svg}'],
+        // Exclude index.html — when Vite rebuilds, chunk filenames change and
+        // a cached index.html references stale chunks, causing lazyWithRetry
+        // to trigger a hard page reload on every first navigation.
+        globPatterns: ['**/*.{js,css,svg}'],
+        globIgnores: ['**/index.html'],
+        // Always serve fresh index.html for navigation requests so the app
+        // never loads stale chunk references after a rebuild.
+        navigateFallback: 'index.html',
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallbackDenylist: [/^\/api\//, /^\/proxy/],
         // Navigation preload — the SW intercepts the nav request AND
@@ -75,6 +82,18 @@ export default defineConfig({
         // cached pages feel instant even on first SW activation.
         navigationPreload: true,
         runtimeCaching: [
+          // Navigation: always fetch index.html from network so the app
+          // never loads stale chunk references after a Vite rebuild.
+          // Fall back to cache only when offline.
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 5, maxAgeSeconds: 60 },
+            },
+          },
           // Anime metadata — stale-while-revalidate so the browse pages
           // feel snappy on revisits while still updating in the background.
           {
