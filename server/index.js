@@ -23,6 +23,14 @@ import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
 
+// Read the app version from package.json at startup (not hardcoded) so the
+// health endpoint and diagnostics always report the true installed version.
+let APP_VERSION = '0.0.0'
+try {
+  const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8'))
+  APP_VERSION = pkg.version || APP_VERSION
+} catch { /* fall back to 0.0.0 if package.json is unreachable */ }
+
 // Must be defined BEFORE the dotenv block — ESM const declarations are NOT
 // hoisted, so using __dirname in a top-level await before this line would
 // throw ReferenceError (TDZ), silently caught, and .env.local never loads.
@@ -2033,7 +2041,7 @@ app.get('/api/health', async (_req, res) => {
     browserReady,
     isRateLimited,
     rateLimitRemaining,
-    version: '0.3.3',
+    version: APP_VERSION,
   })
 })
 

@@ -225,6 +225,25 @@ export default React.memo(function VideoPlayer({
     setError(null)
     setLoading(true)
     setActiveSrc(src)
+    // ── CRITICAL: kill any in-flight auto-skip countdown from the PREVIOUS
+    // episode/server. If the user switches episodes mid-countdown, the stale
+    // interval keeps ticking (showing a ghost countdown badge) and the stale
+    // timeout can fire a seek on the NEW video (skipping the wrong spot or
+    // jumping episodes ahead). The unmount-only cleanup below doesn't catch
+    // this because the component stays mounted across src changes.
+    if (skipCountdownRef.current) {
+      window.clearInterval(skipCountdownRef.current)
+      skipCountdownRef.current = null
+    }
+    if (skipTimeoutRef.current) {
+      window.clearTimeout(skipTimeoutRef.current)
+      skipTimeoutRef.current = null
+    }
+    setSkipCountdown(null)
+    setActiveSkip(null)
+    autoSkippedOpRef.current = false
+    autoSkippedEdRef.current = false
+    autoSkippedRecapRef.current = false
   }, [src])
 
   const [levels, setLevels] = useState<Level[]>([])
