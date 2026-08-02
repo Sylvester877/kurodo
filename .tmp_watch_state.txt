@@ -1,0 +1,11 @@
+775:   // ───── Sleep Timer ─────
+776:   const [sleepMinutes, setSleepMinutes] = useState<number | null>(null)
+777:   const [sleepActive, setSleepActive] = useState(false)
+778:   const [sleepDialogOpen, setSleepDialogOpen] = useState(false)
+779:   const [sleepDialogValue, setSleepDialogValue] = useState('30')
+780:   useEffect(() => {
+781:     if (!sleepActive || !sleepMinutes) return
+782:     const id = window.setTimeout(() => {
+783:       // Pause video and show toast
+784:       const video = document.querySelector('video')
+785:       video?.pause()

@@ -1,0 +1,1211 @@
+@import "tailwindcss";
+
+/* Fonts (Instrument Sans + Bricolage Grotesque + Noto Serif JP) are loaded
+   via <link> in index.html so we don't hit CSS @import ordering issues. */
+
+/* ── CSS @property registrations for smooth theme transitions ──────
+   Registering the H/S/L slices as animatable properties lets the
+   browser interpolate theme colour changes (e.g. pink→purple→red)
+   via CSS transitions instead of snapping instantly. Chromium-only
+   (Chrome 85+), which is perfect for Electron's bundled browser. */
+@property --theme-h {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 330;
+}
+@property --theme-s {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 81%;
+}
+@property --theme-l {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 60%;
+}
+
+@theme {
+  /* Surface palette — pitch black canvas, anidap-style */
+  --color-background:         hsl(0 0% 3%);
+  --color-foreground:         hsl(0 0% 98%);
+  --color-card:               hsl(0 0% 6%);
+  --color-card-foreground:    hsl(0 0% 98%);
+  --color-popover:            hsl(0 0% 5%);
+  --color-popover-foreground: hsl(0 0% 98%);
+  --color-muted:              hsl(0 0% 10%);
+  --color-muted-foreground:   hsl(240 4% 66%);
+  --color-secondary:          hsl(0 0% 10%);
+  --color-secondary-foreground: hsl(0 0% 98%);
+  --color-border:             hsl(0 0% 100% / 0.06);
+  --color-input:              hsl(0 0% 100% / 0.06);
+
+  /* Kurōdo signature — anikage pink→purple gradient identity.
+     Default primary is pink; --theme-* (set per-preset below) recolors it. */
+  --color-primary:            var(--theme-primary, hsl(330 81% 60%));
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-accent:             hsl(280 85% 62%);   /* anikage purple */
+  --color-accent-foreground:  hsl(0 0% 100%);
+  --color-ring:               var(--theme-primary, hsl(330 81% 60%));
+
+  /* Brand gradient endpoints — pink → purple (the anikage signature) */
+  --brand-pink:   #ff4d9d;
+  --brand-purple: #a855f7;
+
+  /* Shadow-friendly slices of the primary for arbitrary-value Tailwind classes */
+  --theme-primary-h: var(--theme-h, 330);
+  --theme-primary-s: var(--theme-s, 81%);
+  --theme-primary-l: var(--theme-l, 60%);
+
+  --radius-lg: 1rem;
+  --radius-md: 0.75rem;
+  --radius-sm: 0.5rem;
+
+  --font-sans: 'Poppins', 'Instrument Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Poppins', 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-serif-jp: 'Noto Serif JP', serif;
+}
+
+@layer base {
+  :root {
+    /* ── Sidebar rail width ─────────────────────────────────────────
+       Shared across Layout, Hero, and Sidebar so the width can be
+       changed in one place. Used for left padding on desktop. */
+    --sidebar-rail-width: 4.5rem;
+  }
+
+  html {
+    /* NOTE: scroll-behavior: smooth is intentionally NOT set here.
+       Lenis (installed in Layout.tsx) handles smooth scrolling via JS.
+       Setting CSS scroll-behavior: smooth on top of Lenis causes
+       double-smoothing — the browser tries to animate scroll while
+       Lenis is also animating it, producing a janky, fighting motion.
+       Lenis disables native smooth-scroll automatically, but having
+       it here as a fallback for reduced-motion users is still wrong
+       because the reduce-motion class already disables Lenis's
+       smoothWheel option. */
+    /* Always show scrollbar gutter to prevent layout shift */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    /* Anikage-style canvas — layered dark with subtle depth.
+       Linear gradient prevents the "flat black" look during page
+       transitions; radial gradient adds a subtle brand-colour glow
+       at the top that follows the active theme preset. Noise texture
+       moved to a GPU-promoted fixed pseudo-element so it composites
+       once instead of repainting every frame. */
+    background-color: #0A0A0A;
+    transition: background-color 0.3s ease;
+    background-image:
+      linear-gradient(180deg, hsl(0 0% 4%) 0%, hsl(0 0% 3%) 50%, hsl(0 0% 5%) 100%),
+      radial-gradient(ellipse 100% 80% at 50% -20%, hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.03), transparent 60%);
+    color: var(--color-foreground);
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: var(--font-sans);
+    letter-spacing: -0.01em;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* GPU-promoted noise overlay — fixed layer, composites once.
+     Using a pseudo-element on body so it never causes layout.
+     translate3d alone is sufficient for GPU promotion on this element;
+     will-change would allocate a full-viewport GPU texture permanently. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+  }
+
+  *,
+  *::before,
+  *::after { box-sizing: border-box; }
+
+  /* Universal focus ring — visible only on keyboard focus, not clicks */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Suppress the focus ring on mouse/touch interactions */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.35);
+    color: white;
+  }
+
+/* Performance: images use native lazy loading via loading="lazy" attr.
+     content-visibility:auto was causing blank images + breaking IntersectionObserver. */
+
+  /* ── GPU layer promotion for animated elements (lightweight — no perspective) ── */
+  .gpu-accelerated {
+    transform: translate3d(0,0,0);
+  }
+
+  /* ── Card grid spacing helper (layout isolation removed — was breaking IntersectionObserver) ── */
+  .gallery-grid {
+    /* placeholder: layout containment removed; see ScrollReveal/StaggerCard for scroll animations */
+  }
+
+  /* ── Magnetic button spring ── */
+  .magnetic-btn {
+    transition: transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  /* ── Paint containment for scroll rails (isolates repaint) ── */
+  .contain-paint {
+    contain: layout style paint;
+  }
+
+  /* ── Layout containment for sections (prevents reflow cascades) ── */
+  .contain-section {
+    contain: layout style;
+  }
+
+  /* ── content-visibility for virtualized lists (skip rendering off-screen items) ── */
+  .contain-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 500px;
+  }
+
+  /* Reduced motion: respect OS preference */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* User-toggled (Settings → Display → Reduce motion) — same effect as the
+     media query but works regardless of OS preference. */
+  html.reduce-motion *,
+  html.reduce-motion *::before,
+  html.reduce-motion *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer utilities {
+  /* ---- Display type (section titles, hero fallback, footer) ---- */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  /* ── Universal interactive transition base ──────────────────────
+     Smooth hover/focus on common interactive elements. Targets only
+     composite-friendly properties (color, bg, border, opacity,
+     transform) to avoid layout thrashing from `transition: all`. */
+  a, button {
+    transition: color 180ms ease, background-color 180ms ease,
+                border-color 180ms ease, opacity 180ms ease,
+                transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  input, select, textarea {
+    transition: border-color 180ms ease, box-shadow 180ms ease,
+                background-color 180ms ease;
+  }
+
+  /* ---- Glass surfaces — solid backgrounds (Iris Xe optimized) ---- */
+  .glass {
+    background-color: hsl(0 0% 4% / 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid hsl(0 0% 100% / 0.05);
+    transition: background-color 250ms ease, border-color 250ms ease,
+                box-shadow 250ms ease;
+  }
+  .glass:hover {
+    border-color: hsl(0 0% 100% / 0.12);
+    background-color: hsl(0 0% 5% / 0.85);
+  }
+
+  .glass-card {
+    background-color: hsl(0 0% 11% / 0.85);
+    border: 1px solid hsl(0 0% 100% / 0.06);
+    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.3), 0 4px 24px hsl(0 0% 0% / 0.4);
+    transition: border-color 250ms ease, transform 250ms ease,
+                box-shadow 250ms ease;
+  }
+  .glass-card:hover {
+    border-color: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.25);
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.06) inset,
+      0 2px 4px hsl(0 0% 0% / 0.3),
+      0 8px 40px -8px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.18),
+      0 0 0 1px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.06);
+    transform: translateY(-2px);
+  }
+
+  /* ---- Brand utilities ---- */
+  .font-jp { font-family: var(--font-serif-jp); }
+
+  .text-glow      { text-shadow: 0 0 24px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.5); }
+  .text-glow-gold { text-shadow: 0 0 24px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.5); }
+  .bg-glow        { box-shadow: 0 0 40px -8px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.5); }
+  .bg-glow-gold   { box-shadow: 0 0 40px -8px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.4); }
+
+  /* Gradient text — anikage pink→purple */
+  .text-gradient {
+    background: linear-gradient(135deg, #fff 0%, var(--brand-pink) 45%, var(--brand-purple) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* ── Brand gradient utilities (anikage signature pink→purple) ── */
+  .text-gradient-brand {
+    background: linear-gradient(90deg, var(--brand-pink), var(--brand-purple));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .bg-brand-gradient {
+    background-image: linear-gradient(135deg, var(--brand-pink), var(--brand-purple));
+  }
+  .bg-brand-gradient-soft {
+    background-image: linear-gradient(135deg,
+      color-mix(in srgb, var(--brand-pink) 18%, transparent),
+      color-mix(in srgb, var(--brand-purple) 18%, transparent));
+  }
+  .border-brand-gradient {
+    border-image: linear-gradient(135deg, var(--brand-pink), var(--brand-purple)) 1;
+  }
+  .shadow-brand-glow {
+    box-shadow: 0 8px 30px -8px color-mix(in srgb, var(--brand-pink) 55%, transparent);
+  }
+
+  /* ── Poster card — anikage-style premium thumbnails ── */
+  .poster-frame {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    background: hsl(0 0% 8%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.5), 0 4px 16px -6px rgba(0,0,0,0.6);
+    transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 300ms ease;
+  }
+  .group:hover .poster-frame,
+  a:hover > .poster-frame {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow:
+      0 2px 4px rgba(0,0,0,0.5),
+      0 16px 40px -10px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.15),
+      0 0 0 1px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.2);
+  }
+  .poster-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid hsl(0 0% 100% / 0.08);
+    pointer-events: none;
+    transition: border-color 250ms ease, opacity 250ms ease;
+    opacity: 0.6;
+  }
+  .group:hover .poster-frame::after {
+    border-color: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.3);
+    opacity: 1;
+  }
+
+  /* ── Section divider — anikage-style hairline gradient line ── */
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, hsl(0 0% 100% / 0.06) 20%, hsl(0 0% 100% / 0.06) 80%, transparent);
+    margin: 2.5rem 0;
+  }
+
+  /* ── Kicker bar — anikage-style colored accent block ── */
+  .kicker-bar {
+    display: inline-block;
+    width: 4px;
+    height: 18px;
+    border-radius: 999px;
+    background: linear-gradient(to bottom, hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l)), hsl(var(--theme-primary-h) var(--theme-primary-s) calc(var(--theme-primary-l) - 15%)));
+    box-shadow: 0 0 8px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.3);
+  }
+
+  /* Animated gradient ring used around the live "now playing" episode */
+  .ring-anim {
+    position: relative;
+    isolation: isolate;
+  }
+  .ring-anim::before {
+    content: '';
+    position: absolute; inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(from var(--a, 0deg),
+      hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l)), var(--brand-purple), hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l)));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    animation: spin-slow 6s linear infinite;
+    z-index: -1;
+  }
+  @keyframes spin-slow {
+    to { --a: 360deg; transform: rotate(360deg); }
+  }
+  /* Fallback for browsers without @property */
+  @property --a {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  .shimmer {
+    background: linear-gradient(110deg,
+      hsl(0 0% 8%) 25%,
+      hsl(0 0% 12%) 50%,
+      hsl(0 0% 8%) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* v2 shimmer — smoother, wider gradient for a more premium Netflix-style pulse */
+  .shimmer-v2 {
+    position: relative;
+    overflow: hidden;
+    background: hsl(0 0% 7%);
+  }
+  .shimmer-v2::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg,
+      transparent 30%,
+      hsl(0 0% 100% / 0.03) 40%,
+      hsl(0 0% 100% / 0.06) 50%,
+      hsl(0 0% 100% / 0.03) 60%,
+      transparent 70%);
+    animation: shimmerV2 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  @keyframes shimmerV2 {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  /* shimmer-wave — alternating left-to-right sweep with subtle opacity wave.
+     More premium than shimmer-v2: each skeleton pulses brightness while
+     the sweep passes, giving a "breathing" effect. */
+  .shimmer-wave {
+    position: relative;
+    overflow: hidden;
+    background: hsl(0 0% 7%);
+    animation: shimmerPulse 2.4s ease-in-out infinite;
+  }
+  .shimmer-wave::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg,
+      transparent 25%,
+      hsl(0 0% 100% / 0.02) 35%,
+      hsl(0 0% 100% / 0.07) 45%,
+      hsl(0 0% 100% / 0.04) 55%,
+      hsl(0 0% 100% / 0.02) 65%,
+      transparent 75%);
+    animation: shimmerSweep 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  @keyframes shimmerPulse {
+    0%, 100% { opacity: 0.7; }
+    50%      { opacity: 1; }
+  }
+  @keyframes shimmerSweep {
+    0%   { transform: translateX(-110%); }
+    100% { transform: translateX(110%); }
+  }
+
+  /* ── Button press-down effect — scale(0.97) on :active ── */
+  button:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* ── Staggered card entry — delays staggered by index ── */
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(16px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card-enter {
+    animation: cardEnter 0.45s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+  /* Stagger delays: card-enter-1 through card-enter-20 */
+  .card-enter-1  { animation-delay: 0.03s; }
+  .card-enter-2  { animation-delay: 0.06s; }
+  .card-enter-3  { animation-delay: 0.09s; }
+  .card-enter-4  { animation-delay: 0.12s; }
+  .card-enter-5  { animation-delay: 0.15s; }
+  .card-enter-6  { animation-delay: 0.18s; }
+  .card-enter-7  { animation-delay: 0.21s; }
+  .card-enter-8  { animation-delay: 0.24s; }
+  .card-enter-9  { animation-delay: 0.27s; }
+  .card-enter-10 { animation-delay: 0.30s; }
+  .card-enter-11 { animation-delay: 0.33s; }
+  .card-enter-12 { animation-delay: 0.36s; }
+  .card-enter-13 { animation-delay: 0.39s; }
+  .card-enter-14 { animation-delay: 0.42s; }
+  .card-enter-15 { animation-delay: 0.45s; }
+  .card-enter-16 { animation-delay: 0.48s; }
+  .card-enter-17 { animation-delay: 0.51s; }
+  .card-enter-18 { animation-delay: 0.54s; }
+  .card-enter-19 { animation-delay: 0.57s; }
+  .card-enter-20 { animation-delay: 0.60s; }
+
+  /* Card hover: subtle lift (kept for non-poster surfaces) */
+  .card-tilt {
+    transition: transform 350ms cubic-bezier(.2, .8, .2, 1),
+                box-shadow 350ms ease;
+    transform-style: preserve-3d;
+  }
+  .card-tilt:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 1px 0 hsl(0 0% 100% / 0.06) inset, 0 20px 44px -16px hsl(0 0% 0% / 0.6);
+  }
+
+  /* ── Discuss badge micro-interaction ── */
+  .discuss-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    background: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.08);
+    border: 1px solid hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.12);
+    color: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.65);
+    transition: all 200ms ease;
+  }
+  .group:hover .discuss-badge {
+    background: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.14);
+    border-color: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.3);
+    color: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.9);
+  }
+  .line-clamp-1, .line-clamp-2, .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-1 { -webkit-line-clamp: 1; }
+  .line-clamp-2 { -webkit-line-clamp: 2; }
+  .line-clamp-3 { -webkit-line-clamp: 3; }
+
+  /* ── Refined card hover (premium-site pattern) ── */
+  .card-lift {
+    transition: transform 250ms cubic-bezier(0.23, 1, 0.32, 1),
+                box-shadow 250ms ease,
+                border-color 250ms ease;
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    border-color: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.2);
+    box-shadow: 0 2px 6px hsl(0 0% 0% / 0.4), 0 12px 32px -12px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.1),
+                0 0 0 1px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.06);
+  }
+
+  /* ── Focus-within glow for search inputs and interactive containers ── */
+  .focus-glow {
+    transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+  }
+  .focus-glow:focus-within {
+    border-color: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.5);
+    box-shadow: 0 0 22px -8px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.35);
+    background-color: hsl(0 0% 0% / 0.5);
+  }
+
+  /* ── Episode button active state glow ── */
+  .ep-active {
+    box-shadow: 0 0 16px -4px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.4),
+                inset 0 0 0 1px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.3);
+  }
+  .ep-active:active {
+    transform: scale(0.96);
+  }
+
+  /* ---- Scrollbars — premium thin styled ---- */
+  .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 100% / 0.08);
+    border-radius: 999px;
+    transition: background 200ms ease;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.5);
+  }
+
+  /* Global page scrollbar — matches the app theme */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track {
+    background: hsl(0 0% 3%);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 100% / 0.06);
+    border-radius: 999px;
+    border: 2px solid hsl(0 0% 3%);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.35);
+  }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Safe page-level entrance transition ───────────────────────────
+   Entrance-only animation (no exit/AnimatePresence), so it cannot
+   leave a gap where neither page is visible. Apply to a page's root
+   element for a subtle fade/slide in. Respects reduce-motion. */
+.page-enter {
+  animation: pageEnter 0.35s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+html.reduce-motion .page-enter,
+@media (prefers-reduced-motion: reduce) {
+  .page-enter {
+    animation: none;
+  }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+/* Video player: tap-feedback animations */
+@keyframes playerRipple {
+  0%   { opacity: 0.7; transform: scale(0.6); }
+  100% { opacity: 0;   transform: scale(1.6); }
+}
+@keyframes playerFanLeft {
+  0%   { opacity: 0;   transform: translateX(-10%); }
+  20%  { opacity: 0.9; transform: translateX(0); }
+  100% { opacity: 0;   transform: translateX(-10%); }
+}
+@keyframes playerFanRight {
+  0%   { opacity: 0;   transform: translateX(10%); }
+  20%  { opacity: 0.9; transform: translateX(0); }
+  100% { opacity: 0;   transform: translateX(10%); }
+}
+
+/* Hero carousel timer bar — fills left-to-right over slide duration. */
+@keyframes heroProgress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+/* ── Pulsing live badge (AIRING indicator) ── */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+.live-pulse {
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+
+/* ── Hero directional blur mask ── */
+.hero-edge-blur {
+  mask-image: radial-gradient(ellipse 60% 60% at center, transparent 40%, black 100%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 60% at center, transparent 40%, black 100%);
+}
+
+/* ── Glass metadata pills ── */
+.glass-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.8);
+  letter-spacing: 0.02em;
+}
+
+/* ── Keyboard key caps — consistent key styling across help modals,
+     bookmark hints, and shortcut references. Square-ish with a subtle
+     bottom bevel for that physical-key look. */
+.kbd-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 0.4rem;
+  border-radius: 0.375rem;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-bottom-width: 2px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: rgba(255,255,255,0.72);
+  box-shadow: 0 4px 12px -2px rgba(0,0,0,0.4);
+  white-space: nowrap;
+}
+.glass-pill--live {
+  background: hsl(354 78% 52%);
+  border-color: hsl(354 78% 60%);
+  color: white;
+  font-weight: 700;
+}
+
+/* ── Theme colour presets ──────────────────────────────────────────
+   The `anikage` preset (pink→purple) is the brand default; the rest are
+   user-selectable alternates in Settings → Appearance. */
+html.theme-anikage {
+  --theme-primary: hsl(330 81% 60%);   /* anikage pink #ff4d9d */
+  --theme-h: 330; --theme-s: 81%; --theme-l: 60%;
+}
+html.theme-violet {
+  --theme-primary: hsl(280 85% 62%);   /* anikage purple */
+  --theme-h: 280; --theme-s: 85%; --theme-l: 62%;
+}
+html.theme-indigo {
+  --theme-primary: hsl(245 75% 60%);
+  --theme-h: 245; --theme-s: 75%; --theme-l: 60%;
+}
+html.theme-anidap {
+  --theme-primary: hsl(357 75% 49%);   /* anidap red #e01b24 */
+  --theme-h: 357; --theme-s: 75%; --theme-l: 49%;
+}
+html.theme-crimson {
+  --theme-primary: hsl(354 78% 52%);
+  --theme-h: 354; --theme-s: 78%; --theme-l: 52%;
+}
+html.theme-emerald {
+  --theme-primary: hsl(152 76% 44%);
+  --theme-h: 152; --theme-s: 76%; --theme-l: 44%;
+}
+html.theme-amber {
+  --theme-primary: hsl(36 100% 52%);
+  --theme-h: 36; --theme-s: 100%; --theme-l: 52%;
+}
+
+/* ── Light mode — CSS filter invert trick ─────────────────────────
+   Inverts the entire page (black → white, white → black) then
+   double-inverts images, videos, and brand assets back to normal.
+   The hue-rotate(180deg) keeps the colour wheel intact so accent
+   colours (pink, violet, etc.) still read correctly. */
+html.light-mode {
+  filter: invert(1) hue-rotate(180deg);
+  background-color: #f8f8f8;
+}
+
+/* Double-invert media elements so they don't look like photo negatives.
+   Only targets explicit media elements and known poster/image containers.
+   Avoids [style*="background-image"] which is too broad (catches gradients, overlays, etc.). */
+html.light-mode img,
+html.light-mode video,
+html.light-mode canvas,
+html.light-mode .poster-frame,
+html.light-mode .hero-logo,
+html.light-mode .details-logo,
+html.light-mode .watch-logo {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* ── Light mode: soften the noise texture (it gets inverted too) ── */
+html.light-mode body {
+  background-image: none;
+  background-color: #f8f8f8;
+}
+
+/* Progressive image loading — blurred placeholder → crisp full-res */
+@keyframes progressiveReveal {
+  from { filter: blur(10px) saturate(0.5); opacity: 0.7; }
+  to   { filter: blur(0px) saturate(1); opacity: 1; }
+}
+.progressive-img {
+  animation: progressiveReveal 0.4s ease-out forwards;
+}
+
+/* ── Profile banner: AniList-style live animations ────────────────── */
+
+/* Ken Burns — slow continuous zoom + subtle pan on profile banner */
+@keyframes bannerKenBurns {
+  0%   { transform: scale(1) translate(0, 0); }
+  50%  { transform: scale(1.08) translate(-0.5%, -0.3%); }
+  100% { transform: scale(1) translate(0, 0); }
+}
+.banner-ken-burns {
+  animation: bannerKenBurns 30s ease-in-out infinite;
+  backface-visibility: hidden;
+}
+
+/* Shimmer sweep — diagonal light streak across the banner */
+@keyframes bannerShimmer {
+  0%   { transform: translateX(-100%) translateY(-100%) rotate(25deg); }
+  100% { transform: translateX(200%) translateY(200%) rotate(25deg); }
+}
+.banner-shimmer-sweep {
+  animation: bannerShimmer 6s ease-in-out infinite;
+}
+
+/* Frame glow — pulsing border aura around the banner container */
+@keyframes frameGlowPulse {
+  0%, 100% { opacity: 0.4; box-shadow: 0 0 20px -4px var(--glow-color, #7c3aed44), 0 0 40px -8px var(--glow-color, #7c3aed22), inset 0 0 0 1px rgba(255,255,255,0.04); }
+  50%      { opacity: 0.8; box-shadow: 0 0 30px -2px var(--glow-color, #7c3aed66), 0 0 60px -12px var(--glow-color, #7c3aed33), inset 0 0 0 1px rgba(255,255,255,0.08); }
+}
+.profile-frame-glow {
+  animation: frameGlowPulse 4s ease-in-out infinite;
+}
+
+/* Floating particles — subtle dust motes drifting upward */
+@keyframes floatUp1 {
+  0%   { transform: translateY(100%) translateX(0) scale(0); opacity: 0; }
+  10%  { opacity: 0.6; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-100%) translateX(30px) scale(1); opacity: 0; }
+}
+@keyframes floatUp2 {
+  0%   { transform: translateY(100%) translateX(0) scale(0); opacity: 0; }
+  15%  { opacity: 0.5; }
+  85%  { opacity: 0.5; }
+  100% { transform: translateY(-100%) translateX(-20px) scale(0.8); opacity: 0; }
+}
+@keyframes floatUp3 {
+  0%   { transform: translateY(100%) translateX(0) scale(0); opacity: 0; }
+  20%  { opacity: 0.4; }
+  80%  { opacity: 0.4; }
+  100% { transform: translateY(-100%) translateX(15px) scale(1.2); opacity: 0; }
+}
+.banner-particle-1 { animation: floatUp1 8s ease-in-out infinite; }
+.banner-particle-2 { animation: floatUp2 10s ease-in-out infinite 2s; }
+.banner-particle-3 { animation: floatUp3 9s ease-in-out infinite 5s; }
+
+/* Status dot — subtle breathing glow */
+@keyframes statusBreathe {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(16, 185, 129, 0.4); }
+  50%      { box-shadow: 0 0 12px 3px rgba(16, 185, 129, 0.7); }
+}
+.status-breathe {
+  animation: statusBreathe 2s ease-in-out infinite;
+}
+
+/* GPU-accelerated Ken Burns — offloaded to compositor thread */
+.ken-burns {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+/* Player loading stage bar — pulses width 60% ↔ 90% on the active step. */
+@keyframes stageBar {
+  from { width: 60%; }
+  to   { width: 90%; }
+}
+
+/* Player loading progress bar fill — fills 0%→100% over ~20s (browser bridge window) */
+@keyframes progressFill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+/* Glow ring pulse — subtle scale+opacity oscillation for the center play button. */
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%      { opacity: 0.7; transform: scale(1.04); }
+}
+
+/* ── Aurora background blobs ───────────────────────────────────────
+   Premium trending aesthetic: three large blurred radial gradient
+   blobs drift slowly across the viewport. GPU-composited (transform
+   + opacity only), zero layout thrashing. Used by AuroraBackground.tsx. */
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.1;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  /* No will-change — framer-motion already promotes to GPU layer.
+     Adding will-change on viewport-sized blobs would allocate
+     ~200 MB VRAM per blob (4K display), causing OOM on iGPUs. */
+}
+.aurora-blob-1 {
+  width: 60vw;
+  height: 60vw;
+  max-width: 900px;
+  max-height: 900px;
+  top: -10%;
+  left: -5%;
+  background: radial-gradient(circle at center,
+    hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.6),
+    hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.2) 40%,
+    transparent 70%);
+}
+.aurora-blob-2 {
+  width: 50vw;
+  height: 50vw;
+  max-width: 700px;
+  max-height: 700px;
+  top: 30%;
+  right: -8%;
+  background: radial-gradient(circle at center,
+    hsl(280 85% 62% / 0.5),
+    hsl(280 85% 62% / 0.15) 40%,
+    transparent 70%);
+}
+.aurora-blob-3 {
+  width: 55vw;
+  height: 55vw;
+  max-width: 800px;
+  max-height: 800px;
+  top: 50%;
+  left: 30%;
+  background: radial-gradient(circle at center,
+    hsl(330 81% 60% / 0.4),
+    hsl(280 85% 62% / 0.15) 40%,
+    transparent 70%);
+}
+
+/* Subtle grain texture overlay on the aurora */
+.aurora-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+  transform: translate3d(0, 0, 0);
+}
+
+/* ── Animated border spin keyframe ─────────────────────────────────
+   Used by AnimatedBorder.tsx — continuous conic-gradient rotation
+   around card containers. GPU-composited via transform: rotate(). */
+@keyframes animatedBorderSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Confetti — one-time burst on PWA install ─────────────────────
+   Each .confetti-piece reads --drift from inline style for its horizontal
+   travel, falls from -12px to 110vh, and spins 720°. The chip's `left`
+   is set in % to spread evenly across the viewport, and the animation
+   completes in ~2.2-3.6s with a small random delay. The component
+   unmounts the layer once all pieces are done (timeout in Celebrations.tsx). */
+@keyframes confettiFall {
+  0%   {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  85%  { opacity: 1; }
+  100% {
+    transform: translate3d(var(--drift, 0px), 110vh, 0) rotate(720deg);
+    opacity: 0;
+  }
+}
+.confetti-piece {
+  animation-name: confettiFall;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: forwards;
+}
+
+/* ── Hero — full-bleed title logo (TMDB) over styled wordmark ───── */
+.hero-logo, .details-logo, .watch-logo {
+  display: block;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 32px rgba(0, 0, 0, 0.55))
+          drop-shadow(0 1px 0 rgba(255, 255, 255, 0.05));
+  user-select: none;
+}
+.hero-logo {
+  max-height: clamp(120px, 22vh, 240px);
+  max-width: min(100%, 560px);
+  pointer-events: none;
+}
+.details-logo {
+  /* Larger cap than .hero-logo for the details page hero banner */
+  max-height: clamp(96px, 18vh, 200px);
+  max-width: min(100%, 520px);
+  /* Reserve space to prevent CLS while the PNG streams in */
+  min-height: 64px;
+}
+@media (min-width: 768px) {
+  .details-logo { max-height: 220px; }
+}
+.watch-logo {
+  /* Compact — sits in the Watch page title bar next to a 56×80 poster */
+  max-height: 32px;
+  max-width: 220px;
+  /* Lighter drop-shadow since the logo is small */
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+@media (min-width: 640px) {
+  .watch-logo { max-height: 40px; max-width: 280px; }
+}
+.group:hover .watch-logo { transform: scale(1.02); }
+.hero-wordmark {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 0.92;
+  background: linear-gradient(180deg, #ffffff 0%, #d4d4d8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: 0 2px 40px rgba(0, 0, 0, 0.5);
+  filter: drop-shadow(0 2px 24px rgba(0, 0, 0, 0.45));
+}
+.hero-nav-dot {
+  width: 24px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 200ms ease, transform 200ms ease, width 200ms ease;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
+.hero-nav-dot:hover { background: rgba(255, 255, 255, 0.32); }
+.hero-nav-dot--active {
+  background: rgba(255, 255, 255, 0.95);
+  transform: scaleY(1.4);
+  width: 32px;
+}
+
+/* ── Swiper pagination — anidap/JustAnime premium dot styling ── */
+.swiper-pagination-bullet {
+  background: rgba(255, 255, 255, 0.35) !important;
+  opacity: 1 !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  transition: all 200ms ease !important;
+}
+.swiper-pagination-bullet:hover {
+  background: rgba(255, 255, 255, 0.55) !important;
+}
+.swiper-pagination-bullet-active {
+  background: hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l)) !important;
+  opacity: 1 !important;
+  width: 24px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 12px hsl(var(--theme-primary-h) var(--theme-primary-s) var(--theme-primary-l) / 0.5);
+}
+
+/* FeaturedSlider specific: reposition pagination to sit inside the card area */
+.featured-slider .swiper-pagination {
+  bottom: 4px !important;
+}
+.featured-slider .swiper-horizontal > .swiper-pagination-bullets {
+  display: flex !important;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Avatar frames — decorative borders for profile avatar ──────── */
+
+/* Gold ring — classic gold border with subtle shine animation */
+@keyframes goldShine {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(251,191,36,0.6), 0 0 20px rgba(251,191,36,0.2); }
+  50%      { box-shadow: 0 0 0 3px rgba(251,191,36,0.85), 0 0 30px rgba(251,191,36,0.35); }
+}
+.avatar-frame-gold {
+  animation: goldShine 2.5s ease-in-out infinite;
+}
+
+/* Neon glow — pulsing cyan electric aura */
+@keyframes neonPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(0,255,255,0.5), 0 0 20px rgba(0,255,255,0.2), 0 0 45px rgba(0,255,255,0.08); }
+  50%      { box-shadow: 0 0 0 3px rgba(0,255,255,0.9), 0 0 35px rgba(0,255,255,0.4), 0 0 70px rgba(0,255,255,0.15); }
+}
+.avatar-frame-neon {
+  animation: neonPulse 2s ease-in-out infinite;
+}
+
+/* Crystal — ice shimmer with rotating highlight */
+@keyframes crystalShimmer {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px rgba(255,255,255,0.5),
+      0 0 12px rgba(180,220,255,0.25),
+      0 0 25px rgba(180,220,255,0.1),
+      inset 0 0 0 1px rgba(255,255,255,0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(255,255,255,0.7),
+      0 0 20px rgba(180,220,255,0.4),
+      0 0 40px rgba(180,220,255,0.2),
+      inset 0 0 0 1px rgba(255,255,255,0.2);
+  }
+}
+.avatar-frame-crystal {
+  animation: crystalShimmer 3s ease-in-out infinite;
+}
+
+/* Flame — warm fire edge glow */
+@keyframes flameGlow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255,100,0,0.6), 0 0 18px rgba(255,100,0,0.25), 0 0 35px rgba(255,60,0,0.1); }
+  50%      { box-shadow: 0 0 0 3px rgba(255,120,20,0.9), 0 0 28px rgba(255,80,0,0.4), 0 0 50px rgba(255,60,0,0.2); }
+}
+.avatar-frame-flame {
+  animation: flameGlow 1.8s ease-in-out infinite;
+}
+
+/* Cosmic — starry purple shimmer with rotating gradient highlight */
+@keyframes cosmicSpin {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(168,85,247,0.6), 0 0 20px rgba(168,85,247,0.25), 0 0 45px rgba(139,92,246,0.1); }
+  50%      { box-shadow: 0 0 0 3px rgba(168,85,247,0.9), 0 0 30px rgba(168,85,247,0.4), 0 0 60px rgba(139,92,246,0.2); }
+}
+.avatar-frame-cosmic {
+  animation: cosmicSpin 2.8s ease-in-out infinite;
+}
+
+/* Shadow — dark aura with subtle edge highlight */
+@keyframes shadowBreath {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px rgba(255,255,255,0.12),
+      0 0 30px rgba(0,0,0,0.4),
+      0 8px 32px rgba(0,0,0,0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(255,255,255,0.2),
+      0 0 50px rgba(0,0,0,0.6),
+      0 8px 40px rgba(0,0,0,0.7);
+  }
+}
+.avatar-frame-shadow {
+  animation: shadowBreath 3.5s ease-in-out infinite;
+}
+
+/* ── Banner overlays — decorative patterns on profile banner ────── */
+
+/* Stars — twinkling starfield overlay */
+.banner-overlay-stars::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 25% 35%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1.5px 1.5px at 50% 10%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 70% 25%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(1px 1px at 85% 45%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 15% 65%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1px 1px at 40% 75%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1px 1px at 65% 55%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 90% 70%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 30% 85%, rgba(255,255,255,0.3), transparent);
+  opacity: 0.6;
+  mix-blend-mode: overlay;
+}
+
+/* Grid — subtle geometric grid pattern */
+.banner-overlay-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.5;
+}
+
+/* Waves — animated gradient wave effect */
+@keyframes waveShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.banner-overlay-waves::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255,255,255,0.04) 40%,
+    rgba(255,255,255,0.06) 45%,
+    rgba(255,255,255,0.04) 50%,
+    transparent 60%
+  );
+  background-size: 300% 300%;
+  animation: waveShift 8s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+
+/* Hex — honeycomb hexagonal pattern */
+.banner-overlay-hex::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    url("data:image/svg+xml,%3Csvg width='40' height='46' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0l20 11.5v23L20 46 0 34.5v-23z' fill='none' stroke='rgba(255,255,255,0.04)' stroke-width='0.8'/%3E%3C/svg%3E");
+  background-size: 40px 46px;
+  opacity: 0.5;
+}
+
+/* Gradient — extra color gradient overlay */
+.banner-overlay-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(135deg, transparent 0%, rgba(168,85,247,0.08) 50%, rgba(236,72,153,0.06) 100%);
+  opacity: 0.6;
+}
+
+/* Particles — tiny floating dots (reuses existing particle animations) */
+.banner-overlay-particles::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,0.15), transparent),
+    radial-gradient(1px 1px at 50% 20%, rgba(255,255,255,0.12), transparent),
+    radial-gradient(1.5px 1.5px at 75% 40%, rgba(255,255,255,0.14), transparent),
+    radial-gradient(1px 1px at 35% 60%, rgba(255,255,255,0.1), transparent),
+    radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.13), transparent),
+    radial-gradient(1.5px 1.5px at 85% 80%, rgba(255,255,255,0.11), transparent);
+  opacity: 0.5;
+}

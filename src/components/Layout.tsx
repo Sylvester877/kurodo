@@ -1,0 +1,178 @@
+import { useEffect, useMemo, useRef } from 'react'
+import { Outlet } from 'react-router-dom'
+import { ReactLenis } from 'lenis/react'
+import Navbar from './Navbar'
+import Footer from './Footer'
+import Celebrations from './Celebrations'
+import Toaster from './Toaster'
+import TopLoadingBar from './TopLoadingBar'
+import PendingActivityChip from './PendingActivityChip'
+import BackToTop from './BackToTop'
+import ScrollProgress from './ScrollProgress'
+import OfflineBanner from './OfflineBanner'
+import KeyboardShortcuts from './KeyboardShortcuts'
+import CommandPalette from './CommandPalette'
+import UpdateNotification from './UpdateNotification'
+import CompletionDialog from './CompletionDialog'
+import SetupWizard from './SetupWizard'
+import AuroraBackground from './AuroraBackground'
+import Sidebar from './Sidebar'
+import { useAuthStore } from '../store/useAuthStore'
+import { useSettings } from '../store/useSettings'
+import { useReaderStore } from '../store/useReaderStore'
+import { restoreCredsFromDisk } from '../api/anilistAuth'
+import { backfillEntryIds, pullFromAniList } from '../lib/sync'
+import { shouldReduceQuality, getIntegratedGpuDefaults } from '../utils/gpuDetection'
+import { useScrollRestoration } from '../hooks/useScrollRestoration'
+import {
+  startNotificationScheduler, stopNotificationScheduler, getPermission,
+} from '../lib/notifications'
+
+export default function Layout() {
+  const auth = useAuthStore((s) => s.auth)
+  const reduceMotion = useSettings((s) => s.reduceMotion)
+  const reduceQuality = useSettings((s) => s.reduceQuality)
+  const notifyAiring = useSettings((s) => s.notifyAiring)
+  const themeColor = useSettings((s) => s.themeColor)
+  const lightMode = useSettings((s) => s.lightMode)
+  const lastUserIdRef = useRef<number | null>(null)
+
+  // On first mount, restore AniList credentials from the Electron disk file
+  // into localStorage. The disk file survives reinstalls; localStorage is
+  // tied to Chromium's data dir and gets wiped on Electron version bumps.
+  useEffect(() => { restoreCredsFromDisk() }, [])
+
+  // Save/restore scroll position per route.
+  useScrollRestoration()
+
+  // Mirror the reduce-motion setting onto <html> so the CSS rule in
+  // index.css picks it up the same way `@media (prefers-reduced-motion)` does.
+  useEffect(() => {
+    document.documentElement.classList.toggle('reduce-motion', reduceMotion)
+  }, [reduceMotion])
+
+  // Apply theme colour class to <html>
+  useEffect(() => {
+    const html = document.documentElement
+    html.classList.remove('theme-anikage', 'theme-violet', 'theme-anidap', 'theme-indigo', 'theme-crimson', 'theme-emerald', 'theme-amber')
+    html.classList.add(`theme-${themeColor}`)
+  }, [themeColor])
+
+  // Sync light mode class to <html>
+  useEffect(() => {
+    document.documentElement.classList.toggle('light-mode', lightMode)
+  }, [lightMode])
+
+  // ── Auto-detect integrated GPU and apply reduced-quality settings on first load ──
+  useEffect(() => {
+    // One-shot guard: only auto-detect on the very first app boot.
+    // After that, the user's manual toggle in Settings is respected.
+    if (localStorage.getItem('kurodo-gpu-detected')) return
+    localStorage.setItem('kurodo-gpu-detected', '1')
+
+    if (shouldReduceQuality()) {
+      // Apply main settings
+      useSettings.getState().set('reduceQuality', true)
+      // Apply reader store optimizations
+      const defaults = getIntegratedGpuDefaults()
+      useReaderStore.getState().setMany(defaults)
+    }
+  }, []) // Run once on mount
+
+  // Start/stop the airing-notification scheduler when the setting flips.
+  // The scheduler is a no-op until the user grants browser permission.
+  useEffect(() => {
+    if (notifyAiring && getPermission() === 'granted') {
+      startNotificationScheduler()
+      return () => stopNotificationScheduler()
+    }
+    stopNotificationScheduler()
+  }, [notifyAiring])
+
+  // On first sign-in (or user switch) — pull list down once.
+  // On every subsequent app boot while still signed in — just backfill IDs
+  // so the delete button works for items that were already in localStorage.
+  // Defer AniList sync work to idle time — it shouldn't block first paint.
+  useEffect(() => {
+    if (!auth) {
+      lastUserIdRef.current = null
+      return
+    }
+    const syncWork = () => {
+      if (lastUserIdRef.current !== auth.user.id) {
+        lastUserIdRef.current = auth.user.id
+        void pullFromAniList()
+      } else {
+        void backfillEntryIds()
+      }
+    }
+    const handle = window.requestIdleCallback(syncWork, { timeout: 2000 })
+    return () => window.cancelIdleCallback(handle)
+  }, [auth])
+
+
+
+  // Memoize lenis options so ReactLenis doesn't re-initialize on every render.
+  // Tuned for a premium, grounded feel: tighter lerp for physical friction,
+  // slightly heavier wheel multiplier, and syncTouch so mobile devices get
+  // the same smoothness as desktop wheel scrolling.
+  const lenisOptions = useMemo(() => ({
+    lerp: 0.08,
+    smoothWheel: !reduceMotion,
+    syncTouch: !reduceMotion,
+    touchMultiplier: 1.5,
+    wheelMultiplier: 0.9,
+  }), [reduceMotion])
+
+  return (
+    <ReactLenis
+      root
+      options={lenisOptions}
+    >
+    <div className="min-h-screen flex flex-col bg-background relative">
+      {/* ── Aurora animated mesh gradient background ── */}
+      {/* Disabled on integrated GPUs or reduced quality — avoids GPU memory pressure causing black screens */}
+      {!reduceMotion && !reduceQuality && <AuroraBackground />}
+      {/* Accessibility: skip-to-content link (visible on first Tab press) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-primary focus:text-white focus:text-sm focus:font-bold focus:shadow-lg"
+      >
+        Skip to content
+      </a>
+      <TopLoadingBar />
+      <Navbar />
+      <Sidebar />
+      {/* Add left padding on desktop so page content sits beside the sidebar rail. */}
+      <main id="main-content" className="flex-1 relative z-[1] lg:pl-[var(--sidebar-rail-width)]">
+        {/* ═══ No route-level page transitions ═══
+             Route-level keyed wrappers / AnimatePresence opacity fades were
+             causing black screens during navigation: forcing a full remount
+             resets local state and re-triggers Suspense fallbacks, while
+             exit animations can leave a gap where neither page is visible.
+             Pages mount instantly; individual pages can apply the local
+             `.page-enter` class for their own entrance animation without
+             risking the whole route. */}
+        <Outlet />
+      </main>
+      {/* Footer is a sibling (not inside <main>) so it remains a top-level
+          landmark. We still pad it on desktop so it clears the rail. */}
+      <div className="relative z-[1] lg:pl-[var(--sidebar-rail-width)]">
+        <Footer />
+      </div>
+      {/* ── PWA/browser-only features — hidden in Electron (desktop app) ── */}
+      {!window.electronAPI?.isElectron && <OfflineBanner />}
+      <Celebrations />
+      <PendingActivityChip />
+      <Toaster />
+      <UpdateNotification />
+      <CompletionDialog />
+      <SetupWizard />
+      <ScrollProgress />
+      <BackToTop />
+      <KeyboardShortcuts />
+      <CommandPalette />
+    </div>
+    </ReactLenis>
+  )
+}

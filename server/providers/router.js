@@ -1,0 +1,436 @@
+// Provider router — Jul 2026.
+//
+// The current runtime ships only the anidap provider. Keep this thin router
+// layer so additional providers can be plugged back in without changing route
+// handlers, but never fabricate fallback providers that don't exist.
+
+import { anidapProvider } from './anidap.js'
+import { gogoanimeProvider } from './gogoanime.js'
+import {
+  isProviderRateLimited, markProviderRateLimited,
+} from '../anidap.js'
+
+const IS_ELECTRON = typeof process !== 'undefined' && process.type === 'browser'
+
+// Fastest-known providers ordered by speed (from Naruto/JJK benchmarks).
+// Used as the racing pool — the user's provider races these 4 in parallel.
+const FAST_PROVIDERS = ['anidap-yuki','anidap-kami','anidap-neko','anidap-koto']
+
+// Per-provider failure cooldown across requests. When a provider fails to
+// return a stream (empty, timeout, or exception), it is briefly cooled down
+// so the next request doesn't waste time on a dead/slow provider. Consecutive
+// failures back off exponentially up to a cap. A successful stream clears it.
+const providerFailureCooldown = new Map()
+const FAILURE_COOLDOWN_BASE_MS = 15_000
+const FAILURE_COOLDOWN_MAX_MS = 120_000
+const FAILURE_COOLDOWN_JITTER_MS = 5_000
+
+function isProviderInCooldown(provider) {
+  const entry = providerFailureCooldown.get(provider)
+  if (!entry) return false
+  if (Date.now() >= entry.until) {
+    providerFailureCooldown.delete(provider)
+    return false
+  }
+  return true
+}
+
+function markProviderCooldown(provider, reason) {
+  if (!provider) return
+  const existing = providerFailureCooldown.get(provider)
+  const multiplier = existing ? existing.multiplier * 2 : 1
+  const delay = Math.min(FAILURE_COOLDOWN_BASE_MS * multiplier, FAILURE_COOLDOWN_MAX_MS)
+  const jitter = Math.floor(Math.random() * FAILURE_COOLDOWN_JITTER_MS)
+  providerFailureCooldown.set(provider, {
+    until: Date.now() + delay + jitter,
+    multiplier,
+    reason,
+  })
+  if (providerFailureCooldown.size > 100) {
+    pruneProviderCooldown()
+    if (providerFailureCooldown.size > 100) {
+      let oldest = null
+      for (const [name, entry] of providerFailureCooldown) {
+        if (!oldest || entry.until < oldest.entry.until) oldest = { name, entry }
+      }
+      if (oldest) providerFailureCooldown.delete(oldest.name)
+    }
+  }
+  console.log(`[router] Provider ${provider} cooled down for ${Math.round((delay + jitter) / 1000)}s (${reason})`)
+}
+
+function clearProviderCooldown(provider) {
+  providerFailureCooldown.delete(provider)
+}
+
+function bareProviderName(name) {
+  return name.replace(/^anidap-/, '')
+}
+
+function isProviderRateLimitedAny(name) {
+  return isProviderRateLimited(name) || isProviderRateLimited(bareProviderName(name))
+}
+
+function shouldSkipProvider(name) {
+  return isProviderRateLimitedAny(name) || isProviderInCooldown(name)
+}
+
+function pruneProviderCooldown() {
+  const now = Date.now()
+  for (const [provider, entry] of providerFailureCooldown) {
+    if (now >= entry.until) providerFailureCooldown.delete(provider)
+  }
+}
+
+function normalizeProviderName(providerName) {
+  if (!providerName) return providerName
+  if (/^anidap-/i.test(providerName)) return providerName
+  if (/^gogoanime-/i.test(providerName)) return providerName
+  return `anidap-${providerName}`
+}
+
+export async function routedGetInfo(anilistId) {
+  try {
+    const info = await anidapProvider.getInfoByAniListId(anilistId)
+    if (info?.slug) return { ...info, source: 'anidap' }
+  } catch {
+    // fall through to gogoanime
+  }
+
+  try {
+    const gogoInfo = await Promise.race([
+      gogoanimeProvider.getInfoByAniListId(anilistId),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('gogoanime info timeout')), 4000),
+      ),
+    ])
+    if (gogoInfo?.slug) return { ...gogoInfo, source: 'gogoanime' }
+  } catch { /* fall through */ }
+
+  return { slug: String(anilistId), anilistId, source: 'anidap' }
+}
+
+export async function routedGetEpisodes(anilistId, slug, title) {
+  // Always try anidap — episodes are a stub, never rate-limited
+  try {
+    const episodes = await anidapProvider.getEpisodes(slug || String(anilistId), anilistId, title)
+    if (episodes && episodes.length > 0) {
+      return { episodes, source: 'anidap', unavailable: false }
+    }
+  } catch { /* fall through */ }
+
+  // Fall back to gogoanime for episode lists with real thumbnails
+  try {
+    const gogoEps = await gogoanimeProvider.getEpisodes(slug, anilistId)
+    if (gogoEps && gogoEps.length > 0) {
+      return { episodes: gogoEps, source: 'gogoanime', unavailable: false }
+    }
+  } catch { /* fall through */ }
+
+  return { episodes: [], source: null, unavailable: true, reason: 'provider-error' }
+}
+
+export async function routedGetProviders(anilistId, slug, ep, title) {
+  const allProviders = []
+
+  // Always return all anidap servers — no rate-limit gate here.
+  // Individual servers may be rate-limited, but the LIST should always
+  // show so the user can see what's available and try different servers.
+  try {
+    const providers = await anidapProvider.getProviders(slug || String(anilistId), ep, anilistId, title)
+    if (Array.isArray(providers)) {
+      allProviders.push(...providers.map((s) => ({ ...s, _provider: 'anidap' })))
+    }
+  } catch { /* continue */ }
+
+  // Then gogoanime as fallback (Electron mode only)
+  if (IS_ELECTRON) {
+    try {
+      const gogoProviders = await gogoanimeProvider.getProviders(slug, ep, anilistId)
+      if (Array.isArray(gogoProviders)) {
+        allProviders.push(...gogoProviders.map((s) => ({ ...s, _provider: 'gogoanime' })))
+      }
+    } catch { /* continue */ }
+  }
+
+  if (allProviders.length > 0) {
+    return { providers: allProviders, source: 'gogoanime+anidap', unavailable: false }
+  }
+
+  return {
+    providers: [],
+    source: null,
+    unavailable: true,
+    reason: 'provider-error',
+  }
+}
+
+export async function routedGetStream(anilistId, slug, ep, providerName, type, _query, title) {
+  const normalized = normalizeProviderName(providerName)
+  const effectiveSlug = slug || String(anilistId || '')
+  const tried = new Set()
+
+  const tryStream = async (candidateProvider, candidateType = type, opts = {}) => {
+    const key = `${candidateProvider}:${candidateType}`
+    if (tried.has(key)) return null
+    tried.add(key)
+
+    // Skip rate-limited providers — but only THIS provider, not all of them
+    if (isProviderRateLimitedAny(candidateProvider)) {
+      console.log(`[router] Skipping rate-limited provider: ${candidateProvider}`)
+      return null
+    }
+
+    // Skip providers that recently failed (dead-provider skipping)
+    if (isProviderInCooldown(candidateProvider)) {
+      console.log(`[router] Skipping cooled-down provider: ${candidateProvider}`)
+      return null
+    }
+
+    try {
+      const data = await anidapProvider.getStream(effectiveSlug, ep, candidateProvider, candidateType, anilistId, { ...opts, titles: title })
+      if (!data) {
+        markProviderCooldown(candidateProvider, 'empty stream')
+        return null
+      }
+      clearProviderCooldown(candidateProvider)
+      return { ...data, source: 'anidap' }
+    } catch (e) {
+      const is429 = e?.upstream === 429 || e?.message?.includes('too_many_requests')
+      if (is429) {
+        const bareName = candidateProvider.replace(/^anidap-/, '')
+        markProviderRateLimited(bareName, 15)
+      } else {
+        markProviderCooldown(candidateProvider, e?.message || 'failed')
+      }
+      return null
+    }
+  }
+
+  // ── Fast path: explicit anidap provider requested ─────────────────
+  // Most user clicks pick a specific server (e.g. anidap-yuki). Going
+  // straight to that provider avoids the ~7s multi-provider race and
+  // the mutex contention that serialises browser work in cf-harvester.
+  // If it fails or times out, fall through to the normal racing pool.
+  const isExplicitAnidap = normalized && normalized.startsWith('anidap-') &&
+    !['anidap-auto', 'anidap-default'].includes(normalized)
+  if (isExplicitAnidap && !shouldSkipProvider(normalized)) {
+    try {
+      const fastResult = await Promise.race([
+        tryStream(normalized, type),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('fast path timeout')), 20_000),
+        ),
+      ])
+      if (fastResult) {
+        console.log(`[router] Fast path succeeded: ${normalized}/${type}`)
+        return fastResult
+      }
+    } catch (e) {
+      if (e?.upstream === 429 || e?.message?.includes('too_many_requests')) {
+        const bareName = normalized.replace(/^anidap-/, '')
+        markProviderRateLimited(bareName, 15)
+        console.warn(`[router] Fast path provider ${bareName} rate-limited`)
+      } else {
+        console.warn(`[router] Fast path failed for ${normalized}/${type}: ${e?.message || e}`)
+      }
+      // Fall through to the racing pool below; the `tried` set will
+      // skip this provider so the pool doesn't repeat the same call.
+    }
+  }
+
+  // Try gogoanime if the provider name starts with gogoanime-
+  if (providerName && providerName.startsWith('gogoanime-')) {
+    try {
+      // Gogoanime pages are heavier (ads, iframes, Cloudflare) and must wait
+      // for the same cf-harvester mutex that anidap uses. Give it enough
+      // time to acquire the mutex and finish extraction.
+      const gogoData = await Promise.race([
+        gogoanimeProvider.getStream(effectiveSlug, ep, providerName, type, anilistId),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('gogoanime stream timeout')), 25_000),
+        ),
+      ])
+      if (gogoData) return { ...gogoData, source: 'gogoanime' }
+    } catch (e) {
+      console.warn(`[router] gogoanime stream failed: ${e?.message || e}`)
+    }
+    console.log(`[router] gogoanime failed - falling through to anidap providers`)
+  }
+
+  // ── Parallel provider racing ──────────────────────────────────────
+  // All candidates fire at once and race via Promise.race. The
+  // cf-harvester mutex serialises actual browser operations, so the
+  // fastest provider to complete its extraction wins regardless of
+  // which one started first.
+  //
+  // CRITICAL: Rate-limited providers are FILTERED OUT of the race pool
+  // instead of blocking the entire request. This means if yuki gets 429'd,
+  // kami/koto/neko/vee/uwu all still race and one of them will win.
+  try {
+    const anidapResult = await Promise.race([
+      (async () => {
+        const providerList = await anidapProvider.getProviders(effectiveSlug, ep, anilistId, title)
+        const sameTypeAll = (Array.isArray(providerList) ? providerList : [])
+          .filter((p) => String(p.type) === String(type))
+          .map((p) => normalizeProviderName(p.name))
+          .filter((name) => name && name !== normalized)
+
+        // Build the racing pool: the user's provider + up to 3 fastest
+        const fastFallbacks = sameTypeAll
+          .filter((name) => FAST_PROVIDERS.includes(name))
+          .slice(0, 3)
+        const candidates = Array.from(new Set([...fastFallbacks, normalized]))
+
+        // Also include up to 3 extra non-fast providers in the race
+        const extraProviders = sameTypeAll
+          .filter((name) => !candidates.includes(name))
+          .slice(0, 3)
+        let allCandidates = [...candidates, ...extraProviders]
+
+        // Per-provider timeout: 20 s. cf-harvester serialises browser work
+        // with a mutex, so queued providers need headroom to start after the
+        // current one finishes. Fast providers resolve in <1s; 20s still
+        // gives slow providers a chance without letting them block the
+        // mutex for an excessive time.
+        const TRY_TIMEOUT_MS = 20_000
+        const tryStreamWithTimeout = (candidate, candidateType = type) =>
+          Promise.race([
+            tryStream(candidate, candidateType, { maxDurationMs: TRY_TIMEOUT_MS - 1_000 }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('provider try timed out')), TRY_TIMEOUT_MS),
+            ),
+          ])
+
+        // ── Filter out rate-limited/cooled providers from the race pool ──
+        // Only the rate-limited/cooled provider is excluded; all others still race.
+        allCandidates = allCandidates.filter((name) => !shouldSkipProvider(name))
+
+        if (allCandidates.length === 0) {
+          // All candidates are rate-limited — try cross-type
+          console.warn(`[router] All ${type} providers rate-limited for #${anilistId}`)
+          if (type === 'sub') {
+            // Try dub as cross-type fallback
+            const crossData = await tryStreamWithTimeout(normalized, 'dub')
+            if (crossData) return crossData
+          }
+          throw new Error(`All providers rate-limited for ${type}`)
+        }
+
+        // Race all candidates in a loop: fire them all, then
+        // repeatedly race the remaining pool, discarding each loser
+        // until one succeeds or all are exhausted.
+        const pending = allCandidates.map((candidate) => ({
+          name: candidate,
+          promise: tryStreamWithTimeout(candidate, type)
+            .then(
+              (data) =>
+                data
+                  ? { ok: true, provider: candidate, data }
+                  : { ok: false, provider: candidate },
+            )
+            .catch((err) => ({
+              ok: false,
+              provider: candidate,
+              err: err?.message || String(err),
+            })),
+        }))
+
+        // Cross-type fallback (sub -> dub) as last-resort
+        const crossTypeEntry =
+          type === 'sub'
+            ? {
+                name: `${normalized}(dub)`,
+                promise: tryStreamWithTimeout(normalized, 'dub')
+                  .then(
+                    (data) =>
+                      data
+                        ? { ok: true, provider: `${normalized}(dub)`, data, crossType: true }
+                        : { ok: false, provider: `${normalized}(dub)` },
+                  )
+                  .catch((err) => ({
+                    ok: false,
+                    provider: `${normalized}(dub)`,
+                    err: err?.message || String(err),
+                  })),
+              }
+            : null
+
+        let remaining = [...pending]
+        while (remaining.length > 0) {
+          const tagged = remaining.map((p) =>
+            p.promise.then((result) => ({ result, loser: p.name })),
+          )
+          const { result, loser } = await Promise.race(tagged)
+          if (result.ok && result.data) {
+            const tag = result.crossType ? ' (cross-type)' : ''
+            console.log(
+              `[router] Parallel race won by: ${result.provider}/${type}${tag}`,
+            )
+            return result.data
+          }
+          // Discard the loser and keep racing the survivors
+          remaining = remaining.filter((p) => p.name !== loser)
+        }
+
+        // Same-type exhausted — try cross-type as last resort
+        if (crossTypeEntry) {
+          const result = await crossTypeEntry.promise
+          if (result.ok && result.data) {
+            console.log(
+              `[router] Sub->dub fallback (last resort): ${normalized}`,
+            )
+            return result.data
+          }
+        }
+
+        return null
+      })(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('anidap provider racing timeout')), 30_000),
+      ),
+    ])
+
+    if (anidapResult) return anidapResult
+  } catch (e) {
+    // Per-provider rate-limit: don't trigger a global block
+    if (e?.upstream === 429) {
+      const bareName = normalized?.replace(/^anidap-/, '')
+      markProviderRateLimited(bareName, 15)
+      console.warn(`[router] Provider ${bareName} rate-limited (per-provider, 15s)`)
+    }
+    console.warn(`[router] anidap stream failed: ${e?.message || e}`)
+  }
+
+  // ── Fallback to gogoanime when anidap has no stream ──
+  if (IS_ELECTRON && !providerName?.startsWith('gogoanime-')) {
+    try {
+      console.log(`[router] anidap empty - trying gogoanime fallback for #${anilistId}`)
+      const gogoInfo = await Promise.race([
+        gogoanimeProvider.getInfoByAniListId(anilistId),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('gogoanime info timeout')), 8_000),
+        ),
+      ])
+      if (gogoInfo?.slug) {
+        const gogoProvider = type === 'dub' ? 'gogoanime-dub' : 'gogoanime-sub'
+        const gogoData = await Promise.race([
+          gogoanimeProvider.getStream(gogoInfo.slug, ep, gogoProvider, type, anilistId),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('gogoanime stream timeout')), 25_000),
+          ),
+        ])
+        if (gogoData) {
+          console.log(`[router] Gogoanime fallback succeeded for #${anilistId}`)
+          return { ...gogoData, source: 'gogoanime' }
+        }
+      }
+    } catch (e) {
+      console.warn(`[router] gogoanime fallback failed: ${e?.message || e}`)
+    }
+  }
+
+  const err = new Error(`No stream available for ${normalized || providerName}/${type}`)
+  err.upstream = 404
+  throw err
+}

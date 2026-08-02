@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS Player Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { font-family: sans-serif; background: #0f0f0f; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        video { width: 80%; max-width: 800px; border: 2px solid #333; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .controls { margin-top: 20px; }
+        input { padding: 10px; width: 400px; background: #222; border: 1px solid #444; color: #fff; border-radius: 4px; }
+        button { padding: 10px 20px; background: #007bff; border: none; color: white; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #status { margin-top: 10px; font-size: 0.9em; color: #aaa; }
+    </style>
+</head>
+<body>
+    <h1>Premium HLS Player Test</h1>
+    <video id="video" controls></video>
+    <div class="controls">
+        <input type="text" id="streamUrl" placeholder="Paste .m3u8 URL here" value="">
+        <button onclick="loadStream()">Load Stream</button>
+    </div>
+    <div id="status">Ready</div>
+
+    <script>
+        const video = document.getElementById('video');
+        const status = document.getElementById('status');
+
+        function loadStream() {
+            let url = document.getElementById('streamUrl').value;
+            if (!url) return;
+            
+            // Route through our local bypass proxy to solve CORS and Headers
+            if (!url.includes('localhost:3000')) {
+                url = `http://localhost:3000/proxy?url=${encodeURIComponent(url)}`;
+            }
+            
+            status.innerText = "Loading stream via Proxy...";
+            console.log("Loading stream:", url);
+
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    video.play();
+                    status.innerText = "Playing via Hls.js";
+                });
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    console.error("HLS Error:", data);
+                    status.innerText = "Error: " + data.details;
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', function() {
+                    video.play();
+                    status.innerText = "Playing via Native HLS";
+                });
+            } else {
+                status.innerText = "HLS not supported in this browser";
+            }
+        }
+
+        // Auto-load if URL is passed in hash
+        const hashUrl = window.location.hash.substring(1);
+        if (hashUrl) {
+            document.getElementById('streamUrl').value = decodeURIComponent(hashUrl);
+            loadStream();
+        }
+    </script>
+</body>
+</html>

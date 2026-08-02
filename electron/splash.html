@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kurōdo</title>
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    user-select: none; -webkit-user-select: none;
+    cursor: none;
+  }
+
+  .stage {
+    position: relative;
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+    overflow: hidden;
+  }
+
+  /* ── Vignette ────────────────────────────────────────────────── */
+  .vignette {
+    position: absolute; inset: 0; z-index: 1;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+  }
+
+  /* ── Beams container ─────────────────────────────────────────── */
+  .beams {
+    position: absolute; inset: 0; z-index: 0;
+    opacity: 0;
+    animation: beamsIn 0.3s ease 0.15s forwards;
+  }
+  @keyframes beamsIn { to { opacity: 1; } }
+
+  /* Each beam: ultra-wide gradient streak, blurred for volumetric look */
+  .beam {
+    position: absolute;
+    height: 180px;
+    width: 220%;
+    left: -60%;
+    opacity: 0;
+    filter: blur(40px);
+  }
+
+  /* Beam 1 — warm amber, sweeps top-left to center */
+  .b1 {
+    top: -5%;
+    background: linear-gradient(105deg,
+      transparent 0%,
+      rgba(245,158,11,0.15) 30%,
+      rgba(251,191,36,0.55) 48%,
+      rgba(253,224,71,0.7) 50%,
+      rgba(251,191,36,0.55) 52%,
+      rgba(245,158,11,0.15) 70%,
+      transparent 100%
+    );
+    animation: beamReveal 1.4s cubic-bezier(0.22,1,0.36,1) 0.2s forwards;
+    transform: rotate(-18deg) translateY(-30px);
+  }
+
+  /* Beam 2 — rose/magenta, sweeps bottom-right */
+  .b2 {
+    top: 55%;
+    background: linear-gradient(105deg,
+      transparent 0%,
+      rgba(244,63,94,0.12) 28%,
+      rgba(251,113,133,0.5) 48%,
+      rgba(253,164,175,0.65) 50%,
+      rgba(251,113,133,0.5) 52%,
+      rgba(244,63,94,0.12) 72%,
+      transparent 100%
+    );
+    animation: beamReveal 1.4s cubic-bezier(0.22,1,0.36,1) 0.35s forwards;
+    transform: rotate(12deg) translateY(30px);
+  }
+
+  /* Beam 3 — bright gold center beam */
+  .b3 {
+    top: 25%;
+    height: 250px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(234,179,8,0.1) 25%,
+      rgba(250,204,21,0.5) 45%,
+      rgba(253,224,71,0.85) 50%,
+      rgba(250,204,21,0.5) 55%,
+      rgba(234,179,8,0.1) 75%,
+      transparent 100%
+    );
+    animation: beamReveal 1.2s cubic-bezier(0.22,1,0.36,1) 0.3s forwards;
+    transform: rotate(-3deg);
+    filter: blur(50px);
+  }
+
+  /* Beam 4 — subtle amber top */
+  .b4 {
+    top: 8%;
+    height: 120px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(217,119,6,0.08) 35%,
+      rgba(245,158,11,0.35) 50%,
+      rgba(217,119,6,0.08) 65%,
+      transparent 100%
+    );
+    animation: beamReveal 1.5s cubic-bezier(0.22,1,0.36,1) 0.5s forwards;
+    transform: rotate(5deg);
+    filter: blur(35px);
+  }
+
+  @keyframes beamReveal {
+    0%   { opacity: 0; transform: var(--t, rotate(0deg)) scaleX(0.1) translateY(var(--ty, 0px)); }
+    30%  { opacity: 0.7; }
+    55%  { opacity: 1; transform: var(--t, rotate(0deg)) scaleX(1) translateY(var(--ty, 0px)); }
+    85%  { opacity: 0.85; }
+    100% { opacity: 0.5; transform: var(--t, rotate(0deg)) scaleX(0.95) translateY(var(--ty, 0px)); }
+  }
+
+  /* ── Core flare at center ────────────────────────────────────── */
+  .flare {
+    position: absolute;
+    width: 300px; height: 300px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle,
+      rgba(253,224,71,0.6) 0%,
+      rgba(251,191,36,0.3) 15%,
+      rgba(245,158,11,0.1) 35%,
+      transparent 70%
+    );
+    border-radius: 50%;
+    filter: blur(30px);
+    opacity: 0;
+    z-index: 1;
+    animation: flarePulse 1s ease-out 0.8s forwards;
+  }
+  @keyframes flarePulse {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.1); }
+    60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+    100% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.9); }
+  }
+
+  /* ── Logo container ──────────────────────────────────────────── */
+  .logo-wrap {
+    position: relative; z-index: 3;
+    display: flex; flex-direction: column; align-items: center;
+    opacity: 0;
+    animation: logoReveal 0.9s cubic-bezier(0.22,1,0.36,1) 1.1s forwards;
+  }
+  @keyframes logoReveal {
+    0%   { opacity: 0; transform: scale(0.7); filter: blur(20px); }
+    50%  { opacity: 0.9; filter: blur(5px); }
+    100% { opacity: 1; transform: scale(1); filter: blur(0); }
+  }
+
+  .logo-text {
+    font-size: clamp(56px, 9vw, 110px);
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    background: linear-gradient(180deg,
+      #fef3c7 0%,
+      #fde047 20%,
+      #fbbf24 45%,
+      #f59e0b 60%,
+      #b45309 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 25px rgba(251,191,36,0.45))
+            drop-shadow(0 0 50px rgba(251,191,36,0.2))
+            drop-shadow(0 0 80px rgba(245,158,11,0.1));
+  }
+
+  .subtitle {
+    font-size: clamp(10px, 1.4vw, 15px);
+    font-weight: 500;
+    letter-spacing: 0.55em;
+    color: rgba(251,191,36,0.55);
+    margin-top: 6px;
+    text-transform: uppercase;
+    opacity: 0;
+    animation: subIn 0.5s ease 1.7s forwards;
+  }
+  @keyframes subIn { to { opacity: 1; } }
+
+  /* ── Fade curtain ────────────────────────────────────────────── */
+  .curtain {
+    position: fixed; inset: 0;
+    background: #000;
+    opacity: 0;
+    z-index: 10;
+    pointer-events: none;
+    animation: fadeBlack 0.5s ease-in 3.2s forwards;
+  }
+  @keyframes fadeBlack { to { opacity: 1; } }
+
+  /* ── Dust particles ──────────────────────────────────────────── */
+  .dust {
+    position: absolute; inset: 0; z-index: 2; overflow: hidden;
+    opacity: 0;
+    animation: dustIn 0.4s ease 0.9s forwards;
+  }
+  @keyframes dustIn { to { opacity: 1; } }
+
+  .particle {
+    position: absolute;
+    width: 2px; height: 2px;
+    border-radius: 50%;
+    background: #fde047;
+    box-shadow: 0 0 4px 1px rgba(253,224,71,0.5);
+    animation: drift 2s ease-out 0.9s forwards;
+    opacity: 0;
+  }
+  @keyframes drift {
+    0%   { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="vignette"></div>
+
+  <!-- Volumetric light beams -->
+  <div class="beams">
+    <div class="beam b1" style="--t:rotate(-18deg);--ty:-30px"></div>
+    <div class="beam b2" style="--t:rotate(12deg);--ty:30px"></div>
+    <div class="beam b3" style="--t:rotate(-3deg);--ty:0px"></div>
+    <div class="beam b4" style="--t:rotate(5deg);--ty:0px"></div>
+  </div>
+
+  <!-- Center flare -->
+  <div class="flare"></div>
+
+  <!-- Dust particles -->
+  <div class="dust" id="dust"></div>
+
+  <!-- Logo -->
+  <div class="logo-wrap">
+    <div class="logo-text">KURŌDO</div>
+    <div class="subtitle">Anime Streaming</div>
+  </div>
+
+  <!-- Fade-to-black -->
+  <div class="curtain"></div>
+</div>
+
+<audio id="sfx" src="assets/splash.mp3" preload="auto"></audio>
+
+<script>
+  // Generate particles dynamically for variety
+  const dust = document.getElementById('dust');
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.cssText = `
+      left: ${42 + Math.random() * 16}%;
+      top: ${42 + Math.random() * 16}%;
+      --x: ${(Math.random() - 0.5) * 200}px;
+      --y: ${(Math.random() - 0.5) * 200}px;
+      animation-delay: ${0.9 + Math.random() * 0.6}s;
+      animation-duration: ${1.2 + Math.random() * 1.2}s;
+    `;
+    dust.appendChild(p);
+  }
+
+  // Play sound
+  const audio = document.getElementById('sfx');
+  audio.volume = 0.85;
+  audio.play().catch(() => {
+    document.addEventListener('click', () => audio.play(), { once: true });
+  });
+
+  // Signal main process after animation completes (~3.7s)
+  setTimeout(() => {
+    if (window.electronAPI) window.electronAPI.splashDone();
+  }, 3700);
+</script>
+
+</body>
+</html>

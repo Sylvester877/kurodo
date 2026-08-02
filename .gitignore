@@ -1,0 +1,43 @@
+node_modules/
+dist/
+release/
+logs/
+.env.local
+*.log
+nul
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+*.exe
+*.blockmap
+builder-debug.yml
+
+# Electron
+out/
+
+# Test
+coverage/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Server data (contains user comments — don't commit)
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+
+# Temp files
+/tmp/
+*.tmp
+.tmp-*

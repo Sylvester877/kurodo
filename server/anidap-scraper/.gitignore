@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Debug & Logs
+debug_log.txt
+debug_output.txt
+final_output.txt
+final_results.txt
+test_output.txt
+*.log
+
+# Temporary/Cache Data
+response.json
+results.json
+servers.json
+decrypted_koto.json
+
+# Test Scripts
+test.js
+test2.js
+test_axios.js
+test_decrypt.js
+test_decryption.js
+test_mapping.js
+debug_test.js
+verify_stream.js
+get_url.js
+getproviders.js
+debug_api.js
+
+# OS files
+.DS_Store
+Thumbs.db

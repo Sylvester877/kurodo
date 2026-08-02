@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-06-28T05:47:34.838Z",
+  "consoleLogs": [
+    {
+      "type": "verbose",
+      "text": "[DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o"
+    },
+    {
+      "type": "info",
+      "text": "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner."
+    },
+    {
+      "type": "info",
+      "text": "Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner."
+    },
+    {
+      "type": "verbose",
+      "text": "[DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 504 (Gateway Time-out)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 504 (Gateway Time-out)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 504 (Gateway Time-out)"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 504 (Gateway Time-out)"
+    }
+  ],
+  "networkErrors": [
+    {
+      "url": "https://yt3.ggpht.com/9NAMSseIbdxYiC73t4hvJ3HBLLYkxdnu7DMqb6vxu3xea9Y7XKIPpeYqfkF4WKqgYGiRthi5mg=s68-c-k-c0x00ffffff-no-rj",
+      "errText": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://www.youtube.com/api/stats/qoe?fmt=399&afmt=251&cpn=DhZpNhoMmDLG-FBd&el=embedded&ns=yt&fexp=v1%2C24004644%2C27058999%2C34656%2C124674%2C117689%2C9252%2C3479%2C13030%2C6257%2C16949%2C100702%2C2878%2C12227%2C25059%2C4174%2C30447%2C18705%2C21437%2C4571%2C5236%2C7780%2C13110%2C2977%2C7516%2C1888%2C23826%2C9500%2C1840%2C45716%2C13159%2C451%2C30489%2C5023%2C9969%2C3325%2C7294%2C4199%2C459%2C29655%2C17715%2C6633%2C249%2C82%2C17367%2C12593%2C3227%2C4298%2C6032%2C1168%2C372%2C490%2C2325%2C2629%2C2315%2C16624%2C3001%2C5867%2C3475%2C5353%2C1900%2C2276%2C11%2C5679%2C907%2C189%2C500%2C927%2C193%2C2056%2C273%2C2285%2C4132%2C1566%2C133%2C1143%2C2550%2C7345%2C1877%2C2370%2C1350%2C862%2C22970%2C3972%2C914%2C1796%2C904%2C187%2C945&cl=936900853&seq=1&docid=ikxIrDr72iA&ei=eLVAat2RIsat9fwPjo6U0Q4&event=streamingstats&plid=AAZVSeEHPfmmMcu5&cbr=Chrome&cbrver=149.0.0.0&c=WEB_EMBEDDED_PLAYER&cver=2.20260626.01.00&cplayer=UNIPLAYER&cos=Windows&cosver=10.0&cplatform=DESKTOP&vps=0.000:N,0.078:B,0.917:B,0.917:B&cat=streaming,sabr&cmt=0.078:0.000,0.917:0.000&afs=0.907:251;CggKA2RyYxIBMQ::i:fl.-14.33;tl.-14;vg.0;nm.1;sms.2:CAEoAQ&vfs=0.917:399:399::a:sms.2:CAEoAQ&view=0.917:1522:855:1.25&bwm=0.917:426352:0.501&bwe=0.917:655360&bat=0.917:0.41:0&vis=0.917:0&bh=0.917:0.000&qclc=ChBEaFpwTmhvTW1ETEctRkJkEAE",
+      "errText": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://www.youtube.com/ptracking?html5=1&video_id=ikxIrDr72iA&cpn=DhZpNhoMmDLG-FBd&ei=eLVAat2RIsat9fwPjo6U0Q4&ptk=youtube_single&oid=pL_Wol3SBnrKsHkzR0_ydA&ptchn=eagNi3-wLiok3MWPIHAScw&pltype=content",
+      "errText": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://www.youtube.com/api/stats/playback?ns=yt&el=embedded&cpn=DhZpNhoMmDLG-FBd&ver=2&cmt=0.022&fmt=399&fs=0&rt=1.284&euri=http%3A%2F%2Flocalhost%3A5173%2F&lact=1390&cl=936900853&mos=1&volume=100&cbr=Chrome&cbrver=149.0.0.0&c=WEB_EMBEDDED_PLAYER&cver=2.20260626.01.00&cplayer=UNIPLAYER&cos=Windows&cosver=10.0&cplatform=DESKTOP&autoplay=1&epm=1&delay=4&hl=en_US&cr=AU&len=72&fexp=v1%2C24004644%2C27058999%2C34656%2C124674%2C117689%2C9252%2C3479%2C13030%2C6257%2C16949%2C100702%2C2878%2C12227%2C25059%2C4174%2C30447%2C18705%2C21437%2C4571%2C5236%2C7780%2C13110%2C2977%2C7516%2C1888%2C23826%2C9500%2C1840%2C45716%2C13159%2C451%2C30489%2C5023%2C9969%2C3325%2C7294%2C4199%2C459%2C29655%2C17715%2C6633%2C249%2C82%2C17367%2C12593%2C3227%2C4298%2C6032%2C1168%2C372%2C490%2C2325%2C2629%2C2315%2C16624%2C3001%2C5867%2C3475%2C5353%2C1900%2C2276%2C11%2C5679%2C907%2C189%2C500%2C927%2C193%2C2056%2C273%2C2285%2C4132%2C1566%2C133%2C1143%2C2550%2C7345%2C1877%2C2370%2C1350%2C862%2C22970%2C3972%2C914%2C1796%2C904%2C187%2C945&rtn=10&afmt=251&size=1522%3A855%3A1.25&inview=0&muted=1&docid=ikxIrDr72iA&ei=eLVAat2RIsat9fwPjo6U0Q4&plid=AAZVSeEHPfmmMcu5&referrer=https%3A%2F%2Fwww.youtube.com%2Fembed%2FikxIrDr72iA%3Fautoplay%3D1%26mute%3D1%26controls%3D0%26loop%3D1%26playlist%3DikxIrDr72iA%26showinfo%3D0%26rel%3D0%26modestbranding%3D1%26playsinline%3D1%26enablejsapi%3D1&list=TLGGrL1BZCFsJwcyODA2MjAyNg&of=jFYEKsh2GKabX5MSY_fHvA&vm=CAEQABgEOjJBSHFpSlRJYnRXcEh3Y08ySWJtQ2lwdW9WUFNuMnAweVI0SElmSF9aRk1yUFFLMjFmQWJqQUxkcUFQSjE3SE5iN21tMDJOY2tkYVQxQTg0ZU45emNGeDNaVmhuY0VvbG9DeFA2UU40UWNIY1lETm1BeFJTTTBuTVlXRVRUY0J1RnVjd25iZ2RPdU5WNWs2SEhEYkU2aVl4Z0F6ZThFQQ",
+      "errText": "net::ERR_ABORTED"
+    },
+    {
+      "url": "https://graphql.anilist.co/",
+      "status": 404
+    },
+    {
+      "url": "https://api.ani.zip/mappings?mal_id=101922",
+      "status": 404
+    },
+    {
+      "url": "https://api.jikan.moe/v4/anime/101922/full",
+      "status": 504
+    },
+    {
+      "url": "https://api.jikan.moe/v4/anime/101922/recommendations",
+      "status": 504
+    },
+    {
+      "url": "https://api.jikan.moe/v4/anime/101922/full",
+      "status": 504
+    },
+    {
+      "url": "https://api.jikan.moe/v4/anime/101922/recommendations",
+      "status": 504
+    }
+  ]
+}

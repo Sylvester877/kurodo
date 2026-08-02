@@ -1,0 +1,7 @@
+src/components/VideoPlayer.tsx(581,26): error TS2304: Cannot find name 'SharpenPreset'.
+src/components/VideoPlayer.tsx(582,48): error TS2339: Property 'sharpenPreset' does not exist on type 'SettingsState'.
+src/components/VideoPlayer.tsx(584,34): error TS2345: Argument of type '"sharpenPreset"' is not assignable to parameter of type 'keyof SettingsState'.
+src/components/VideoPlayer.tsx(585,32): error TS2304: Cannot find name 'SharpenPreset'.
+src/test/components.smoke.test.tsx(124,26): error TS2739: Type '{}' is missing the following properties from type 'Props': title, genres, accentColor
+src/test/fixtures.ts(64,3): error TS2353: Object literal may only specify known properties, and 'url' does not exist in type 'Anime'.
+287 src/components/Comments.tsx

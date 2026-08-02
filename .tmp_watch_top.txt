@@ -1,0 +1,45 @@
+1: import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
+2: import { useParams, Link, useSearchParams } from 'react-router-dom'
+3: import { useQuery } from '@tanstack/react-query'
+4: import { motion, AnimatePresence } from 'framer-motion'
+5: import {
+6:   Star, Calendar, Heart, Film, Globe, Hash, ArrowLeft,
+7:   Play, AlertCircle, Search, Keyboard, X, CheckCircle2, Eye, Mic,
+8: } from 'lucide-react'
+9: import { useTitle } from '../hooks/useTitle'
+10: import { getAnimeById, getAnimeRecommendations } from '../api/anime'
+11: import { getEpisodeInfoFromMal } from '../api/anilist'
+12: import { getEpisodesByMalId, getAniListIdFromMal, type AniZipEpisode } from '../api/anizip'
+13: import {
+14:   fetchAnidapInfo, fetchAnidapServers, fetchAnidapStream,
+15:   type AnidapProvider, type AnidapStream,
+16: } from '../api/anidap'
+17: import { getSkipTimes, type SkipTimes } from '../api/aniskip'
+18: import { useWatchListStore } from '../store/useWatchListStore'
+19: import { cn, getImageUrl, getHeroImageUrl, formatScore, friendlyError, safeBase64, safeSetItem, proxifyWithFallback, getBackendOrigin } from '../lib/utils'
+20: import { buildEpisodeImageUrl } from '../lib/episodeImage'
+21: import AnimeCard from '../components/AnimeCard'
+22: const VideoPlayer = lazy(() =>
+23:   import('../components/VideoPlayer').catch((err) => {
+24:     console.warn('[Watch] VideoPlayer chunk failed, retrying…', err)
+25:     return new Promise((resolve) => setTimeout(resolve, 800)).then(() => import('../components/VideoPlayer'))
+26:   }),
+27: )
+28: import PlayerLoadingStages from '../components/PlayerLoadingStages'
+29: import ServerPicker from '../components/ServerPicker'
+30: import NextEpisodeCountdown from '../components/NextEpisodeCountdown'
+31: import EpisodeRangePicker from '../components/EpisodeRangePicker'
+32: import DownloadButton from '../components/DownloadButton'
+33: import EpisodePreviewTooltip from '../components/EpisodePreviewTooltip'
+34: import Relations from '../components/Relations'
+35: import { toast } from '../components/Toaster'
+36: import { pickPreferredProvider } from '../lib/providers'
+37: import {
+38:   prefetchSkipTimes, prefetchStream, prefetchAnidapServers,
+39:   takePrefetchedStream, clearPrefetchedStream, cancelPrefetch,
+40: } from '../lib/prefetch'
+41: import { useSettings } from '../store/useSettings'
+42: import { getFillerInfo, isFiller, type FillerInfo } from '../api/filler'
+43: import { fetchAnimeLogo, getTmdbLogoUrl, type TmdbLogo } from '../api/tmdb'
+44: import SyncConfirmDialog, { useSyncConfirm } from '../components/SyncConfirmDialog'
+45: import StarRating from '../components/StarRating'
