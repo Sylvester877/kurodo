@@ -25,6 +25,32 @@ const ENDPOINT = () =>
 const MAX_RETRIES = 3
 const MAX_BACKOFF_MS = 30_000
 
+// ── Global pacing + 429 circuit breaker ──────────────────────────────
+// The Electron renderer and the embedded backend share one public IP, so
+// every AniList call from BOTH sides counts against the same ~90 req/min
+// budget. When Jikan is down the app converts many Jikan calls into AniList
+// calls; without pacing we 429 in seconds and the retries deepen the storm.
+//
+//   • Pace all requests (default 400ms → ceiling ≈150/min, but real usage
+//     after 30-min caching and in-flight dedup is far below that).
+//   • On a 429, open a short breaker: fail fast (stale cache or error)
+//     instead of retrying, and give AniList 10s to recover.
+const MIN_REQUEST_INTERVAL_MS = 400
+const BREAKER_MS = 10_000
+let lastRequestAt = 0
+let breakerUntil = 0
+
+async function paceRequest(signal?: AbortSignal): Promise<void> {
+  if (Date.now() < breakerUntil) {
+    throw new AniListRateLimitError(breakerUntil - Date.now())
+  }
+  const wait = lastRequestAt + MIN_REQUEST_INTERVAL_MS - Date.now()
+  if (wait > 0) {
+    await sleep(wait, signal)
+  }
+  lastRequestAt = Date.now()
+}
+
 // Local stale cache: when AniList is rate-limiting or down, return the
 // last successful response so the UI keeps working. Survives reloads.
 const STORAGE_PREFIX = 'kurodo-anilist:'
@@ -126,6 +152,10 @@ export async function anilistRequest<T>(
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`
 
   const cacheKey = getStaleCacheKey(query, variables)
+
+  // Pace (throws AniListRateLimitError immediately while the breaker is open).
+  await paceRequest(opts.signal)
+
   let attempt = 0
   for (;;) {
     let status = 0
@@ -173,6 +203,21 @@ export async function anilistRequest<T>(
     if (!isTransient) {
       const msg = data?.errors?.[0]?.message || `AniList returned ${status}`
       throw new Error(msg)
+    }
+
+    // ── 429: open the breaker and fail fast — never retry into a storm. ──
+    // Retrying a 429 only deepens the throttle for everyone (server + client
+    // share the IP). Serve stale cache when available, else throw immediately.
+    if (isRateLimited) {
+      breakerUntil = Date.now() + BREAKER_MS
+      if (typeof window !== 'undefined') {
+        const stale = readStaleCache<T>(cacheKey)
+        if (stale != null) {
+          console.warn('[anilistClient] 429 — returning stale cache, breaker open')
+          return stale
+        }
+      }
+      throw new AniListRateLimitError((retryAfterSec ?? 10) * 1000)
     }
 
     if (attempt >= MAX_RETRIES) {

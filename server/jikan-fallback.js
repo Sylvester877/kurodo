@@ -7,7 +7,34 @@ import axios from 'axios'
 
 const ANILIST_GQL = 'https://graphql.anilist.co'
 
+// ── Global AniList throttle + 429 circuit breaker ────────────────────
+// AniList enforces ~90 req/min per IP. When Jikan is down (504), EVERY
+// /api/jikan/* request converts into an AniList fallback call — without a
+// shared pace the app blows past the limit in seconds, then the 429s
+// themselves get retried 3× more (retry storm) and the fallback dies too.
+//
+//   • MIN_INTERVAL paces calls so bursts stay under AniList's budget.
+//   • The 429 breaker pauses ALL fallback calls for 15s after a 429 so
+//     AniList can recover instead of being hammered while throttled.
+const MIN_ANILIST_INTERVAL_MS = 700   // ≈ ≤85 req/min — headroom under 90
+const ANILIST_BREAKER_MS = 15_000     // pause after a 429
+let lastAnilistCallAt = 0
+let anilistBreakerUntil = 0
+
+async function paceAniList() {
+  // Circuit breaker: if AniList just 429'd us, don't pile on — fail fast.
+  if (Date.now() < anilistBreakerUntil) {
+    const err = new Error('AniList rate-limited (breaker active)')
+    err.status = 429
+    throw err
+  }
+  const wait = lastAnilistCallAt + MIN_ANILIST_INTERVAL_MS - Date.now()
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+  lastAnilistCallAt = Date.now()
+}
+
 async function anilistRequest(query, variables = {}, { maxRetries = 3 } = {}) {
+  await paceAniList()
   let lastError = null
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -27,14 +54,27 @@ async function anilistRequest(query, variables = {}, { maxRetries = 3 } = {}) {
       // AniList returns 200 with errors array for GraphQL errors, but it can
       // also 429 or 5xx when overloaded.  Retry transient failures.
       if (data?.errors && !data?.data) {
+        // 429 error bodies come through the errors array — open the breaker.
+        if (data.errors.some((er) => er.status === 429)) {
+          anilistBreakerUntil = Date.now() + ANILIST_BREAKER_MS
+          const err = new Error(data.errors[0]?.message || 'AniList rate-limited')
+          err.status = 429
+          throw err
+        }
         return data
       }
       return data
     } catch (e) {
+      const status = e?.status || e?.response?.status
+      // 429 — never retry from the fallback: opening the breaker is enough,
+      // and retrying only deepens the storm.
+      if (status === 429) {
+        anilistBreakerUntil = Date.now() + ANILIST_BREAKER_MS
+        throw e
+      }
       lastError = e
-      const status = e?.response?.status
-      // Retry on network/timeout errors or server errors / 429.
-      if (attempt < maxRetries && (status === 429 || status >= 500 || e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT')) {
+      // Retry on network/timeout errors or server errors.
+      if (attempt < maxRetries && (status >= 500 || e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT')) {
         const waitMs = Math.min(1000 * Math.pow(2, attempt), 8000)
         console.warn(`[jikan-fallback] AniList request failed (attempt ${attempt + 1}/${maxRetries + 1}): ${status || e.code}, retrying in ${waitMs}ms`)
         await new Promise((r) => setTimeout(r, waitMs))

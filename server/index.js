@@ -1389,7 +1389,11 @@ function enqueueJikanRequest(task) {
   return run
 }
 
-async function fetchJikanWithRetry(targetUrl, query, maxRetries = 3) {
+async function fetchJikanWithRetry(targetUrl, query, maxRetries = 1) {
+  // maxRetries=1: Jikan 504s mean MAL is down — the retry chain (1+2+4s
+  // backoff) only added ~7s of dead time before the AniList fallback got a
+  // chance. The parallel race now resolves via AniList while Jikan retries
+  // in the background, so one retry is plenty for transient blips.
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const { data, status, headers } = await axios.get(targetUrl, {
@@ -1507,45 +1511,63 @@ app.get('/api/jikan/*', async (req, res) => {
       return res.status(502).json({ status: 502, type: 'BadGateway', message: failed.message })
     }
 
-    // 3. Deduplicate concurrent identical requests and queue them
-    let inFlight = jikanInFlight.get(cacheKey)
-    if (!inFlight) {
-      inFlight = enqueueJikanRequest(() => fetchJikanWithRetry(targetUrl, req.query))
-      jikanInFlight.set(cacheKey, inFlight)
-      inFlight.finally(() => jikanInFlight.delete(cacheKey))
+    // 3. PARALLEL RACE: Jikan proxy + AniList fallback — first success wins.
+    //    Jikan is frequently down (504) and its retry chain alone can burn
+    //    10s+. We never wait for Jikan to exhaust before trying AniList:
+    //    both fire at once, so search/details resolve in ~2-4s even when
+    //    Jikan is 504ing and AniList is the only healthy source. The
+    //    AniList fallback bypasses the Jikan queue entirely.
+    const JIKAN_ROUTE_TIMEOUT_MS = 10_000
+
+    // Pre-fire the AniList fallback immediately (not behind the Jikan queue).
+    const fallbackReq = tryAniListFallback(targetPath, req.query)
+      .catch(() => null)
+
+    // Queued Jikan request (deduped across concurrent callers). The map
+    // stores the RAW { data, status } promise; each caller reshapes it
+    // locally so concurrent callers can't mis-destructure a reshaped value.
+    let jikanRaw = jikanInFlight.get(cacheKey)
+    if (!jikanRaw) {
+      jikanRaw = enqueueJikanRequest(() => fetchJikanWithRetry(targetUrl, req.query))
+      jikanInFlight.set(cacheKey, jikanRaw)
+      jikanRaw.finally(() => jikanInFlight.delete(cacheKey))
     }
+    const jikanReq = jikanRaw
+      .then(({ data, status }) => (status >= 200 && status < 300 ? data : null))
+      .catch(() => null)
 
-    // 4. Hard route-level timeout so the client never sees a 504 from a
-    //    gateway/proxy in front of us. If Jikan is completely stalled,
-    //    fail fast with 502 instead of letting the connection hang.
-    //    Raised from 12s to 18s — Jikan is often slow during peak hours
-    //    and the queue delay + retries need more headroom.
-    const JIKAN_ROUTE_TIMEOUT_MS = 18_000
-    const { data, status } = await Promise.race([
-      inFlight,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Jikan proxy timed out after ${JIKAN_ROUTE_TIMEOUT_MS}ms`)), JIKAN_ROUTE_TIMEOUT_MS),
-      ),
-    ])
+    const winner = await new Promise((resolve) => {
+      let done = false
+      const win = (v) => { if (!done && v) { done = true; resolve(v) } }
+      jikanReq.then(win)
+      fallbackReq.then(win)
+      // Once both settle with no winner, resolve null (fail fast).
+      Promise.allSettled([jikanReq, fallbackReq]).then(() => {
+        if (!done) { done = true; resolve(null) }
+      })
+      // Hard cap — never let a stalled Jikan queue hold the UI.
+      setTimeout(() => {
+        if (!done) { done = true; resolve(null) }
+      }, JIKAN_ROUTE_TIMEOUT_MS)
+    })
 
-    // Cache successful responses
-    if (status >= 200 && status < 300) {
-      jikanCache.set(cacheKey, { at: Date.now(), data })
-      // Periodic cache prune
+    if (winner) {
+      jikanCache.set(cacheKey, { at: Date.now(), data: winner })
       if (jikanCache.size % 50 === 0) pruneJikanCache()
-      return res.status(200).json(data)
+      return res.status(200).json(winner)
     }
 
-    // Upstream returned a non-success status — for non-critical endpoints
-    // like recommendations, return a graceful empty fallback instead of an
-    // error so the anime details page still renders.
+    // ── Both sources failed or timed out — graceful degradation ──
+    if (isRecommendations) {
+      console.warn('[jikan-proxy] recommendations unavailable, returning empty')
+      return res.status(200).json({ data: [] })
+    }
 
-    // Fallback: the /anime/:id/full endpoint is heavy and often times out.
-    // Try the lighter /anime/:id endpoint so the details page can still render.
+    // The /anime/:id/full endpoint is heavy and often times out. Try the
+    // lighter /anime/:id endpoint so the details page can still render.
     const fullMatch = targetPath.match(/^\/anime\/(\d+)\/full$/)
     if (fullMatch) {
       const liteUrl = `https://api.jikan.moe/v4/anime/${fullMatch[1]}`
-      console.warn(`[jikan-proxy] ${targetPath} returned ${status}, trying lite fallback ${liteUrl}`)
       try {
         const lite = await fetchJikanWithRetry(liteUrl, req.query)
         if (lite.status >= 200 && lite.status < 300) {
@@ -1554,27 +1576,16 @@ app.get('/api/jikan/*', async (req, res) => {
           return res.status(200).json(lite.data)
         }
       } catch (liteErr) {
-        // fall through to normal error handling
+        // fall through to failure handling
       }
     }
 
-    if (isRecommendations) {
-      console.warn(`[jikan-proxy] ${status} on ${targetPath}, returning empty recommendations`)
-      return res.status(200).json({ data: [] })
-    }
-
-    // AniList fallback for Jikan 504s / outages.
-    try {
-      const fallback = await tryAniListFallback(targetPath, req.query)
-      if (fallback) {
-        jikanCache.set(cacheKey, { at: Date.now(), data: fallback })
-        return res.status(200).json(fallback)
-      }
-    } catch (fallbackErr) {
-      console.error('[jikan-proxy] AniList fallback failed:', fallbackErr?.message || fallbackErr)
-    }
-
-    return res.status(status).json(data)
+    jikanFailCache.set(cacheKey, { at: Date.now(), message: 'Jikan and AniList both unavailable' })
+    return res.status(502).json({
+      status: 502,
+      type: 'BadGateway',
+      message: 'Search is temporarily unavailable — MyAnimeList (Jikan) is down and AniList is rate-limiting. Try again in a moment.',
+    })
   } catch (e) {
     console.error('[jikan-proxy]', e?.message || e)
 
