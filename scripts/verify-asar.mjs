@@ -2,6 +2,7 @@
 // Usage: node scripts/verify-asar.mjs [path-to-app.asar]
 import asar from '@electron/asar'
 import path from 'node:path'
+import fs from 'node:fs'
 
 const asarPath = process.argv[2] || path.resolve('release/win-unpacked/resources/app.asar')
 
@@ -102,7 +103,7 @@ if (pkgContent) {
   // false-fail this check with a stale hardcoded number.
   let expectedVersion = 'unknown'
   try {
-    expectedVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version
+    expectedVersion = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf-8')).version
   } catch {}
   console.log(`${v === expectedVersion ? '✅' : '❌'} packaged version = ${v} (expect ${expectedVersion})`)
   if (v !== expectedVersion) ok = false
