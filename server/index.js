@@ -2724,7 +2724,7 @@ if (isProduction) {
   })
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Kurōdo listening on http://localhost:${PORT}`)
   console.log(`   • Scraper API: /api/anidap/*`)
   console.log(`   • HLS proxy:   /proxy?url=...`)
@@ -2751,4 +2751,41 @@ app.listen(PORT, () => {
   // call), and the first user stream load caches the result in streamCache
   // for 5min. Subsequent loads of the same episode are instant.
   import('./cf-harvester.js').then(({ warmUp }) => warmUp()).catch(() => {})
+})
+
+// ── Port-conflict recovery ──────────────────────────────────────
+// When a second Kurōdo instance starts while the first is still running,
+// node crashes with an unhandled EADDRINUSE. Instead of dying, check if
+// the port is already serving a healthy Kurōdo backend and exit quietly —
+// the Electron single-instance lock handles the GUI, but the standalone
+// server (dev mode / scripts) can still hit this.
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.warn(`[server] Port ${PORT} already in use — checking if it's a healthy Kurōdo instance…`)
+    const probe = http.get(`http://localhost:${PORT}/api/health`, (res) => {
+      let body = ''
+      res.on('data', (c) => (body += c))
+      res.on('end', () => {
+        try {
+          const health = JSON.parse(body)
+          if (health && health.ok && health.service === 'kurodo-backend') {
+            console.log(`[server] Existing healthy Kurōdo on :${PORT} — exiting this duplicate.`)
+            process.exit(0)
+          }
+        } catch { /* not our server */ }
+        console.error(`[server] Port ${PORT} in use by another app — cannot start.`)
+        process.exit(1)
+      })
+    })
+    probe.on('error', () => {
+      console.error(`[server] Port ${PORT} in use by another app — cannot start.`)
+      process.exit(1)
+    })
+    probe.setTimeout(3000, () => {
+      console.error(`[server] Port ${PORT} in use and unresponsive — cannot start.`)
+      process.exit(1)
+    })
+  } else {
+    console.error('[server] Failed to start:', err)
+  }
 })
