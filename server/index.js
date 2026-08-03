@@ -1744,7 +1744,9 @@ const ANILIST_CACHE_TTL = 5 * 60 * 1000
 // Stale-while-revalidate: serve older cached responses while refreshing in
 // the background so the UI keeps working when AniList is rate-limiting.
 const ANILIST_STALE_TTL = 15 * 60 * 1000
-const ANILIST_FAIL_TTL = 30 * 1000
+// Short fail TTL (5s) — a single AniList hiccup shouldn't block the entire
+// UI for 30 seconds. The negative cache still stops retry storms but recovers fast.
+const ANILIST_FAIL_TTL = 5 * 1000
 const anilistCache = new Map()
 const anilistFailCache = new Map()
 const anilistInFlight = new Map()
