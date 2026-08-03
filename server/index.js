@@ -904,8 +904,10 @@ async function fetchTmdbStills(malId) {
     if (!Array.isArray(eps) || eps.length === 0) break
     for (const e of eps) {
       if (e?.still_path && e.episode_number) {
+        // w780 = 780px wide — crisp on desktop while loading ~2x faster than w1280.
+        // TMDB rate-limits are generous; the /img proxy caches results 24h anyway.
         out[running + e.episode_number] =
-          `https://image.tmdb.org/t/p/w500${e.still_path}`
+          `https://image.tmdb.org/t/p/w780${e.still_path}`
       }
     }
     running += eps.length

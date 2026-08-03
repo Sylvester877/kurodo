@@ -27,6 +27,13 @@ export function buildEpisodeImageUrl(
   ep: AniZipEpisode | null | undefined,
   opts: Options = {},
 ): string {
+  // ── TMDB images: return directly — they have CORS headers and load
+  // instant in the browser. Bypassing the /img proxy avoids a server
+  // round-trip + buffer pass-through (~300-800ms saved per thumbnail).
+  if (ep?.image && ep.image.includes('image.tmdb.org')) {
+    return ep.image
+  }
+
   // ── No real screenshot? Generate a numbered episode card. ──
   // /img?card=1 fetches the cover server-side, embeds it as a base64
   // data-URL in the SVG, and returns a fully self-contained numbered tile
