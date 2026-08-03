@@ -67,7 +67,7 @@ export default function ReaderSettingsModal({ open, onClose }: Props) {
               <div className="p-3 border-b border-white/[0.04]">
                 <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-wider">Settings</h3>
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
+              <div data-lenis-prevent className="flex-1 overflow-y-auto custom-scrollbar py-1">
                 {CATEGORIES.map((cat) => {
                   const isActive = activeCat === cat.id
                   return (
@@ -98,7 +98,7 @@ export default function ReaderSettingsModal({ open, onClose }: Props) {
             </div>
 
             {/* ── Right: Settings content ── */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
+            <div data-lenis-prevent className="flex-1 overflow-y-auto custom-scrollbar p-5">
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold text-white/80">

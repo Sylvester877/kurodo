@@ -1165,7 +1165,7 @@ const FilterSidebar = React.memo(function FilterSidebar({ filters, onChange }: {
             Genre{activeGenres.length > 0 && ` (${activeGenres.length})`}
           </h3>
         </div>
-        <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+        <div data-lenis-prevent className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
           {allGenres.map((g) => {
             const active = activeGenres.includes(g.mal_id)
             return (

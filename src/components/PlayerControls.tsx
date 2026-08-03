@@ -998,7 +998,7 @@ function MenuPanel({
               {title}
             </div>
           )}
-      <div className="py-1 max-h-[320px] overflow-y-auto">{children}</div>
+      <div data-lenis-prevent className="py-1 max-h-[320px] overflow-y-auto">{children}</div>
     </div>
   )
 }

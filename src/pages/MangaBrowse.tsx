@@ -242,7 +242,7 @@ export default function MangaBrowse() {
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-white/10 bg-black/95 overflow-hidden z-30 shadow-lg max-h-[60vh] overflow-y-auto custom-scrollbar"
+            data-lenis-prevent className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-white/10 bg-black/95 overflow-hidden z-30 shadow-lg max-h-[60vh] overflow-y-auto custom-scrollbar"
           >
             {searching ? (
               <div className="p-8 text-center">
@@ -365,7 +365,7 @@ export default function MangaBrowse() {
                       + Add genre
                     </button>
                     {showGenreDropdown && (
-                      <div className="absolute top-full mt-1 left-0 z-50 min-w-[200px] max-h-[320px] overflow-y-auto custom-scrollbar rounded-xl border border-white/10 bg-black/95 p-2 shadow-lg">
+                      <div data-lenis-prevent className="absolute top-full mt-1 left-0 z-50 min-w-[200px] max-h-[320px] overflow-y-auto custom-scrollbar rounded-xl border border-white/10 bg-black/95 p-2 shadow-lg">
                         {genreOptions.map((g) => {
                           const isSelected = selectedGenres.includes(g)
                           return (

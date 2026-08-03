@@ -94,7 +94,7 @@ function FilterPill({
         )}
       </button>
       {open && (
-        <div className="absolute top-full mt-2 left-0 z-50 min-w-[200px] max-h-[360px] overflow-y-auto custom-scrollbar glass-card rounded-xl p-1.5 shadow-2xl">
+        <div data-lenis-prevent className="absolute top-full mt-2 left-0 z-50 min-w-[200px] max-h-[360px] overflow-y-auto custom-scrollbar glass-card rounded-xl p-1.5 shadow-2xl">
           {children(() => setOpen(false))}
         </div>
       )}

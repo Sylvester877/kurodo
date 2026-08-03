@@ -526,7 +526,7 @@ export default function CommandPalette() {
         {/* Results */}
         <div
           ref={listRef}
-          className="max-h-[55vh] overflow-y-auto custom-scrollbar"
+          data-lenis-prevent className="max-h-[55vh] overflow-y-auto custom-scrollbar"
         >
           {commands.length === 0 ? (
             <div className="px-6 py-10 text-center">

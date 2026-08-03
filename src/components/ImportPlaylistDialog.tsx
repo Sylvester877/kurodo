@@ -805,7 +805,7 @@ function PreviewPanel({
         {previewOpen ? 'Hide' : 'Show'} {previewCount} titles to import
       </button>
       {previewOpen && (
-        <div className="max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-black/30 mb-4">
+        <div data-lenis-prevent className="max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-black/30 mb-4">
           {previewEntries.slice(0, 100).map((e) => (
             <div key={e.malId} className="flex items-center gap-2 px-3 py-1.5 border-b border-white/5 last:border-b-0 text-xs">
               <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', STATUS_META[e.status].dot)} />

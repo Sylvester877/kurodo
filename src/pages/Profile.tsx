@@ -525,7 +525,7 @@ export default function Profile() {
                   Nothing in progress. Start an episode to populate this.
                 </p>
               ) : (
-                <ul className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
+                <ul data-lenis-prevent className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-1">
                   {inProgress.slice(0, 8).map((p) => (
                     <li key={p.anime.mal_id}>
                       <Link

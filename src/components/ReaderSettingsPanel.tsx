@@ -22,7 +22,7 @@ export default function ReaderSettingsPanel({ open, onClose }: Props) {
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
         transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-        className="fixed top-0 right-0 bottom-0 w-[340px] z-50 bg-[#0a0a0a]/98 border-l border-white/[0.06] overflow-y-auto custom-scrollbar"
+        data-lenis-prevent className="fixed top-0 right-0 bottom-0 w-[340px] z-50 bg-[#0a0a0a]/98 border-l border-white/[0.06] overflow-y-auto custom-scrollbar"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5 space-y-5">

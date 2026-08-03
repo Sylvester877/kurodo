@@ -271,7 +271,7 @@ export default function Browse() {
                 )} />
               </button>
               {showFilters && (
-                <div className="absolute top-full mt-2 left-0 z-50 min-w-[260px] max-h-[420px] overflow-y-auto custom-scrollbar glass-card rounded-xl p-2 shadow-2xl">
+                <div data-lenis-prevent className="absolute top-full mt-2 left-0 z-50 min-w-[260px] max-h-[420px] overflow-y-auto custom-scrollbar glass-card rounded-xl p-2 shadow-2xl">
                   <button
                     onClick={() => updateGenre(null)}
                     className={cn(

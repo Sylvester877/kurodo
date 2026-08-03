@@ -95,6 +95,7 @@ import {
   shouldUseProxy,
   initGogoProxyPool,
 } from './proxy-config.js'
+import { register as registerAnikageEpisodes } from './anikage-episodes.js'
 
 // Keep-alive: reuse TCP connections, save 200-500ms per request
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 })
@@ -2821,6 +2822,9 @@ app.get('/img', async (req, res) => {
 //
 // API routes (/api/*, /proxy, /img) are registered ABOVE this block,
 // so they take priority over static file serving.
+
+// Register additional API modules
+await registerAnikageEpisodes(app)
 
 const distPath = path.resolve(__dirname, '..', 'dist')
 const isProduction = fs.existsSync(distPath)

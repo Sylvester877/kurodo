@@ -993,7 +993,7 @@ export default function WatchList() {
               </div>
             </div>
             <div className="px-5 pb-4">
-              <ul className="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/30 text-xs divide-y divide-white/5">
+              <ul data-lenis-prevent className="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/30 text-xs divide-y divide-white/5">
                 {[...selectedIds].slice(0, 6).map((id) => {
                   const a = watchlist.find((w) => w.mal_id === id)
                   if (!a) return null

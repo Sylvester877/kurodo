@@ -8,8 +8,8 @@ import { Star, Calendar, Heart, Film, Users, Globe, Hash, ArrowLeft,
 } from 'lucide-react'
 import { getAnimeById, getAnimeRecommendations, ANIME_LOAD_STUB_TITLE } from '../api/anime'
 import { getEpisodeInfoFromMal } from '../api/anilist'
-import { getEpisodesByMalId, mergeJikanEpisodeMeta, type AniZipEpisode } from '../api/anizip'
-import { useJikanEpisodeImages } from '../hooks/useJikanEpisodeImages'
+import { getEpisodesByMalId, type AniZipEpisode } from '../api/anizip'
+import { useAnikageEpisodes } from '../hooks/useAnikageEpisodes'
 import type { Anime } from '../types'
 import { getSkipTimes, type SkipTimes } from '../api/aniskip'
 import { useWatchListStore } from '../store/useWatchListStore'
@@ -151,13 +151,22 @@ export default function AnimeDetails() {
   }, [anime?.episodes])
 
   const isLoadingEpisodes = episodesQuery.isLoading || epInfoQuery.isLoading
-  // Merge real MAL screenshots (Jikan) into the AniZip list — fills the
-  // thumbnail gap for long shows (Bleach: AniZip only covers eps 1–21).
-  const jikanEpImages = useJikanEpisodeImages(malId, episodesQuery.isSuccess)
+  // ── Anikage-style enriched episode images: TVDB/TMDB stills for EVERY
+  // episode (not just 1-21 like raw AniZip). Fetches in parallel with
+  // episodesQuery; as soon as it lands we merge the real images.
+  const anikageEpQuery = useAnikageEpisodes(malId, episodesQuery.isSuccess)
   const episodes: AniZipEpisode[] = useMemo(() => {
     const base = episodesQuery.data?.length ? episodesQuery.data : stubEpisodes
-    return mergeJikanEpisodeMeta(base, jikanEpImages.data)
-  }, [episodesQuery.data, stubEpisodes, jikanEpImages.data])
+    const anikageMap = new Map(anikageEpQuery.data?.episodes?.map(e => [e.number, e]) ?? [])
+    if (anikageMap.size === 0) return base
+    return base.map(ep => {
+      const enriched = anikageMap.get(Number(ep.episode))
+      if (enriched?.image && !enriched.image.includes('cdn.anidb.net')) {
+        return { ...ep, image: enriched.image }
+      }
+      return ep
+    })
+  }, [episodesQuery.data, stubEpisodes, anikageEpQuery.data])
 
   // AniSkip probe for EP 1 — non-critical for first paint; delay briefly
   // so the initial details/episode network requests get bandwidth first.
@@ -800,7 +809,7 @@ export default function AnimeDetails() {
               </div>
 
               {episodes.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
+                <div data-lenis-prevent className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
                   {episodes.slice(0, 12).map((ep) => (
                     <Link
                       key={ep.episode}
@@ -905,7 +914,7 @@ export default function AnimeDetails() {
         </div>
 
         {/* Right column — sticky metadata */}
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto custom-scrollbar lg:pr-1">
+        <aside data-lenis-prevent className="space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto custom-scrollbar lg:pr-1">
           <ScrollReveal delay={0.25}>
           <div className="glass-card rounded-2xl p-5 space-y-3">
             <div className="flex items-center gap-2 mb-1">

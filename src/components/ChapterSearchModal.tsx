@@ -186,7 +186,7 @@ export default function ChapterSearchModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15, delay: 0.06 }}
-            className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4"
+            data-lenis-prevent className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4"
             onClick={(e) => e.stopPropagation()}
           >
             {filtered.length === 0 ? (

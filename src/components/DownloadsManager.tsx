@@ -195,7 +195,7 @@ export default function DownloadsManager({ open, onClose }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
+        <div data-lenis-prevent className="flex-1 overflow-y-auto custom-scrollbar py-2">
           {api?.addTorrent && (
             <div className="px-5 pb-3 mb-2 border-b border-white/[0.04]">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2 flex items-center gap-1.5">
@@ -625,7 +625,7 @@ function TorrentRow({ torrent: t, isActive }: { torrent: TorrentInfo; isActive?:
                     </div>
                     {/* Title lookup results */}
                     {titleResults && titleResults.length > 0 && (
-                      <div className="px-1 mb-1.5 max-h-[100px] overflow-y-auto custom-scrollbar">
+                      <div data-lenis-prevent className="px-1 mb-1.5 max-h-[100px] overflow-y-auto custom-scrollbar">
                         {titleResults.map((m: any) => (
                           <button
                             key={m.id}
@@ -668,7 +668,7 @@ function TorrentRow({ torrent: t, isActive }: { torrent: TorrentInfo; isActive?:
                     )}
                     {/* Wyzie results */}
                     {wyzieResults && wyzieResults.length > 0 && (
-                      <div className="mt-1.5 max-h-[180px] overflow-y-auto custom-scrollbar">
+                      <div data-lenis-prevent className="mt-1.5 max-h-[180px] overflow-y-auto custom-scrollbar">
                         {wyzieResults.map((r: any) => (
                           <button
                             key={r.url}

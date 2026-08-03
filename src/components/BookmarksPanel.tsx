@@ -66,7 +66,7 @@ export default function BookmarksPanel({ open, onClose, mangaId, chapters, curre
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+            <div data-lenis-prevent className="flex-1 overflow-y-auto custom-scrollbar p-4">
               {enriched.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <Bookmark className="h-10 w-10 text-white/[0.06] mb-3" />

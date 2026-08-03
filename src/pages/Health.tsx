@@ -535,7 +535,7 @@ export default function HealthPage() {
                             <summary className="cursor-pointer text-white/50 hover:text-white/80 font-mono">
                               Raw response
                             </summary>
-                            <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-black/40 border border-white/5 p-2 text-white/65 whitespace-pre-wrap">
+                            <pre data-lenis-prevent className="mt-2 max-h-48 overflow-auto rounded-md bg-black/40 border border-white/5 p-2 text-white/65 whitespace-pre-wrap">
                               {JSON.stringify(res.data, null, 2)}
                             </pre>
                           </details>

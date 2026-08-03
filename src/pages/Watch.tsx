@@ -10,8 +10,8 @@ import {
 import { useTitle } from '../hooks/useTitle'
 import { getAnimeById, getAnimeRecommendations } from '../api/anime'
 import { getEpisodeInfoFromMal } from '../api/anilist'
-import { getEpisodesByMalId, getAniListIdFromMal, mergeJikanEpisodeMeta, type AniZipEpisode } from '../api/anizip'
-import { useJikanEpisodeImages } from '../hooks/useJikanEpisodeImages'
+import { getEpisodesByMalId, getAniListIdFromMal, type AniZipEpisode } from '../api/anizip'
+import { useAnikageEpisodes } from '../hooks/useAnikageEpisodes'
 import {
   fetchAnidapInfo, fetchAnidapServers, fetchAnidapStream,
   type AnidapProvider, type AnidapStream,
@@ -285,13 +285,24 @@ export default function Watch() {
     placeholderData: (prev) => prev,
     meta: { persist: true },
   })
-  // Merge real MAL screenshots (Jikan) into the AniZip list — fills the
-  // thumbnail gap for long shows (Bleach: AniZip only covers eps 1–21).
-  const jikanEpImages = useJikanEpisodeImages(malId, episodesQuery.isSuccess)
-  const episodes: AniZipEpisode[] = useMemo(
-    () => mergeJikanEpisodeMeta(episodesQuery.data ?? [], jikanEpImages.data),
-    [episodesQuery.data, jikanEpImages.data],
-  )
+  // ── Anikage-style enriched episode images: TVDB/TMDB stills for EVERY
+  // episode (not just 1-21 like raw AniZip). Fetches in parallel with
+  // episodesQuery; as soon as it lands we merge the real images into the
+  // AniZip list. The existing buildEpisodeImageUrl already passes TMDB
+  // URLs through directly — no rendering changes needed.
+  const anikageEpQuery = useAnikageEpisodes(malId, episodesQuery.isSuccess)
+  const episodes: AniZipEpisode[] = useMemo(() => {
+    const base = episodesQuery.data ?? []
+    const anikageMap = new Map(anikageEpQuery.data?.episodes?.map(e => [e.number, e]) ?? [])
+    if (anikageMap.size === 0) return base
+    return base.map(ep => {
+      const enriched = anikageMap.get(Number(ep.episode))
+      if (enriched?.image && !enriched.image.includes('cdn.anidb.net')) {
+        return { ...ep, image: enriched.image }
+      }
+      return ep
+    })
+  }, [episodesQuery.data, anikageEpQuery.data])
 
   // ── Memoize episode filtering so we don't re-compute on every render.
   // Critical for 100+ ep anime (One Piece etc.) where re-filtering the
@@ -1619,7 +1630,7 @@ export default function Watch() {
         </div>
 
         {/* ---- Sidebar: episode list ---- */}
-        <aside className={cn(
+        <aside data-lenis-prevent className={cn(
           'space-y-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto custom-scrollbar lg:pr-1',
           'flex flex-col gap-3',
           theaterMode && 'hidden',
@@ -1762,7 +1773,7 @@ export default function Watch() {
                     })()}
                   </div>
                 ) : (
-                  <div ref={epListRef} className="overflow-y-auto custom-scrollbar p-2 flex-1">
+                  <div ref={epListRef} data-lenis-prevent className="overflow-y-auto custom-scrollbar p-2 flex-1">
                     {shouldVirtualize ? (
                       <div style={{ height: `${episodeVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
                         {episodeVirtualizer.getVirtualItems().map((vItem) => {

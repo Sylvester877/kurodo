@@ -35,7 +35,7 @@ export default function KeyboardHelpModal({ open, onClose, isStrip }: Props) {
             className="fixed inset-0 z-[61] flex items-center justify-center p-4"
           >
             <div
-              className="bg-[#0d0d0d]/98 border border-white/[0.06] rounded-2xl shadow-lg shadow-black/50 w-full max-w-[420px] max-h-[80vh] overflow-y-auto custom-scrollbar"
+              data-lenis-prevent className="bg-[#0d0d0d]/98 border border-white/[0.06] rounded-2xl shadow-lg shadow-black/50 w-full max-w-[420px] max-h-[80vh] overflow-y-auto custom-scrollbar"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}

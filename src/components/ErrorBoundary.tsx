@@ -167,7 +167,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <summary className="cursor-pointer text-[11px] text-white/50 hover:text-white/80 select-none">
               View stack trace
             </summary>
-            <pre className="mt-2 max-h-56 overflow-auto rounded-lg bg-black/60 border border-white/5 p-3 text-[10px] text-white/50 leading-relaxed whitespace-pre-wrap">
+            <pre data-lenis-prevent className="mt-2 max-h-56 overflow-auto rounded-lg bg-black/60 border border-white/5 p-3 text-[10px] text-white/50 leading-relaxed whitespace-pre-wrap">
               {e.stack || '(no stack available)'}
             </pre>
           </details>

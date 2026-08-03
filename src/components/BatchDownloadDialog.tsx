@@ -271,7 +271,7 @@ export default function BatchDownloadDialog({
         )}
 
         {/* Episode queue list */}
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-1 pr-1">
+        <div data-lenis-prevent className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-1 pr-1">
           {downloadStates.map((s) => (
             <div
               key={s.ep}

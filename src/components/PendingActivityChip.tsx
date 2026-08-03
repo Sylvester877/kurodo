@@ -89,7 +89,7 @@ export default function PendingActivityChip() {
             </button>
           </div>
 
-          <div className="max-h-[260px] overflow-y-auto custom-scrollbar">
+          <div data-lenis-prevent className="max-h-[260px] overflow-y-auto custom-scrollbar">
             {entries.map((e) => (
               <PendingRow key={e.malId} entry={e} title={titleFor(e.malId)} />
             ))}

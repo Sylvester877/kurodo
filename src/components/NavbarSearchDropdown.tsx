@@ -215,7 +215,7 @@ export default function NavbarSearchDropdown({
       {/* Dropdown body — shown for both empty (recents) and active (results) states. */}
       <div
         ref={listRef}
-        className="absolute top-full mt-2 left-0 right-0 max-h-[70vh] overflow-y-auto custom-scrollbar bg-card border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 animate-[fadeInUp_0.15s_ease]"
+        data-lenis-prevent className="absolute top-full mt-2 left-0 right-0 max-h-[70vh] overflow-y-auto custom-scrollbar bg-card border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 animate-[fadeInUp_0.15s_ease]"
       >
         {/* Empty input: show recent searches if any */}
         {!hasQuery && (
