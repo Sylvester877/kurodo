@@ -904,10 +904,11 @@ async function fetchTmdbStills(malId) {
     if (!Array.isArray(eps) || eps.length === 0) break
     for (const e of eps) {
       if (e?.still_path && e.episode_number) {
-        // w780 = 780px wide — crisp on desktop while loading ~2x faster than w1280.
-        // TMDB rate-limits are generous; the /img proxy caches results 24h anyway.
+        // w1280 = 1280px wide — maximum quality for desktop. TMDB rate-limits
+        // are generous; images are cached 24h by the server and loaded direct
+        // by the browser (CORS), so the extra file size only hits once per day.
         out[running + e.episode_number] =
-          `https://image.tmdb.org/t/p/w780${e.still_path}`
+          `https://image.tmdb.org/t/p/w1280${e.still_path}`
       }
     }
     running += eps.length
