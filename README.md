@@ -1,217 +1,164 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/dist/icon-256.png" alt="Kurodo" width="128" />
-</p>
+<div align="center">
 
-<h1 align="center">Kurōdo</h1>
-<p align="center">
-  <strong>Discover & stream anime — fast, beautiful, keyboard-first.</strong><br/>
-  A premium anime streaming desktop app with multi-provider scraping, AniList sync, and a cinematic Netflix-style UI.
-</p>
+<img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/dist/icon-256.png" alt="Kurōdo" width="120" />
 
-<p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.3-blueviolet" alt="Version" />
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform" />
-  <img src="https://img.shields.io/badge/electron-34%2B-9cf" alt="Electron" />
-  <img src="https://img.shields.io/badge/react-19-61dafb" alt="React" />
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
-</p>
+# 蔵人 · Kurōdo
 
----
+**A cinematic anime & manga streaming desktop app — fast, beautiful, keyboard-first.**
 
-## ✨ Features
+[![Version](https://img.shields.io/badge/version-0.3.19-blueviolet)](https://github.com/Sylvester877/kurodo/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078d6)](https://github.com/Sylvester877/kurodo/releases)
+[![Electron](https://img.shields.io/badge/electron-34%2B-9cf)](https://www.electronjs.org/)
+[![React](https://img.shields.io/badge/react-19-61dafb)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/typescript-5.7-3178c6)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-### 🎬 Streaming
-- **10+ Scraper Providers** — yuki, gojo, koto, kami, nuri, neko, beep, uwu, vee, and more
-- **Sub & Dub Support** — toggle between audio tracks with automatic English track detection
-- **Multi-source fallback** — if one provider fails, the next one auto-switches instantly
-- **Per-provider rate limiting** — prevents 429 storms from taking down all servers
-- **Intro/Outro auto-skip** — powered by AniSkip community timestamps (like Netflix's "Skip Intro")
-- **Resume where you left off** — progress saved per episode across sessions
+**Auto-updating Windows app · Netflix-style UI · Real per-episode thumbnails · 15+ stream providers**
 
-### 🎨 UI/UX
-- **Cinematic blurred backdrops** — each anime's artwork becomes the page background
-- **Lenis smooth scrolling** — buttery 60fps scroll with parallax effects
-- **Magnetic cards** — posters tilt toward your cursor on hover
-- **Spotlight glow** — cards illuminate as you mouse over them
-- **Keyboard shortcuts** — Space to play/pause, J/L seek, N next episode, F fullscreen, T theater mode
-- **Theater mode** — hides sidebar for a wider player experience
-- **Staggered card animations** — Netflix-style progressive grid reveal
-- **Glass-morphism design system** — consistent pill badges, glass cards, accent glows
-
-### 🔗 Integrations
-- **AniList Sync** — auto-mark episodes as watched, sync your entire list
-- **AniSkip** — community-submitted intro/outro skip timestamps
-- **AniZip** — episode metadata and thumbnails
-- **TMDB** — high-quality title logos for the hero banner
-- **AniList feeds** — Trending, Seasonal, Upcoming, Most Favorite on Home
-- **Filler detection** — FILLER and MIXED CANON badges for Naruto/Bleach/One Piece
-
-### 📦 Platform
-- **Electron desktop app** — native Chromium window with frameless design
-- **Auto-update via GitHub Releases** — checks for new versions on startup
-- **Local update detection** — finds new releases on disk for instant updates
-- **PWA support** — service worker with offline caching
-- **Torrent streaming** — built-in WebTorrent client with subtitle extraction
-- **Wyzie Subs** — external subtitle provider integration
+</div>
 
 ---
 
-## 🛠 Tech Stack
+## ✨ What makes Kurōdo special
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React 19, TypeScript 5.7, Tailwind CSS v4, Framer Motion |
-| **State** | Zustand 5, TanStack React Query 5 |
-| **Virtualization** | TanStack React Virtual 3 |
-| **Desktop** | Electron 34+, electron-updater 6 |
-| **Backend** | Express 4, Node.js |
-| **Scraping** | Puppeteer (headless), axios, Cloudflare bypass |
-| **Video** | HLS.js 1.5, WebTorrent, ffmpeg-static |
-| **Build** | Vite 6, electron-builder 25 (NSIS installer) |
+- **Real episode thumbnails** — every episode gets an actual screenshot from TVDB (the same source anikage.cc uses), not a grey box or a number over a banner. Long shows like *Bleach* get all 366.
+- **Fast by design** — Home rows lazy-mount as you scroll, streams race across 15+ providers, episode lists are virtualized for 500+ episode shows, and the first episode list paints in ~5s cold.
+- **Cinematic UI** — glassmorphism design system, blurred backdrops, magnetic poster cards, Lenis buttery smooth scrolling, theme presets (pink, violet, crimson, emerald, amber…).
+- **Keyboard-first** — Space play/pause, J/L seek, N next episode, F fullscreen, T theater mode, ⌘K command palette.
 
 ---
 
-## 🚀 Quick Start
+## 🎬 Streaming
+
+- **15+ provider servers** — yuki, gojo, koto, kami, nuri, neko, beep, uwu, vee, and more, with sub & dub tracks
+- **Per-provider rate limiting & dead-provider skipping** — one 429 can't take down every server
+- **Intro / outro auto-skip** — AniSkip community timestamps, Netflix-style skip button
+- **Resume watching** — per-episode progress saved across sessions, continue-watching rails
+- **Next-episode prefetching** — streams are decrypted in the background at 75% progress so the next episode starts instantly
+- **Torrent streaming** — built-in WebTorrent with subtitle extraction + Wyzie subs
+
+## 📚 Manga & Browse
+
+- **Manga reader** — Mangadex-backed, with reading stats, chapter search, and a continue-reading rail
+- **Search with deep filters** — format, status, genres, score, year (races Jikan vs AniList so results appear in seconds)
+- **Watchlist & activity** — syncs with AniList (auto-mark watched, share activity)
+- **Schedule & seasonal** — upcoming episode countdowns, seasonal lineups
+- **Filler flags** — FILLER / RECAP badges on Naruto, Bleach, One Piece
+- **Comments & social hub** — discuss episodes in-app
+- **Top 100 & genre explorer** — ranked lists and curated genre tiles
+
+## 🔗 Integrations
+
+| Service | Used for |
+|---|---|
+| **TVDB** (v4 API) | Real per-episode screenshots — the anikage.cc source |
+| **AniZip** | Episode metadata, titles, runtimes, ID mappings |
+| **TMDB** | Title logos & backdrop art for the hero |
+| **AniList** | Feeds, metadata, watchlist sync, activity |
+| **Jikan** (MAL) | Scores, ranks, filler flags |
+| **AniSkip** | Intro/outro timestamps |
+
+---
+
+## 🚀 Getting started
 
 ### Prerequisites
-- **Node.js** ≥ 18
-- **npm** ≥ 9
+- **Node.js ≥ 18** · **npm ≥ 9**
 
-### Install & Run
-
+### Run in development
 ```bash
-# Clone the repo
 git clone https://github.com/Sylvester877/kurodo.git
 cd kurodo
-
-# Install dependencies
 npm install
 
-# Start in development mode (Vite + Express server)
+# Web app (Vite + Express backend on :5173)
 npm run dev
 
-# Or start the Electron desktop app
+# Or the Electron desktop app
 npm run electron:dev
 ```
 
-The app opens at **http://localhost:5173**.
-
-### Build the Installer
-
+### Build the installer
 ```bash
-# Build the Windows NSIS installer (.exe)
-npm run electron:build:win
-
-# Output: release/Kurodo-Setup-0.3.3.exe
+npm run electron:build:win   # → release/Kurodo-Setup-0.3.19.exe
 ```
 
-To publish to GitHub Releases (for auto-update):
+### Publish a release (enables auto-update)
 ```bash
-# Set your GitHub token
-export GH_TOKEN=ghp_xxxxxxxxxxxx
-
-# Build + publish
-npm run electron:build:win
+export GH_TOKEN=ghp_xxxxxxxxxxxx   # classic token with `repo` scope
+npm run electron:build:win         # builds + publishes to GitHub Releases
 ```
+Users with an older version get the update automatically on startup via `electron-updater`.
 
 ---
 
-## 📁 Project Structure
+## 🧰 Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19 · TypeScript 5.7 · Tailwind CSS v4 · Framer Motion |
+| State | Zustand 5 · TanStack React Query 5 · React Virtual 3 |
+| Desktop | Electron 34 · electron-updater 6 (NSIS installer) |
+| Backend | Express 4 · Node 24 |
+| Scraping | Puppeteer + Electron CF-harvester, axios, Cloudflare bypass |
+| Video | HLS.js · WebTorrent · ffmpeg-static |
+
+---
+
+## 🎯 Performance notes
+
+- **Lazy-mounted Home** — below-fold rows only mount + fetch near the viewport (AniList is paced at 400ms/request, so bursting 9 queries used to cost ~3.5s before the hero painted)
+- **Parallel episode enrichment** — TVDB / AniZip / TMDB / Jikan fetched concurrently server-side; the Jikan filler loop is capped at 3.5s so a rate-limited upstream can't stall the list
+- **Virtualized episode sidebars** — 500+ episode shows render only ~15 rows
+- **Route-level code splitting + hover preloaders** — pages and data are warm before you click
+- **Aggressive caching** — persisted React Query snapshots, 24h image cache, server-side episode cache
+- **Progressive image loading** — blurred placeholder → crisp full-res crossfade
+
+---
+
+## ⌨️ Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `Space` | Play / pause |
+| `J` / `L` | Seek −10s / +10s |
+| `N` | Next episode |
+| `F` | Fullscreen |
+| `T` | Theater mode |
+| `Ctrl/⌘ + K` | Command palette |
+| `M` | Mute |
+
+---
+
+## 📁 Project layout
 
 ```
 kurodo/
-├── src/                    # React frontend
-│   ├── api/                # API clients (AniList, AniSkip, AniZip, TMDB, anidap)
-│   ├── components/         # React components
-│   │   ├── AnimeCard.tsx   # Card with magnetic tilt + spotlight
-│   │   ├── VideoPlayer.tsx # HLS.js player with skip buttons
-│   │   ├── Watch/          # Episode sidebar, keyboard shortcuts
-│   │   └── ...
-│   ├── pages/              # Route pages
-│   │   ├── Home.tsx        # Hero + grids + seasonal
-│   │   ├── Watch.tsx       # Player + episode list + servers
-│   │   ├── AnimeDetails.tsx# Hero banner + metadata + episodes
-│   │   ├── Search.tsx      # Search with filters
-│   │   └── ...
-│   ├── lib/                # Utilities, prefetch, query client
-│   ├── store/              # Zustand stores (auth, settings, watchlist)
-│   └── hooks/              # Custom hooks
-├── server/                 # Express backend
-│   ├── index.js            # Main server + proxy routes
-│   ├── providers/          # Scraper providers (anidap, gogoanime, consumet)
-│   ├── lib/
-│   │   └── cf-harvester/   # Puppeteer + Electron stream extraction
-│   └── data/               # SQLite databases (comments)
-├── electron/               # Electron main process
-│   ├── main.js             # Window management + auto-update + IPC
-│   └── preload.cjs         # Context bridge
-├── build/                  # Build assets (icons, NSIS script)
-├── scripts/                # Test scripts
-└── package.json
+├── src/                  # React frontend
+│   ├── api/              # AniList, Jikan, AniZip, TMDB, TVDB, anidap clients
+│   ├── components/       # Player, cards, rails, settings, profile, social…
+│   ├── pages/            # Home, Watch, AnimeDetails, Search, Manga*, Profile…
+│   ├── lib/              # query client, prefetch, utils, adapters
+│   ├── store/            # Zustand stores (auth, settings, watchlist)
+│   └── hooks/
+├── server/               # Express backend
+│   ├── index.js          # API + proxies + image proxy
+│   ├── anikage-episodes.js  # TVDB/AniZip/TMDB/Jikan episode enrichment
+│   ├── tvdb-episodes.js  # TVDB v4 client (real episode screenshots)
+│   └── providers/        # anidap, gogoanime, consumet scrapers
+├── electron/             # Main process (window, auto-update, IPC)
+├── build/                # Icons + NSIS installer config
+└── scripts/              # Tests & utilities
 ```
 
 ---
 
-## 🔧 Architecture
+## ⚠️ Disclaimer
 
-```
-┌─────────────────────────────────────────────────┐
-│                 Electron Shell                   │
-│  ┌───────────────────────────────────────────┐  │
-│  │         Chromium Renderer (React)         │  │
-│  │  localhost:5173 ← Vite dev / dist static │  │
-│  └──────────────┬────────────────────────────┘  │
-│                 │ /api/*  /img/*                 │
-│  ┌──────────────▼────────────────────────────┐  │
-│  │         Express Backend (:5173)           │  │
-│  │  ┌─────────────────────────────────────┐  │  │
-│  │  │  Provider Router                    │  │  │
-│  │  │  anidap → gogoanime → consumet      │  │  │
-│  │  └──────────────┬──────────────────────┘  │  │
-│  │  ┌──────────────▼──────────────────────┐  │  │
-│  │  │  CF Harvester (Puppeteer/Electron)  │  │  │
-│  │  │  Cloudflare bypass + stream decrypt │  │  │
-│  │  └─────────────────────────────────────┘  │  │
-│  └───────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────┘
-```
-
-### Stream Resolution Flow
-1. User clicks an anime → `/anime/:malId` resolves metadata from Jikan + AniList
-2. "Watch Now" → `/watch/:malId?ep=1` loads the Watch page
-3. Server resolves the anidap slug + fetches available providers
-4. User selects a provider (or auto-selects) → scraper extracts the decrypted stream URL
-5. HLS.js plays the `.m3u8` with hardware-accelerated decoding
-6. AniSkip timestamps enable one-click intro/outro skipping
+Kurōdo is a **personal/educational project**. It does not host any content — streams are pulled from public third-party APIs. Please respect each source's terms of service and your local copyright laws.
 
 ---
 
-## 🎯 Performance
-
-- **Episode sidebar virtualization** — 500+ episode shows (Naruto, One Piece) render only ~15 visible rows
-- **Deferred non-critical queries** — filler data and recommendations load after the critical path
-- **Image proxy with 24h cache** — all CDN images go through `/img` proxy with fallback chains
-- **Progressive image loading** — blurred placeholder → full resolution crossfade
-- **Route-level code splitting** — VideoPlayer is `React.lazy` loaded
-- **Zustand atomic selectors** — prevents cascading re-renders during playback ticks
-- **`content-visibility: auto`** — off-screen grid items skip rendering
-
----
-
-## 🐛 Known Issues
-
-- **Jikan API 504s**: Upstream occasionally times out — gracefully returns empty fallbacks
-- **Some anidap providers unavailable for specific titles**: Upstream availability varies by show
-- **HLS manifest headers**: Some CDNs require specific Referer/Origin headers (handled via proxy)
-
----
-
-## 📄 License
-
-MIT — see [LICENSE](./LICENSE) for details.
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/Sylvester877">Sylvester877</a>
-</p>
+<div align="center">
+Made with ❤️ by <a href="https://github.com/Sylvester877">Sylvester877</a>
+</div>
