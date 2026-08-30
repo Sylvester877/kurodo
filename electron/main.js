@@ -1889,8 +1889,15 @@ app.whenReady().then(async () => {
 
   ipcMain.once('splash:done', () => showApp())
 
-  // Safety timeout: 8 s
-  setTimeout(() => showApp(), 8000)
+  // Safety timeout: 14 s (was 8s)
+  // The splash fires its own "done" at ~3.7s; the app then waits for the
+  // backend (cold boot: harvester warm-up + AniList feed warm-up can take
+  // 8-12s). The old 8s cap cut the wait short — the app window appeared
+  // with "fetching servers" spinners still pending, which read as
+  // "servers are different / stuck". 14s keeps the splash visible until
+  // the backend is truly ready, without any extra waiting when it's fast
+  // (showApp still fires immediately on splash:done).
+  setTimeout(() => showApp(), 14_000)
 })
 
 app.on('window-all-closed', () => {

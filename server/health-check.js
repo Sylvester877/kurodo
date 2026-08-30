@@ -423,6 +423,19 @@ export function logHealthCheck({ slug, ep, results }) {
 // would navigate the page away from each other.
 
 export async function probeAllServersHealth() {
+  // ── Skip probing while chad is bot-blocked / 429'd ──
+  // The scheduler's serial DOM probes against a dead upstream take 8-15s
+  // EACH (12+ servers ≈ 2.5+ min of mutex time) and mark healthy servers
+  // "unreachable" — exactly the "all servers down" false state. The probes
+  // can't distinguish upstream blockage from a dead server; deferring is
+  // strictly better. chad gates auto-clear (5 min soft / ≤3 min 429), and
+  // the scheduler fires again on its next tick (default 15 min).
+  const { isChadBlocked, isChad429Blocked } = await import('./anidap.js')
+  if (isChadBlocked() || isChad429Blocked()) {
+    console.log('[health-check] chad is blocked — skipping server probe this tick')
+    return
+  }
+
   const providers = getAllKnownProviders()
   if (!providers?.length) return
 

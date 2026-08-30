@@ -171,7 +171,11 @@ async function electronInit() {
         }, 12_000),
       ),
     ])
-    await new Promise(r => setTimeout(r, 3000))
+    // Small settle so cookies/session state persist before the first API
+    // call. 3s of fixed sleep per freshly created window is a meaningful
+    // slice of the ~6-8s chad path — the anidap SPA hydrates in ~1s (see
+    // the safeGoto logs). Reduced to 1s.
+    await new Promise(r => setTimeout(r, 1_000))
     ctx.ready = true
     console.log(`[cf-harvester] Hidden BrowserWindow ready (${context})`)
     return ctx.hiddenWin
@@ -181,7 +185,15 @@ async function electronInit() {
     // Cap retries and per-attempt load time so a stalled navigation
     // cannot hold the shared mutex for 36s (old: 3 attempts × 12s).
     // Callers that need more time can still override these defaults.
-    const { maxRetries = 1, loadTimeoutMs = 8_000, context = 'anidap' } = options
+    //
+    // Default raised 8s → 10s (Aug 2026): anidap's watch page regularly
+    // needs ~9s to finish loading (its own timers log "safeGoto done … in
+    // 872ms" only AFTER the SPA settles; several real loads showed 8-9s
+    // spans). At 8s the load timed out, win.stop() detached the frame, and
+    // the chad fetch inside it was cancelled → the DOM path then burned
+    // another 6-10s (and ~10-15s on long movies like Reze), which users
+    // saw as servers that never resolve.
+    const { maxRetries = 1, loadTimeoutMs = 10_000, context = 'anidap' } = options
     const ctx = _contexts[context] || _contexts.anidap
     for (let i = 0; i <= maxRetries; i++) {
       try {

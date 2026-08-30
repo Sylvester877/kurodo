@@ -414,12 +414,17 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
     const anilistId = req.query.anilistId ? Number(req.query.anilistId) : null
     const title = { english: req.query.title_english, romaji: req.query.title_romaji }
     const cacheKey = `srv:${slug}:${ep}:${anilistId || ''}:${title.english || ''}`
-    // 8s hard cap — provider list is usually fast; don't let a dead upstream
-    // stall the UI. skipFailCache: a transient chad 429 / slow upstream must
-    // NOT poison this key for 5 min (the picker would 502 even after chad
-    // recovers). The empty-list protection below already shortens the TTL.
+    // 12s hard cap (was 8s). When chad is bot-blocked the fast path 403s
+    // in ~1s and the FALLBACK roster returns instantly, but during a chad
+    // 429 window or a cold slug resolve the chad call itself can take ~8s
+    // (timeoutMs=8s) plus the slug fetch — the old 8s cap returned an EMPTY
+    // list right in that window and the picker showed "no servers". The
+    // fallback roster in anidap.getProviders now guarantees a non-empty
+    // list; this cap just needs to survive the chad timeout.
+    // skipFailCache: a transient chad 429 / slow upstream must NOT poison
+    // this key (the picker would 502 even after chad recovers).
     const data = await cached(cacheKey, TTL, () =>
-      routedGetProviders(anilistId, slug, Number(ep), title), { timeoutMs: 8_000, skipFailCache: true })
+      routedGetProviders(anilistId, slug, Number(ep), title), { timeoutMs: 12_000, skipFailCache: true })
     // ── Empty-list protection ──
     // When anidap is briefly rate-limited / bot-blocked, the provider list
     // comes back EMPTY and the generic cache would lock that in for the

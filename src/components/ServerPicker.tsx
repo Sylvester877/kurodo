@@ -52,6 +52,10 @@ export default function ServerPicker({
   onChangeProvider, onChangeType, unavailable,
 }: Props) {
   // Group by type, then sort within each type via sortProviders.
+  // sortProviders ranks chad's live `tip` ("High quality" = 1080p-capable
+  // servers like Sora/Kiwi/Neko/Beep) ABOVE static priorities, so the
+  // best-quality stream is what the user sees (and gets) first — instead
+  // of a 720p-only server that merely has a stale "fastest" label.
   const byType: Record<string, AnidapProvider[]> = {}
   for (const p of providers) (byType[p.type] ||= []).push(p)
   for (const t of Object.keys(byType)) {
@@ -166,7 +170,7 @@ export default function ServerPicker({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {servers.map((p) => {
                   const isActive = activeProvider === p.name
-                  const quality = p.tip?.match(/(\d{3,4}p|HQ|4K)/i)?.[1].toUpperCase()
+                  const quality = p.tip?.match(/(1080p|720p|\b4k\b|high quality|multi quality)/i)?.[1]?.toUpperCase()
 
                   return (
                     <button

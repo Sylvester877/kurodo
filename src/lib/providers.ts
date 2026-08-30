@@ -2,20 +2,31 @@ export interface ProviderMeta {
   name: string; label: string; hint?: string; priority: number; recommended?: boolean
 }
 export const PROVIDER_META: Record<string, ProviderMeta> = {
-  // ── Only anidap servers remain (Jun 2026) ──
-  // miruro: TLS cert REVOKED, consumet: 301 redirect (dead),
-  // saturn: HTML-only, animdl: Python 3.14 can't build native deps
-  yuki:   { name: 'yuki',   label: 'Yuki ★',   hint: '1080p • Fastest',                   priority: 0, recommended: true },
-  mimi:   { name: 'mimi',   label: 'Mimi',     hint: 'Fast • Hard sub',                    priority: 1 },
-  mochi:  { name: 'mochi',  label: 'Mochi',    hint: 'High Quality',                       priority: 1 },
-  koto:   { name: 'koto',   label: 'Koto',     hint: 'Speed (vcdn)',                       priority: 2 },
-  nuri:   { name: 'nuri',   label: 'Nuri',     hint: 'Speed (vcdn)',                       priority: 2 },
-  kami:   { name: 'kami',   label: 'Kami',     hint: 'Reliable',                           priority: 3 },
-  beep:   { name: 'beep',   label: 'Beep',     hint: 'Soft sub, Fast',                     priority: 3 },
-  neko:   { name: 'neko',   label: 'Neko',     hint: 'Alternative',                        priority: 4 },
-  miku:   { name: 'miku',   label: 'Miku',     hint: 'Alternative',                        priority: 4 },
-  shiro:  { name: 'shiro',  label: 'Shiro',    hint: 'Region variety',                     priority: 5 },
-  wave:   { name: 'wave',   label: 'Wave',     hint: 'Region variety',                     priority: 5 },
+  // ── Current chad roster (Aug 2026 re-shuffle) ──
+  // The legacy multi-1080p fleet (nuri/kami/koto/mochi/vee/yume/uwu) is
+  // GONE upstream — chad now serves sora/kiwi/neko/beep/mimi/yuki (verified
+  // live: sora/kiwi/neko/beep masters carry a 1920x1080 variant). Hints are
+  // updated from the live chad tips; priorities rank QUALITY first so the
+  // best-looking stream is the default, and chad's per-episode `default`
+  // flag is the tie-breaker inside a quality tier (sortProviders).
+  // NOTE: the renderer no longer hardcodes this for new servers — the
+  // server API now sends fresh `tip` strings from chad, and Unknown
+  // servers (no entry here) get a neutral auto-derived label instead of a
+  // stale one.
+  sora:   { name: 'sora',   label: 'Sora',     hint: 'Soft sub, Fast, High quality',       priority: 0, recommended: true },
+  kiwi:   { name: 'kiwi',   label: 'Kiwi',     hint: 'Hard sub, Fast, High quality',       priority: 0 },
+  neko:   { name: 'neko',   label: 'Neko',     hint: 'Hard sub, Fast, High quality',       priority: 0 },
+  beep:   { name: 'beep',   label: 'Beep',     hint: 'Soft sub, Fast',                     priority: 1 },
+  mimi:   { name: 'mimi',   label: 'Mimi',     hint: 'Soft sub, Fastest',                  priority: 2 },
+  yuki:   { name: 'yuki',   label: 'Yuki',     hint: 'Soft sub, Good, Multi quality',      priority: 3 },
+  // ── Legacy names, kept in case upstream revives them ──
+  nuri:   { name: 'nuri',   label: 'Nuri',     hint: 'Legacy',                             priority: 9 },
+  kami:   { name: 'kami',   label: 'Kami',     hint: 'Legacy',                             priority: 9 },
+  koto:   { name: 'koto',   label: 'Koto',     hint: 'Legacy',                             priority: 9 },
+  mochi:  { name: 'mochi',  label: 'Mochi',    hint: 'Legacy',                             priority: 9 },
+  miku:   { name: 'miku',   label: 'Miku',     hint: 'Legacy',                             priority: 9 },
+  shiro:  { name: 'shiro',  label: 'Shiro',    hint: 'Legacy',                             priority: 9 },
+  wave:   { name: 'wave',   label: 'Wave',     hint: 'Legacy',                             priority: 9 },
 }
 export function getProviderMeta(name: string): ProviderMeta {
   // Handle prefixed names from the server. The backend prefixes server
@@ -27,16 +38,33 @@ export function getProviderMeta(name: string): ProviderMeta {
   if (meta) return meta
   // Fallback: try the first segment (for unprefixed names like "pahe")
   const firstSeg = name.split('-')[0].toLowerCase()
-  return PROVIDER_META[firstSeg] ?? { name, label: name.charAt(0).toUpperCase() + name.slice(1), priority: 99 }
+  return PROVIDER_META[firstSeg] ?? { name, label: name.charAt(0).toUpperCase() + name.slice(1), priority: 8 }
 }
-export function sortProviders<T extends { name: string; default?: boolean }>(list: T[]): T[] {
-  // Priority is the primary key; alphabetic-by-name is the tie-breaker.
-  // Without a tie-breaker, two servers sharing the same priority (and no
-  // `default` flag) would be ordered by V8's internal sort, which is
-  // not guaranteed stable across browsers / engines — and the user has
-  // reported servers "shuffling" on every page load. This makes order
-  // both deterministic AND consistent across sessions.
+/** Rank an upstream tip for quality: "High quality" > everything else.
+ *  Used as the FIRST sort key in sortProviders so 1080p-capable servers
+ *  (sora/kiwi/neko/beep — live-verified 1080p masters) outrank 720p-only
+ *  ones (mimi/yuki) even when a server has no entry in PROVIDER_META. */
+function tipQualityRank(tip?: string | null): number {
+  if (!tip) return 1
+  const t = tip.toLowerCase()
+  if (t.includes('high quality')) return 0
+  if (t.includes('multi quality')) return 1
+  if (t.includes('good')) return 2
+  return 1
+}
+
+export function sortProviders<T extends { name: string; default?: boolean; tip?: string | null }>(list: T[]): T[] {
+  // Sort keys, in order:
+  //   1. tip quality ("High quality" servers first — 1080p-capable ones)
+  //   2. static PROVIDER_META priority (quality-ranked roster)
+  //   3. chad's per-episode `default` flag
+  //   4. alphabetic name — makes the order deterministic across reloads
+  //      (V8's sort is not guaranteed stable; without the tie-breaker two
+  //      servers sharing all keys would "shuffle" on every page load).
   return [...list].sort((a, b) => {
+    const qa = tipQualityRank((a as { tip?: string | null }).tip)
+    const qb = tipQualityRank((b as { tip?: string | null }).tip)
+    if (qa !== qb) return qa - qb
     const pa = getProviderMeta(a.name).priority
     const pb = getProviderMeta(b.name).priority
     if (pa !== pb) return pa - pb

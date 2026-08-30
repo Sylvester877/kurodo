@@ -71,21 +71,36 @@ function pruneNoStreamCache() {
   }
 }
 
-// Full known server matrix from anidap's providers.
-// Source: vaishnavxd/anidap-scraper server matrix (Jun 2026).
-// All servers are always returned — no filtering, no hiding.
-const ALL_SUB_SERVERS = ['yuki', 'nuri', 'kami', 'koto', 'neko', 'beep', 'mochi', 'mimi', 'miku', 'vee', 'yume', 'uwu', 'shiro']
-const ALL_DUB_SERVERS = ['yuki', 'nuri', 'kami', 'koto', 'neko', 'miku', 'vee', 'uwu']
-const ALL_HSUB_SERVERS = ['mochi', 'kiwi', 'wave', 'shiro']
+// Server roster fallback when chad can't answer (bot-blocked / network
+// down). Updated for the Aug 2026 upstream re-shuffle — the legacy
+// multi-1080p fleet (nuri/kami/koto/mochi/vee/yume/uwu) is GONE upstream:
+// chad now serves the current names below, most of them 1080p-capable
+// (verified live: sora/kiwi/neko/beep masters carry a 1920x1080 variant).
+// Legacy names are kept LAST so an old cached stream or a server that
+// comes back can still be used, without letting dead names crowd out the
+// working ones.
+const ALL_SUB_SERVERS = ['sora', 'kiwi', 'neko', 'beep', 'mimi', 'yuki', 'nuri', 'kami', 'koto', 'mochi', 'miku', 'shiro']
+const ALL_DUB_SERVERS = ['mimi', 'yuki', 'neko', 'kiwi', 'sora', 'nuri', 'kami', 'koto', 'miku']
+const ALL_HSUB_SERVERS = ['kiwi', 'mochi', 'wave', 'shiro']
+
+// Live tips from the chad /servers API (Aug 2026). Used when chad itself
+// can't be reached for the real per-episode list — keeps the picker's
+// quality badges truthful instead of showing stale "1080p • Fastest" text.
+const PROVIDER_TIPS = {
+  sora: 'Soft sub, Fast, High quality',
+  kiwi: 'Hard sub, Fast, High quality',
+  neko: 'Hard sub, Fast, High quality',
+  mimi: 'Soft sub, Fastest, High quality',
+  beep: 'Soft sub, Fast',
+  yuki: 'Soft sub, Good, Multi quality',
+}
 
 // Per-server health cache — tracks which servers are generally reachable.
 // Key: `${name}:${type}`  Value: { ok: boolean, at: timestamp }
 // TTL: 10 min — long enough to survive between scheduler ticks, short
 //       enough that servers that come back online are detected quickly.
 const serverHealthCache = new Map()
-const SERVER_HEALTH_TTL = 10 * 60 * 1000
-
-// ── Per-provider rate-limit tracking ─────────────────────────────────
+const SERVER_HEALTH_TTL = 10 * 60 * 1000// ── Per-provider rate-limit tracking ─────────────────────────────────
 // CRITICAL FIX (Jul 2026): Previously a single provider's 429 would
 // trigger a GLOBAL 60-second cooldown that blocked ALL 27 servers.
 // If yuki got rate-limited, kami/koto/neko/vee/uwu were ALL blocked
@@ -634,6 +649,8 @@ export function getServerHealth(name, type) {
 // Provider lists rarely change and this saves ~0.5-8s per new episode.
 const providerListCache = new Map()
 const PROVIDER_LIST_TTL = 5 * 60 * 1000
+// Single-flight for concurrent getProviders() calls (see below).
+const providerListInFlight = new Map() // cacheKey -> Promise<providers[]>
 function pruneProviderListCache() {
   const now = Date.now()
   for (const [key, entry] of providerListCache) {
@@ -655,34 +672,57 @@ export async function getProviders(slug, ep, anilistId, titles = {}) {
     return cachedProviders.data
   }
 
-  // Fast path: REAL per-episode provider lists from the chad API.
-  // The site only lists servers that actually have this episode, so the
-  // picker stops showing dead servers for episodes they don't cover.
-  try {
-    const resolved = await resolveAnidapSlug(id)
-    if (resolved) {
-      const data = await chadGet('servers', { id: resolved, epNum: Number(ep) || 1 })
-      if (data?._error === 404) invalidateSlug(id)
-      if (data && !data._error) {
-        const out = []
-        for (const [key, type] of [['subProviders', 'sub'], ['dubProviders', 'dub'], ['hsubProviders', 'hsub']]) {
-          for (const p of data[key] || []) {
-            out.push({ name: p.id, type, default: !!p.default, tip: p.tip || null })
+  // ── Single-flight: the chad servers round-trip can take up to 8s when
+  // chad is bot-blocked (the browser path is used inside getStream, but
+  // the server LIST only has the fast path here). Two concurrent calls
+  // (e.g. React StrictMode double-fetch + a stream request reading the
+  // list) would both miss the cache and duplicate the work. Share one
+  // promise instead.
+  const inFlight = providerListInFlight.get(cacheKey)
+  if (inFlight) return inFlight
+
+  const attempt = (async () => {
+    // Fast path: REAL per-episode provider lists from the chad API.
+    // The site only lists servers that actually have this episode, so the
+    // picker stops showing dead servers for episodes they don't cover.
+    try {
+      const resolved = await resolveAnidapSlug(id)
+      if (resolved) {
+        const data = await chadGet('servers', { id: resolved, epNum: Number(ep) || 1 })
+        if (data?._error === 404) invalidateSlug(id)
+        if (data && !data._error) {
+          const out = []
+          for (const [key, type] of [['subProviders', 'sub'], ['dubProviders', 'dub'], ['hsubProviders', 'hsub']]) {
+            for (const p of data[key] || []) {
+              out.push({ name: p.id, type, default: !!p.default, tip: p.tip || null })
+            }
+          }
+          if (out.length > 0) {
+            providerListCache.set(cacheKey, { at: Date.now(), data: out })
+            return out
           }
         }
-        if (out.length > 0) {
-          providerListCache.set(cacheKey, { at: Date.now(), data: out })
-          return out
-        }
       }
-    }
-  } catch (e) { console.warn(`[anidap] chad servers failed for #${id}:`, e.message) }
+    } catch (e) { console.warn(`[anidap] chad servers failed for #${id}:`, e.message) }
 
-  return [
-    ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub' })),
-    ...ALL_DUB_SERVERS.map(name => ({ name, type: 'dub' })),
-    ...ALL_HSUB_SERVERS.map(name => ({ name, type: 'hsub' })),
-  ]
+    // Chad is unreachable/bot-blocked. Fall back to the CURRENT Aug-2026
+    // roster (1080p-capable names first — sora/kiwi/neko/beep), NOT the
+    // legacy multi-CDN fleet. Returning the old dead names (nuri/kami/
+    // koto/mochi/vee) made the picker full of "High Quality" tiles that
+    // all failed, which is exactly the "servers are different" complaint.
+    return [
+      ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub', tip: PROVIDER_TIPS[name] || null })),
+      ...ALL_DUB_SERVERS.map(name => ({ name, type: 'dub', tip: PROVIDER_TIPS[name] || null })),
+      ...ALL_HSUB_SERVERS.map(name => ({ name, type: 'hsub', tip: PROVIDER_TIPS[name] || null })),
+    ]
+  })()
+
+  providerListInFlight.set(cacheKey, attempt)
+  try {
+    return await attempt
+  } finally {
+    providerListInFlight.delete(cacheKey)
+  }
 }
 
 // ── Fetch stream URL via chad API ─────────────────────────────────────
