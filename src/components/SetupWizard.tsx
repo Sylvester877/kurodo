@@ -10,6 +10,11 @@ import { setClientId, setClientSecret } from '../api/anilistAuth'
 import Starfield from './Starfield'
 
 const SETUP_DONE_KEY = 'kurodo-setup-done'
+// Shown-once flag: the welcome wizard covers the whole viewport with a
+// blurred backdrop, so it must appear at most ONCE ever. If the user
+// closes the app without finishing/skipping, later launches auto-skip
+// instead of re-blurring the entire app every time.
+const SETUP_SHOWN_KEY = 'kurodo-setup-shown'
 
 const STEPS = [
   { n: 1, label: 'Connect', icon: Zap },
@@ -89,14 +94,30 @@ export default function SetupWizard() {
   const [done, setDone] = useState(() => {
     try {
       if (localStorage.getItem(SETUP_DONE_KEY) === '1') return true
-      // Auto-detect returning user: if watchlist has items or anilist auth exists,
-      // skip the setup wizard — they've already configured the app.
+      // Auto-detect returning user: if watchlist has items, anilist auth
+      // exists, or settings were ever customized, skip the setup wizard —
+      // they've already configured the app. Checking kurodo-settings means
+      // existing users never see the full-screen blurred welcome again
+      // (previously it reappeared on every launch until explicitly skipped).
       const wl = localStorage.getItem('kurodo-watchlist')
       const auth = localStorage.getItem('kurodo-anilist-auth')
-      if ((wl && wl !== '[]' && wl !== 'null') || auth) {
+      const settings = localStorage.getItem('kurodo-settings')
+      if (
+        (wl && wl !== '[]' && wl !== 'null') ||
+        auth ||
+        (settings && settings !== '{}' && settings !== 'null')
+      ) {
         localStorage.setItem(SETUP_DONE_KEY, '1')
         return true
       }
+      // Shown-once rule: the wizard's full-viewport blurred backdrop looks
+      // like the app is "broken/full blur" if it reappears every launch.
+      // Mark it shown on the FIRST mount and auto-skip from then on.
+      if (localStorage.getItem(SETUP_SHOWN_KEY) === '1') {
+        localStorage.setItem(SETUP_DONE_KEY, '1')
+        return true
+      }
+      try { localStorage.setItem(SETUP_SHOWN_KEY, '1') } catch { /* ignore */ }
       return false
     } catch { return false }
   })
@@ -167,8 +188,10 @@ export default function SetupWizard() {
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
       />
 
-      {/* Semi-transparent overlay — light enough to see content behind */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      {/* Semi-transparent overlay — light frost so the app behind is still
+          recognizable (a heavy backdrop-blur looks like the whole app is
+          broken). Content stays dimmed so the card reads clearly. */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
 
       {/* ── Floating particles ────────────────────────────────────── */}
       {particles.map((p) => (

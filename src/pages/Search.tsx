@@ -87,7 +87,7 @@ function SearchPageContent() {
   const mangaLoadMoreRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const debouncedQuery = useDebounce(query, 500)
+  const debouncedQuery = useDebounce(query, 250)
   useTitle(query ? `Search: ${query}` : 'Search')
 
   // Mirror NSFW setting into filters.sfw
@@ -95,6 +95,25 @@ function SearchPageContent() {
     () => ({ ...filters, sfw: !showNsfw }),
     [filters, showNsfw],
   )
+
+  // Genres for the quick-filter chip row — shares the ['genres'] cache with
+  // FilterSidebar, so no extra network request when the sidebar already loaded.
+  const quickGenresQuery = useQuery({
+    queryKey: ['genres'],
+    queryFn: getAnimeGenres,
+    staleTime: 24 * 60 * 60 * 1000,
+    meta: { persist: true },
+  })
+  const allGenres: Genre[] = quickGenresQuery.data?.data ?? []
+  const toggleGenre = useCallback((id: number) => {
+    setFilters((prev) => {
+      const active = prev.genres ?? []
+      const next = active.includes(id)
+        ? active.filter((g) => g !== id)
+        : [...active, id]
+      return { ...prev, genres: next.length ? next : null }
+    })
+  }, [])
 
   // ───── Anime Query ─────
   const trimmed = debouncedQuery.trim()
@@ -110,6 +129,7 @@ function SearchPageContent() {
         : undefined,
     staleTime: 5 * 60 * 1000,
     retry: 0,
+    placeholderData: (prev) => prev, // keep old results visible between keystrokes
   })
 
   const searchResults = useMemo(
@@ -121,10 +141,11 @@ function SearchPageContent() {
   const loadingMore = listQuery.isFetchingNextPage
   const error = listQuery.isError
 
-  // ───── Manga infinite query ─────
+  // ───── Manga infinite query (only when the Manga tab is active — firing
+  // it on the anime tab wasted an AniList GraphQL call on every search) ─────
   const mangaQuery = useInfiniteQuery({
     queryKey: ['manga-search-page', trimmed],
-    enabled: trimmed.length >= 2,
+    enabled: trimmed.length >= 2 && activeTab === 'manga',
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
       searchMangaAniListPaginated(trimmed, pageParam as number, 24),
@@ -134,6 +155,7 @@ function SearchPageContent() {
         : undefined,
     staleTime: 5 * 60 * 1000,
     retry: 0,
+    placeholderData: (prev) => prev,
   })
   const mangaResults = useMemo(
     () => (mangaQuery.data?.pages ?? []).flatMap((p) => p?.data ?? []),
@@ -151,6 +173,7 @@ function SearchPageContent() {
     enabled: trimmed.length >= 2 && activeTab === 'manga',
     staleTime: 5 * 60 * 1000,
     retry: 0,
+    placeholderData: (prev) => prev,
   })
   const colourRaw = colourQuery.data?.results ?? []
 
@@ -346,6 +369,40 @@ function SearchPageContent() {
             {activeTab === 'anime' && (
               <div className="mt-4 lg:hidden">
                 <SearchFilters value={filters} onChange={setFilters} />
+              </div>
+            )}
+
+            {/* Quick genre chips — one-tap genre filtering, all breakpoints */}
+            {activeTab === 'anime' && allGenres.length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {allGenres.slice(0, 12).map((g) => {
+                    const active = (filters.genres ?? []).includes(g.mal_id)
+                    return (
+                      <button
+                        key={g.mal_id}
+                        type="button"
+                        onClick={() => toggleGenre(g.mal_id)}
+                        className={cn(
+                          'group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200 border',
+                          active
+                            ? 'bg-gradient-to-r from-pink-500/25 to-purple-500/25 border-primary/50 text-primary shadow-[0_0_14px_-4px_hsl(245,75%,60%,0.4)]'
+                            : 'glass-pill text-white/60 border-white/10 hover:text-white hover:border-white/25 hover:bg-white/[0.08]',
+                        )}
+                      >
+                        <span>{g.name}</span>
+                        <span className={cn(
+                          'text-[9px] tabular-nums',
+                          active ? 'text-primary/70' : 'text-white/30 group-hover:text-white/50',
+                        )}>
+                          {g.count >= 1000
+                            ? `${(g.count / 1000).toFixed(1)}k`
+                            : g.count}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>

@@ -87,13 +87,17 @@ export default function Hero(_props: Props = {}) {
   // sections instead of firing its own near-duplicate request. We only
   // render the first few backdrops, so the extra rows cost nothing.
   const { data: featuredData, isLoading: isLoadingFeatured } = useQuery({
-    queryKey: ['hero-featured'],
+    // Shared with the Home "Trending Now" row (['feed','trending']) so
+    // both consume ONE AniList request — the hero no longer doubles the
+    // traffic for the top feed section.
+    queryKey: ['feed', 'trending'],
     queryFn: () => getTrending(18),
     staleTime: 30 * 60 * 1000,
     meta: { persist: true },
   })
   const { data: editorsData, isLoading: isLoadingEditors } = useQuery({
-    queryKey: ['hero-editors'],
+    // Shared with the Home "Most Favorite" row (['feed','mostFavorite']).
+    queryKey: ['feed', 'mostFavorite'],
     queryFn: () => getAllTimeTop(18),
     staleTime: 30 * 60 * 1000,
     meta: { persist: true },

@@ -89,8 +89,16 @@ export default function AnimeDetails() {
   useEffect(() => {
     const el = recsRef.current
     if (!el) return
+    // The sentinel is a 0-height div at the page bottom. Right after
+    // navigation the page is briefly short, so the sentinel can sit within
+    // the rootMargin and "intersect" without the user ever scrolling — which
+    // fired the heavy Jikan recommendations request on every page load.
+    // Require an actual scroll (scrollY > 200) so deferral actually defers.
+    // Exception: pages too short to scroll (few-episode anime on tall
+    // viewports) — then recs are already visible and deferral is pointless.
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) setLoadRecs(true)
+      const scrollable = document.documentElement.scrollHeight > window.innerHeight + 100
+      if (entry.isIntersecting && (!scrollable || window.scrollY > 200)) setLoadRecs(true)
     }, { rootMargin: '200px' })
     observer.observe(el)
     return () => observer.disconnect()
@@ -154,7 +162,11 @@ export default function AnimeDetails() {
   // ── Anikage-style enriched episode images: TVDB/TMDB stills for EVERY
   // episode (not just 1-21 like raw AniZip). Fetches in parallel with
   // episodesQuery; as soon as it lands we merge the real images.
-  const anikageEpQuery = useAnikageEpisodes(malId, episodesQuery.isSuccess)
+  // Fire in parallel with episodesQuery (no gate): the server endpoint does
+  // its own AniZip/TVDB/TMDB/Jikan fetches, so waiting on AniZip episodes
+  // here only delayed the TVDB thumbnails by the AniZip round-trip. The
+  // merge below is order-independent — whichever lands first wins.
+  const anikageEpQuery = useAnikageEpisodes(malId)
   const episodes: AniZipEpisode[] = useMemo(() => {
     const base = episodesQuery.data?.length ? episodesQuery.data : stubEpisodes
     const anikageMap = new Map(anikageEpQuery.data?.episodes?.map(e => [e.number, e]) ?? [])

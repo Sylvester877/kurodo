@@ -60,7 +60,7 @@ export default function BookmarksPanel({ open, onClose, mangaId, chapters, curre
                   </span>
                 )}
               </h3>
-              <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors">
+              <button onClick={onClose} className="text-white/45 hover:text-white transition-colors" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -129,7 +129,7 @@ export default function BookmarksPanel({ open, onClose, mangaId, chapters, curre
                             onNavigateToPage(bm.pageIndex)
                             onClose()
                           }}
-                          className="p-1.5 rounded-lg text-white/30 hover:text-primary hover:bg-primary/10 transition-colors"
+                          className="p-1.5 rounded-lg text-white/45 hover:text-primary hover:bg-primary/10 transition-colors"
                           title="Go to page"
                         >
                           <ArrowRight className="h-3.5 w-3.5" />
@@ -137,7 +137,7 @@ export default function BookmarksPanel({ open, onClose, mangaId, chapters, curre
                         {/* Delete */}
                         <button
                           onClick={() => removeBookmark(mangaId, bm.chapterId, bm.pageIndex)}
-                          className="p-1.5 rounded-lg text-white/20 hover:text-red-400/70 hover:bg-red-400/[0.06] transition-colors"
+                          className="p-1.5 rounded-lg text-white/45 hover:text-red-400 hover:bg-red-400/[0.1] transition-colors"
                           title="Remove bookmark"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

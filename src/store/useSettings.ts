@@ -172,14 +172,19 @@ const DEFAULTS: Omit<SettingsState, 'set' | 'reset'> = {
   server: 'yuki',
   quality: 'auto',
   defaultVolume: 1,
-  autoplayNext: true,
+  // v5: autoplay-next is now OPT-IN. Watching to 90% and having the app
+  // silently jump episodes was the top "the app has its own brain" complaint.
+  autoplayNext: false,
   autoplayDelay: 8,
   pauseOnBlur: false,
   prefetchNext: true,
 
-  autoSkipIntro: true,
-  autoSkipOutro: true,
-  skipDelay: 0,
+  // v6: auto-skip intro/outro is now OPT-IN. The app must ASK (show the
+  // Skip button) before jumping a segment — silently seeking past the
+  // outro at ~90% felt like the app had a mind of its own.
+  autoSkipIntro: false,
+  autoSkipOutro: false,
+  skipDelay: 3,
 
   captionSize: 1.0,
   captionColor: '#ffffff',
@@ -208,7 +213,8 @@ const DEFAULTS: Omit<SettingsState, 'set' | 'reset'> = {
   statsOverlay: false,
   audioTrack: -1,
   defaultPlaybackSpeed: 1,
-  autoSkipRecap: true,
+  // v6: recap auto-skip also became opt-in (same ask-first policy).
+  autoSkipRecap: false,
   defaultTheaterMode: false,
   captionFont: 'Inter',
   ambientMode: true,
@@ -232,7 +238,7 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: 'kurodo-settings',
-      version: 4,
+      version: 5,
       storage: typeof localStorage !== 'undefined'
         ? debouncedStorage(localStorage, 300) as any
         : undefined,
@@ -251,6 +257,21 @@ export const useSettings = create<SettingsState>()(
         }
         if (version < 4 && (s.themeColor === 'violet' || s.themeColor === 'anidap' || s.themeColor === 'indigo')) {
           s.themeColor = 'anikage'
+        }
+        if (version < 5) {
+          // v5: autoplay-next became opt-in. Users who want binge mode can
+          // re-enable it in Settings (the toggle + countdown still exist).
+          s.autoplayNext = false
+        }
+        if (version < 6) {
+          // v6: auto-skip intro/outro/recap became opt-in. The app now shows
+          // the Skip button and waits for the user instead of silently
+          // jumping segments ("it skips without even asking"). Users who
+          // want auto-skip can re-enable it in Settings.
+          s.autoSkipIntro = false
+          s.autoSkipOutro = false
+          s.autoSkipRecap = false
+          s.skipDelay = 3
         }
         return s as SettingsState
       },

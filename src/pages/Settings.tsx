@@ -908,7 +908,7 @@ export default function Settings() {
             >
               <Row label="Current version">
                 <span className="text-sm font-mono text-white font-semibold">
-                  v{appVersion || '0.1.0'}
+                  v{appVersion || __APP_VERSION__}
                 </span>
               </Row>
 

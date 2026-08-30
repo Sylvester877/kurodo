@@ -38,8 +38,10 @@ export function useAnikageEpisodes(
     queryKey: ['anikage-episodes', malId],
     queryFn: async (): Promise<AnikageEpisodesResponse> => {
       const origin = window.location.origin
+      // 45s: the first (uncached) call fetches TVDB + AniZip + TMDB + Jikan
+      // in parallel server-side, which can take ~10-20s on a cold cache.
       const res = await fetch(`${origin}/api/anikage-episodes/${malId}`, {
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(45000),
       })
       if (!res.ok) throw new Error(`Failed to load episodes: ${res.status}`)
       const json = await res.json()

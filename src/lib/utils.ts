@@ -193,10 +193,9 @@ export function pickTitle(
 }
 
 // ── Backend origin for packaged Electron ────────────────────────────
-// In development Vite proxies /api and /img to the Express backend, so
-// relative URLs work. In the packaged Electron app the frontend is still
-// served from http://localhost:5173, but using an absolute origin makes
-// image/API URLs robust if the page is ever loaded from file:// or a
+// The Express backend serves both the app and its API on one origin
+// (http://localhost:5173), so relative URLs work. Using an absolute origin
+// makes image/API URLs robust if the page is ever loaded from file:// or a
 // different context. window.__KURODO_BACKEND_ORIGIN__ is injected by the
 // Electron preload; otherwise fall back to the current origin.
 export function getBackendOrigin(): string {
@@ -204,9 +203,9 @@ export function getBackendOrigin(): string {
   // Electron preload exposes the backend origin directly.
   const electron = (window as { electronAPI?: { backendOrigin?: string } }).electronAPI
   if (electron?.backendOrigin) return electron.backendOrigin
-  // Fallback: when the page is served from the backend itself (packaged app),
-  // the current origin is the backend. In dev (localhost:3000) Vite proxies
-  // /api and /img, so an empty string keeps relative URLs working.
+  // Fallback: when the page is served from the backend itself (single server
+  // on :5173), the current origin is the backend; otherwise an empty string
+  // keeps relative URLs working.
   return window.location.origin.includes('localhost:5173')
     ? window.location.origin
     : ''

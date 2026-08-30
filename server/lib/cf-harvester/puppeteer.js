@@ -1,7 +1,7 @@
 // server/lib/cf-harvester/puppeteer.js — Puppeteer fallback implementation.
 
 import fs from 'node:fs'
-import { ANIDAP_BASE, slugCache, isCloudflareChallenge, IS_ELECTRON, trimUrl, makeRemainingBudget, CLICK_DUB_TAB_JS, CLICK_FIRST_SERVER_JS, EXTRACT_IFRAME_JS, resolveSlugFromAniList, formatCookieHeader, directFetchChadSources } from './shared.js'
+import { ANIDAP_BASE, slugCache, isCloudflareChallenge, IS_ELECTRON, trimUrl, makeRemainingBudget, CLICK_DUB_TAB_JS, CLICK_FIRST_SERVER_JS, EXTRACT_IFRAME_JS, EXTRACT_SLUG_JS, resolveSlugFromAniList, formatCookieHeader, directFetchChadSources } from './shared.js'
 import { getRandomGogoProxy, markProxyDead } from '../../proxy-config.js'
 
 //  PUPPETEER MODE — internal implementation (standalone fallback)
@@ -96,26 +96,51 @@ async function puppeteerInit() {
   // not thread-safe: concurrent navigations/evaluations cause "detached
   // Frame" errors and cross-contaminate state between requests.
   let _pageMutex = Promise.resolve()
-  function withPageMutex(fn) {
+  function withPageMutex(fn, signal) {
     const prev = _pageMutex
     let release
     _pageMutex = new Promise(r => { release = r })
-    return prev.then(async () => {
-      try { return await fn() }
-      finally { release() }
-    })
+    const run = async () => {
+      try {
+        // If the caller gave up while queued, never touch the shared page.
+        if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
+        return await fn()
+      } finally {
+        release()
+      }
+    }
+    return prev.then(run, run)
   }
 
   // Bounded mutex: if a page operation hangs, don't block forever.
+  // An optional AbortSignal lets the route cancel queued work — without it,
+  // 7 racing providers × 18s extraction budget = 126s of mutex occupancy.
   const PAGE_MUTEX_TIMEOUT = 32_000
-  function withPageMutexBounded(fn) {
-    return withPageMutex(async () => {
-      return Promise.race([
-        fn(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Page operation timed out')), PAGE_MUTEX_TIMEOUT),
-        ),
-      ])
+  function withPageMutexBounded(fn, signal) {
+    if (signal?.aborted) return Promise.reject(new Error('cf-harvester aborted (caller timed out)'))
+    let timer
+    let removeAbort = null
+    const guards = [
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Page operation timed out')), PAGE_MUTEX_TIMEOUT)
+      }),
+    ]
+    if (signal) {
+      guards.push(
+        new Promise((_, reject) => {
+          const onAbort = () => reject(new Error('cf-harvester aborted (caller timed out)'))
+          signal.addEventListener('abort', onAbort, { once: true })
+          removeAbort = () => signal.removeEventListener('abort', onAbort)
+        }),
+      )
+    }
+    const result = withPageMutex(() => Promise.race([fn(), ...guards]), signal)
+    // Swallow late guard rejections: a queued call aborted before its race
+    // started would otherwise surface as an unhandled rejection.
+    for (const g of guards) g.catch(() => {})
+    return result.finally(() => {
+      clearTimeout(timer)
+      removeAbort?.()
     })
   }
 
@@ -225,7 +250,7 @@ async function puppeteerInit() {
         })
 
         if (!warmupDone) {
-          console.log('[cf-harvester] Warming up on anidap.se...')
+          console.log(`[cf-harvester] Warming up on ${ANIDAP_BASE}...`)
           await safeGoto(page, ANIDAP_BASE)
           await new Promise(r => setTimeout(r, 2000))
           warmupDone = true
@@ -244,50 +269,39 @@ async function puppeteerInit() {
   })
 }
 
-  async function _extractVideo(pg, timeoutMs = 30_000) {
-    try {
-      await pg.waitForFunction(() => {
-        // Accept when we see a real network stream OR a direct video source.
-        try {
-          const resources = performance.getEntriesByType('resource')
-          for (const r of resources) {
-            if (r.initiatorType === 'img' || r.initiatorType === 'beacon' || r.initiatorType === 'css') continue
-            const name = r.name || ''
-            if (name.includes('.m3u8') || name.endsWith('.m3u8')) return true
-            if (/\.(mp4|webm|mkv|mov)(\?|$)/i.test(name)) return true
-          }
-        } catch {}
-        const video = document.querySelector('video')
-        if (video && video.src && !video.src.startsWith('blob:')) return true
-        const source = document.querySelector('video source[src]')
-        if (source) return true
-        return false
-      }, { timeout: timeoutMs })
+  async function _extractVideo(pg, timeoutMs = 30_000, signal) {
+    const deadline = Date.now() + timeoutMs
+    const probe = () => pg.evaluate(() => {
+      // 1. Prefer actual network stream URLs captured by the Performance API.
+      try {
+        const resources = performance.getEntriesByType('resource')
+        for (const r of resources) {
+          if (r.initiatorType === 'img' || r.initiatorType === 'beacon' || r.initiatorType === 'css') continue
+          const name = r.name || ''
+          if (name.includes('.m3u8') || name.endsWith('.m3u8')) return name
+          if (/\.(mp4|webm|mkv|mov)(\?|$)/i.test(name)) return name
+        }
+      } catch {}
 
-      const url = await pg.evaluate(() => {
-        // 1. Prefer actual network stream URLs captured by the Performance API.
-        try {
-          const resources = performance.getEntriesByType('resource')
-          for (const r of resources) {
-            if (r.initiatorType === 'img' || r.initiatorType === 'beacon' || r.initiatorType === 'css') continue
-            const name = r.name || ''
-            if (name.includes('.m3u8') || name.endsWith('.m3u8')) return name
-            if (/\.(mp4|webm|mkv|mov)(\?|$)/i.test(name)) return name
-          }
-        } catch {}
-
-        // 2. Fallback to direct DOM video source.
-        const video = document.querySelector('video')
-        if (video && video.src && !video.src.startsWith('blob:')) return video.src
-        const source = document.querySelector('video source[src]')
-        if (source) return source.getAttribute('src')
-        return null
-      })
-      if (url) return url
-    } catch (e) {
-      if (!e.message?.includes('timeout') && !e.message?.includes('Waiting failed')) {
-        console.warn('[cf-harvester] waitForFunction error:', e.message)
+      // 2. Fallback to direct DOM video source.
+      const video = document.querySelector('video')
+      if (video && video.src && !video.src.startsWith('blob:')) return video.src
+      const source = document.querySelector('video source[src]')
+      if (source) return source.getAttribute('src')
+      return null
+    })
+    // Poll every 1s instead of waitForFunction so an aborted request stops
+    // at the next checkpoint rather than blocking the shared page until the
+    // full timeout elapses (which held the mutex for 30-125s before).
+    while (Date.now() < deadline) {
+      if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
+      let url = null
+      try { url = await probe() } catch (e) {
+        if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
+        console.warn('[cf-harvester] _extractVideo probe error:', e.message)
       }
+      if (url) return url
+      await new Promise(r => setTimeout(r, 1000))
     }
     return null
   }
@@ -389,14 +403,21 @@ async function puppeteerInit() {
     // (~6s), and video extraction (~5s). 10s was mathematically impossible;
     // 28s gives enough budget while still fitting under the 35s route cap.
     const HARD_GOTO_TIMEOUT = isGogo ? 28_000 : PAGE_MUTEX_TIMEOUT
+    // The mutex serializes all page work and the signal checks inside
+    // _doExtractStream stop a timed-out extraction at its next checkpoint,
+    // so no browser recycling is needed — that would only force a costly
+    // relaunch (and detached-frame races) on the very next request.
+    const signal = options.signal
+    if (signal?.aborted) return Promise.reject(new Error('cf-harvester aborted (caller timed out)'))
     return withPageMutexBounded(async () => {
+      if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
       return Promise.race([
         _doExtractStream(watchUrl, options),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('DOM extraction hard timeout')), HARD_GOTO_TIMEOUT),
         ),
       ])
-    })
+    }, signal)
   }
 
   async function fetchChadSourcesImpl(anilistId, slug, ep, provider, type) {
@@ -412,54 +433,15 @@ async function puppeteerInit() {
       console.log(`[cf-harvester] Resolving slug for anilistId=${anilistId}: ${watchUrl.slice(0, 100)}`)
       await safeGoto(pg, watchUrl)
 
-      // Poll performance entries for up to 4 s — the SPA usually fires the
-      // chad API within 1-3 s. If it hasn't fired by then, the pathname
-      // fallback below is authoritative and avoids wasting 10 s on every
-      // cold slug resolution.
-      for (let poll = 0; poll < 8 && !resolvedSlug; poll++) {
+      // The slug is static SSR data (a React prop in the watch page HTML),
+      // so it is available the moment the page loads — no need to wait for
+      // the SPA to fire chad network requests (the old perf-entry poll cost
+      // up to 8 s of the extraction budget). Try it immediately, then a few
+      // 1 s retries in case the page is mid-render.
+      try { resolvedSlug = await pg.evaluate(EXTRACT_SLUG_JS) } catch {}
+      for (let poll = 0; poll < 5 && !resolvedSlug; poll++) {
         await new Promise(r => setTimeout(r, 1000))
-        const expectedAnilistId = String(anilistId)
-        resolvedSlug = await pg.evaluate((expectedAnilistId) => {
-          const resources = performance.getEntriesByType('resource')
-          for (const r of resources) {
-            // Consider any chad API endpoint (episodes/servers fire before sources)
-            if (r.name.includes('chad.anidap.lol/rest/api/')) {
-              const m = r.name.match(/[?&]id=([^&]+)/)
-              if (m) {
-                const val = decodeURIComponent(m[1])
-                // Ignore the SPA's initial failed request that uses the raw AniList ID.
-                // We need the actual text slug, not the numeric ID.
-                if (val !== expectedAnilistId) return val
-              }
-            }
-          }
-          return null
-        }, expectedAnilistId)
-      }
-
-      // Fallback: the SPA redirects /watch?id=... to /watch/<slug>?...
-      // once the title resolves. The pathname slug is authoritative.
-      if (!resolvedSlug) {
-        resolvedSlug = await pg.evaluate(() => {
-          const parts = location.pathname.split('/')
-          if (parts[1] === 'watch' && parts[2]) return decodeURIComponent(parts[2])
-          return null
-        })
-      }
-
-      // Fallback 2: Grep the static HTML for chad API URLs. The SPA's
-      // initial SSR/inline data contains the slug even when the player
-      // never fires a network request in headless mode.
-      if (!resolvedSlug) {
-        resolvedSlug = await pg.evaluate((anilistIdStr) => {
-          const html = document.documentElement.innerHTML
-          const m = html.match(/chad\.anidap\.lol\/rest\/api\/(?:episodes|servers|sources)\?id=([^"&\s]+)/)
-          if (m) {
-            const val = decodeURIComponent(m[1])
-            if (val !== anilistIdStr) return val
-          }
-          return null
-        }, String(anilistId))
+        try { resolvedSlug = await pg.evaluate(EXTRACT_SLUG_JS) } catch {}
       }
 
       if (resolvedSlug) {
@@ -581,6 +563,7 @@ async function puppeteerInit() {
     const GOGO_MAX_RETRIES = 2
     for (let attempt = 0; attempt <= GOGO_MAX_RETRIES; attempt++) {
       try {
+        if (options.signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
         return await __doExtract(watchUrl, options)
       } catch (err) {
     const isRotateError = err?.message?.includes('ERR_ABORTED') ||
@@ -613,6 +596,7 @@ async function puppeteerInit() {
     // (previously we passed `false` unconditionally, which meant every
     // retry reused the same direct IP — the rotation was a no-op).
     const pg = await ensureBrowser(isGogo)
+    if (options.signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
     console.log(`[cf-harvester] DOM extraction: ${watchUrl.slice(0, 100)}`)
     await safeGoto(pg, watchUrl)
 
@@ -664,19 +648,61 @@ async function puppeteerInit() {
     })
     if (pageStatus === 'not_found') throw new Error('Anime not available')
 
-    // ── Fast path for non-gogo URLs (anidap providers: yuki, gojo, etc.) ──
-    // Anidap embeds video directly — no iframes. Polling for iframes first
-    // wastes 10s on every request. Try direct video immediately.
+    // ── Unified direct-video / no-stream poll (non-gogo only) ──
+    // Anidap embeds video directly — no iframes. Every 1s probe checks for
+    // a stream AND the SPA's no-stream error state: working providers win
+    // as soon as the video appears, dead providers fail in ~3-4s (after a
+    // 2s render grace) instead of wasting the full video timeout.
     let streamUrl = null
 
     if (!isGogo) {
-      console.log('[cf-harvester] Non-gogo URL — trying direct video first (skip iframe polling)')
-      // 5s — all fast providers find video in <4s; longer wastes time on slow ones
-      const fastTimeout = Math.min(5_000, remainingBudget())
-      streamUrl = await _extractVideo(pg, fastTimeout)
-      if (streamUrl) {
-        console.log(`[cf-harvester] ✓ Direct video: ${streamUrl.slice(0, 80)}`)
-        return { sources: [{ url: streamUrl, quality: 'auto' }], tracks: [] }
+      console.log('[cf-harvester] Non-gogo URL — polling for direct video / no-stream state')
+      const fastTimeout = Math.min(8_000, remainingBudget())
+      const pollStart = Date.now()
+      const deadline = pollStart + fastTimeout
+      while (Date.now() < deadline) {
+        if (options.signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
+        const probe = await pg.evaluate((pollStartMs) => {
+          // 1. Stream via Performance API.
+          try {
+            const resources = performance.getEntriesByType('resource')
+            for (const r of resources) {
+              if (r.initiatorType === 'img' || r.initiatorType === 'beacon' || r.initiatorType === 'css') continue
+              const name = r.name || ''
+              if (name.includes('.m3u8') || name.endsWith('.m3u8')) return { kind: 'stream', value: name }
+              if (/\.(mp4|webm|mkv|mov)(\?|$)/i.test(name)) return { kind: 'stream', value: name }
+            }
+          } catch {}
+          // 2. Direct video element.
+          const video = document.querySelector('video')
+          if (video && video.src && !video.src.startsWith('blob:')) return { kind: 'stream', value: video.src }
+          const source = document.querySelector('video source[src]')
+          if (source) return { kind: 'stream', value: source.getAttribute('src') }
+          // 3. No-stream error state (only after a 2s render grace, scoped to
+          // the player container so generic strings in the page shell can't
+          // false-positive a working provider).
+          if (Date.now() - pollStartMs >= 2000) {
+            const player = document.querySelector('[class*="player" i], [id*="player" i], [class*="video" i]')
+            if (player) {
+              const body = (player.textContent || '').toLowerCase()
+              const noStreamPatterns = [
+                'source not found', 'stream not available', 'stream unavailable',
+                'video unavailable', 'player error',
+              ]
+              for (const p of noStreamPatterns) if (body.includes(p)) return { kind: 'no-stream', value: p }
+            }
+          }
+          return null
+        }, pollStart).catch(() => null)
+        if (probe) {
+          if (probe.kind === 'stream') {
+            console.log(`[cf-harvester] ✓ Direct video: ${probe.value.slice(0, 80)}`)
+            return { sources: [{ url: probe.value, quality: 'auto' }], tracks: [] }
+          }
+          console.log(`[cf-harvester] Early no-stream detected ("${probe.value}") — failing fast`)
+          throw new Error('Stream not available on this provider')
+        }
+        await new Promise(r => setTimeout(r, 1000))
       }
       console.log('[cf-harvester] Direct video not found — falling back to iframe walk')
     }
@@ -688,7 +714,11 @@ async function puppeteerInit() {
     // Match Electron's extraction budget: gogoanime JS needs 5-8s to
     // decrypt data-encrypted-url attributes and create the player iframe.
     const MAX_DEPTH = 3
-    const iframePollMax = isGogo ? 8 : 2
+    // anidap's SPA hydrates slowly — the player iframe can take 5-15s to
+    // render after the watch page loads (SSR shell first). Poll up to 6s at
+    // depth 0 so we catch the player once it appears; the extraction budget
+    // still bounds the total time (the loop bails when budget < 2s).
+    const iframePollMax = isGogo ? 8 : 6
     console.log(`[cf-harvester] Starting extraction loop (isGogo=${isGogo}, maxDepth=${MAX_DEPTH}, iframePollMax=${iframePollMax})`)
     for (let depth = 0; depth < MAX_DEPTH; depth++) {
       // Fail fast if we have run out of extraction budget.
@@ -702,6 +732,7 @@ async function puppeteerInit() {
       const pollAttempts = depth === 0 ? iframePollMax : 3
       let iframeSrc = null
       for (let poll = 0; poll < pollAttempts && !iframeSrc; poll++) {
+        if (options.signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
         if (remainingBudget() < 2_000) {
           console.log(`[cf-harvester] Budget too low for iframe poll at depth ${depth}`)
           break
@@ -713,7 +744,7 @@ async function puppeteerInit() {
       if (iframeSrc) {
         console.log(`[cf-harvester] Depth ${depth} iframe -> ${trimUrl(iframeSrc)}`)
         await safeGoto(pg, iframeSrc)
-        streamUrl = await _extractVideo(pg, videoTimeout)
+        streamUrl = await _extractVideo(pg, videoTimeout, options.signal)
         if (streamUrl) break
         continue
       }
@@ -737,11 +768,11 @@ async function puppeteerInit() {
         if (iframeSrc) {
           console.log(`[cf-harvester] Depth 0 retry iframe -> ${trimUrl(iframeSrc)}`)
           await safeGoto(pg, iframeSrc)
-          streamUrl = await _extractVideo(pg, videoTimeout)
+          streamUrl = await _extractVideo(pg, videoTimeout, options.signal)
           if (streamUrl) break
           continue
         }
-        streamUrl = await _extractVideo(pg, videoTimeout)
+        streamUrl = await _extractVideo(pg, videoTimeout, options.signal)
         if (streamUrl) break
       }
 

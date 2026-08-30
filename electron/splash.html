@@ -13,9 +13,44 @@
     background: #000;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     user-select: none; -webkit-user-select: none;
-    cursor: none;
+    /* Cursor visible — the intro has window controls now, so hiding it
+       would make the buttons feel unclickable. */
+    cursor: default;
   }
 
+  /* ── Top drag region + window controls ─────────────────────────── */
+  .titlebar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 44px;
+    z-index: 50;
+    -webkit-app-region: drag;   /* drag the frameless window from here */
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    opacity: 0;
+    animation: controlsIn 0.4s ease 1.4s forwards;
+  }
+  @keyframes controlsIn { to { opacity: 1; } }
+
+  .win-btn {
+    -webkit-app-region: no-drag;
+    width: 38px; height: 30px;
+    display: grid; place-items: center;
+    border: none; border-radius: 8px;
+    background: transparent;
+    color: rgba(253,224,71,0.5);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 150ms, color 150ms;
+  }
+  .win-btn:hover { background: rgba(255,255,255,0.08); color: #fde047; }
+  .win-btn.close:hover { background: rgba(239,68,68,0.25); color: #fff; }
+  .win-btn svg { display: block; }
+
+  /* ── Stage ────────────────────────────────────────────────────── */
   .stage {
     position: relative;
     width: 100%; height: 100%;
@@ -151,20 +186,20 @@
   .logo-wrap {
     position: relative; z-index: 3;
     display: flex; flex-direction: column; align-items: center;
-    opacity: 0;
-    animation: logoReveal 0.9s cubic-bezier(0.22,1,0.36,1) 1.1s forwards;
-  }
-  @keyframes logoReveal {
-    0%   { opacity: 0; transform: scale(0.7); filter: blur(20px); }
-    50%  { opacity: 0.9; filter: blur(5px); }
-    100% { opacity: 1; transform: scale(1); filter: blur(0); }
   }
 
+  /* Letter-by-letter reveal */
   .logo-text {
+    display: flex;
     font-size: clamp(56px, 9vw, 110px);
     font-weight: 900;
     letter-spacing: 0.1em;
     line-height: 1;
+    perspective: 600px;
+  }
+  .logo-letter {
+    display: inline-block;
+    opacity: 0;
     background: linear-gradient(180deg,
       #fef3c7 0%,
       #fde047 20%,
@@ -178,6 +213,41 @@
     filter: drop-shadow(0 0 25px rgba(251,191,36,0.45))
             drop-shadow(0 0 50px rgba(251,191,36,0.2))
             drop-shadow(0 0 80px rgba(245,158,11,0.1));
+    animation: letterIn 0.7s cubic-bezier(0.22,1,0.36,1) forwards;
+    transform-style: preserve-3d;
+  }
+  @keyframes letterIn {
+    0%   { opacity: 0; transform: translateY(28px) rotateX(-45deg) scale(0.6); filter: blur(16px); }
+    60%  { opacity: 1; }
+    100% { opacity: 1; transform: translateY(0) rotateX(0) scale(1); filter: blur(0); }
+  }
+
+  /* Gold shimmer sweep across the settled wordmark — a plain gradient
+     overlay with screen blending so it brightens the letter glyphs as it
+     passes (background-clip:text on an empty div would render nothing). */
+  .logo-shimmer {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 40%;
+    left: -45%;
+    background: linear-gradient(100deg,
+      transparent 0%,
+      rgba(255,255,255,0) 30%,
+      rgba(255,255,255,0.5) 50%,
+      rgba(255,255,255,0) 70%,
+      transparent 100%
+    );
+    mix-blend-mode: screen;
+    border-radius: 4px;
+    opacity: 0;
+    animation: shimmer 1.1s ease-in-out 2.15s 2;
+    pointer-events: none;
+  }
+  @keyframes shimmer {
+    0%   { left: -40%; opacity: 0; }
+    15%  { opacity: 0.9; }
+    70%  { opacity: 0.9; }
+    100% { left: 105%; opacity: 0; }
   }
 
   .subtitle {
@@ -185,12 +255,33 @@
     font-weight: 500;
     letter-spacing: 0.55em;
     color: rgba(251,191,36,0.55);
-    margin-top: 6px;
+    margin-top: 14px;
     text-transform: uppercase;
     opacity: 0;
-    animation: subIn 0.5s ease 1.7s forwards;
+    animation: subIn 0.5s ease 1.9s forwards;
   }
   @keyframes subIn { to { opacity: 1; } }
+
+  /* ── Progress arc — subtle loading ring under the wordmark ────── */
+  .progress {
+    margin-top: 26px;
+    width: 46px; height: 46px;
+    opacity: 0;
+    animation: subIn 0.4s ease 2.2s forwards;
+  }
+  .progress svg {
+    transform: rotate(-90deg);
+    display: block;
+  }
+  .progress .track { stroke: rgba(251,191,36,0.12); }
+  .progress .bar {
+    stroke: url(#goldGrad);
+    stroke-linecap: round;
+    stroke-dasharray: 125.6;   /* 2πr for r=20 */
+    stroke-dashoffset: 125.6;
+    animation: arcFill 1.4s cubic-bezier(0.4,0,0.2,1) 2.25s forwards;
+  }
+  @keyframes arcFill { to { stroke-dashoffset: 0; } }
 
   /* ── Fade curtain ────────────────────────────────────────────── */
   .curtain {
@@ -228,6 +319,16 @@
 </head>
 <body>
 
+<!-- Frameless window controls (drag region is the whole bar) -->
+<div class="titlebar">
+  <button class="win-btn" id="minBtn" title="Minimize" aria-label="Minimize">
+    <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </button>
+  <button class="win-btn close" id="closeBtn" title="Close" aria-label="Close">
+    <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
 <div class="stage">
   <div class="vignette"></div>
 
@@ -245,10 +346,32 @@
   <!-- Dust particles -->
   <div class="dust" id="dust"></div>
 
-  <!-- Logo -->
+  <!-- Logo — letter-by-letter reveal + shimmer -->
   <div class="logo-wrap">
-    <div class="logo-text">KURŌDO</div>
+    <div class="logo-text" id="wordmark">
+      <span class="logo-letter" style="animation-delay:1.05s">K</span>
+      <span class="logo-letter" style="animation-delay:1.18s">U</span>
+      <span class="logo-letter" style="animation-delay:1.31s">R</span>
+      <span class="logo-letter" style="animation-delay:1.44s">Ō</span>
+      <span class="logo-letter" style="animation-delay:1.57s">D</span>
+      <span class="logo-letter" style="animation-delay:1.70s">O</span>
+      <div class="logo-shimmer" aria-hidden></div>
+    </div>
     <div class="subtitle">Anime Streaming</div>
+
+    <!-- Progress arc (SVG) -->
+    <div class="progress">
+      <svg width="46" height="46" viewBox="0 0 46 46">
+        <defs>
+          <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fde047"/>
+            <stop offset="100%" stop-color="#f59e0b"/>
+          </linearGradient>
+        </defs>
+        <circle class="track" cx="23" cy="23" r="20" fill="none" stroke-width="3"/>
+        <circle class="bar" cx="23" cy="23" r="20" fill="none" stroke-width="3"/>
+      </svg>
+    </div>
   </div>
 
   <!-- Fade-to-black -->
@@ -281,9 +404,19 @@
     document.addEventListener('click', () => audio.play(), { once: true });
   });
 
+  // ── Window controls (via preload-exposed electronAPI) ────────────
+  // In a plain browser (dev/preview) these no-op instead of erroring.
+  const api = window.electronAPI || {};
+  document.getElementById('minBtn').addEventListener('click', () => {
+    if (api.minimizeWindow) api.minimizeWindow();
+  });
+  document.getElementById('closeBtn').addEventListener('click', () => {
+    if (api.closeWindow) api.closeWindow();
+  });
+
   // Signal main process after animation completes (~3.7s)
   setTimeout(() => {
-    if (window.electronAPI) window.electronAPI.splashDone();
+    if (api.splashDone) api.splashDone();
   }, 3700);
 </script>
 

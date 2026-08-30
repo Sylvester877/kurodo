@@ -9,10 +9,25 @@
 
 const { contextBridge, ipcRenderer, shell } = require('electron')
 
+// ── Crash-recovery signal ─────────────────────────────────────────
+// The main process sends 'app:recovered' whenever it reloads/recreates the
+// main window after a renderer crash. We timestamp it here so the SPA can
+// detect "this boot was a crash recovery" and stay paused instead of
+// auto-playing (the "app opens an anime by itself" bug).
+let lastRecoveredAt = 0
+ipcRenderer.on('app:recovered', () => { lastRecoveredAt = Date.now() })
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // ── App info ──────────────────────────────────────────────────────
   /** True when running inside Electron (vs a regular browser tab). */
   isElectron: true,
+
+  // ── Crash recovery ───────────────────────────────────────────────
+  /** True when this window was recreated/reloaded after a renderer crash
+   *  within the last `maxAgeMs` (default 15s). Pages use this to avoid
+   *  auto-playing on boot. */
+  wasRecentlyRecovered: (maxAgeMs = 15000) =>
+    Date.now() - lastRecoveredAt < maxAgeMs,
 
   /** Backend origin (e.g. http://localhost:5173) for absolute API/image URLs. */
   backendOrigin: process.env.KURODO_BACKEND_ORIGIN || `http://localhost:${process.env.PORT || 5173}`,

@@ -88,7 +88,7 @@ export default function Footer() {
           </div>
           <div className="flex items-center gap-3">
             <span className="glass-pill text-[10px] font-bold uppercase tracking-wider text-primary border-primary/20 bg-primary/10">
-              v{/* BUMP-ME: update version when package.json version changes */}0.3.3
+              v{__APP_VERSION__}
             </span>
             <span className="glass-pill text-[10px] font-bold uppercase tracking-wider text-emerald-400 border-emerald-500/20 bg-emerald-500/10">
               <span className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />

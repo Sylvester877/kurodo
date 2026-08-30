@@ -916,9 +916,9 @@ export default function WatchList() {
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{anime.title}</p>
                   )}
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-muted-foreground">{anime.type}</span>
+                    <span className="glass-pill text-[10px] py-0.5 px-2 text-muted-foreground">{anime.type}</span>
                     {total > 0 && (
-                      <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-muted-foreground">
+                      <span className="glass-pill text-[10px] py-0.5 px-2 text-muted-foreground">
                         {watched}/{total} watched
                       </span>
                     )}

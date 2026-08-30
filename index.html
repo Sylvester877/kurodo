@@ -14,6 +14,9 @@
     <meta property="og:description" content="A sleek anime discovery & streaming companion." />
     <meta property="og:type" content="website" />
 
+    <!-- GPU compositor hint: promote the root element to its own layer for
+         smoother scroll + animation performance on integrated GPUs -->
+    <style>#root { will-change: transform; contain: layout style; }</style>
     <!-- Preconnect to the APIs we hit on first paint -->
     <link rel="preconnect" href="https://api.jikan.moe" />
     <link rel="preconnect" href="https://cdn.myanimelist.net" crossorigin />
@@ -25,6 +28,8 @@
     <!-- TMDB — transparent title logos for the hero + details page. -->
     <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
     <link rel="dns-prefetch" href="https://api.themoviedb.org" />
+    <!-- TVDB — REAL per-episode screenshots (anikage.cc source), CORS * -->
+    <link rel="preconnect" href="https://artworks.thetvdb.com" crossorigin />
     <!-- Streaming CDN hosts — warm the TLS handshake before the user clicks Watch -->
     <link rel="dns-prefetch" href="https://anidap.se" />
     <link rel="dns-prefetch" href="https://gogohd.net" />

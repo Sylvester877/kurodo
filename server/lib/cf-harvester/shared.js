@@ -246,6 +246,34 @@ const EXTRACT_IFRAME_JS = `(() => {
   return null
 })()`
 
+// ── Shared JS snippet for extracting the real anidap text slug ──────
+// The SSR HTML embeds it as a React prop right after the watch URL:
+//   ..."watch?id=21&ep=1...","id","one-piece-p8k27","anilistId",21
+// (JSON backslash escapes optional). Runs in the browser right after
+// load — the slug is static SSR data, so this is instant and replaces the
+// old 8s performance-entry poll. Falls back to the pathname (the SPA
+// redirects /watch?id=... to /watch/<slug>... once the title resolves).
+const EXTRACT_SLUG_JS = `(() => {
+  try {
+    // Un-escape the SSR JSON props (\" -> ", \\u0026 -> &) using split/join.
+    // String.fromCharCode(92) = backslash — avoids backslash-escaping
+    // pitfalls entirely (a backslash in a template literal would be
+    // swallowed, producing a bare quote that matches nothing).
+    const BS = String.fromCharCode(92)
+    const clean = document.documentElement.innerHTML
+      .split(BS + '"').join('"')
+      .split(BS + 'u0026').join('&')
+    // The SSR data embeds the slug as ..."id","<slug>","anilistId",<num>...
+    // (the watch URL is a full http URL, so anchor on the prop sequence).
+    const m = clean.match(/"id","([a-z0-9][a-z0-9-]{1,60})","anilistId"/)
+    if (m) return m[1]
+    // Fallback: the SPA redirects /watch?id=... to /watch/<slug>...
+    const parts = location.pathname.split('/')
+    if (parts[1] === 'watch' && parts[2]) return decodeURIComponent(parts[2])
+  } catch {}
+  return null
+})()`
+
 // ═══════════════════════════════════════════════════════════════════
 
-export { ANIDAP_BASE, slugCache, isCloudflareChallenge, IS_ELECTRON, trimUrl, makeRemainingBudget, CLICK_DUB_TAB_JS, CLICK_FIRST_SERVER_JS, EXTRACT_IFRAME_JS, resolveSlugFromAniList, formatCookieHeader, directFetchChadSources }
+export { ANIDAP_BASE, slugCache, isCloudflareChallenge, IS_ELECTRON, trimUrl, makeRemainingBudget, CLICK_DUB_TAB_JS, CLICK_FIRST_SERVER_JS, EXTRACT_IFRAME_JS, EXTRACT_SLUG_JS, resolveSlugFromAniList, formatCookieHeader, directFetchChadSources }

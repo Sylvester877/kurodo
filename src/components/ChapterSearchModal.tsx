@@ -170,7 +170,7 @@ export default function ChapterSearchModal({
                 className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder:text-white/25"
               />
               {query && (
-                <button onClick={() => setQuery('')} className="text-white/30 hover:text-white/60">
+                <button onClick={() => setQuery('')} className="text-white/45 hover:text-white/80">
                   <X className="h-4 w-4" />
                 </button>
               )}

@@ -1,7 +1,7 @@
 // server/lib/cf-harvester/electron.js — Hidden BrowserWindow implementation.
 
 import fs from 'node:fs'
-import { ANIDAP_BASE, slugCache, isCloudflareChallenge, IS_ELECTRON, trimUrl, makeRemainingBudget, CLICK_DUB_TAB_JS, CLICK_FIRST_SERVER_JS, EXTRACT_IFRAME_JS, resolveSlugFromAniList, formatCookieHeader, directFetchChadSources } from './shared.js'
+import { ANIDAP_BASE, slugCache, isCloudflareChallenge, IS_ELECTRON, trimUrl, makeRemainingBudget, CLICK_DUB_TAB_JS, CLICK_FIRST_SERVER_JS, EXTRACT_IFRAME_JS, EXTRACT_SLUG_JS, resolveSlugFromAniList, formatCookieHeader, directFetchChadSources } from './shared.js'
 import { getRandomGogoProxy, markProxyDead } from '../../proxy-config.js'
 
 //  ELECTRON MODE — internal implementation (hidden BrowserWindow)
@@ -27,26 +27,54 @@ async function electronInit() {
   // block the queue forever. Subsequent callers wait up to 20s for the
   // mutex; if it's still held, they reject so the router can fall back.
   const MUTEX_ACQUIRE_TIMEOUT = 20_000
-  function withMutex(fn, context = 'anidap') {
+  const abortedError = () => new Error('cf-harvester aborted (caller timed out)')
+  function withMutex(fn, context = 'anidap', signal) {
     const ctx = _contexts[context] || _contexts.anidap
     const prev = ctx.mutex
     let release
     ctx.mutex = new Promise(r => { release = r })
-    return prev.then(async () => {
-      try { return await fn() }
-      finally { release() }
-    })
+    const run = async () => {
+      try {
+        // If the caller gave up while we were queued, never run the browser
+        // work at all — release the mutex slot immediately.
+        if (signal?.aborted) throw abortedError()
+        return await fn()
+      } finally {
+        release()
+      }
+    }
+    // prev only ever resolves via release(), but handle rejection defensively.
+    return prev.then(run, run)
   }
-  function withMutexBounded(fn, context = 'anidap') {
+  function withMutexBounded(fn, context = 'anidap', signal) {
+    if (signal?.aborted) return Promise.reject(abortedError())
     // Gogoanime pages are much heavier (ads, redirects, iframe setup),
     // so give them a longer leash while keeping anidap tight.
     const timeout = context === 'gogoanime' ? 60_000 : MUTEX_ACQUIRE_TIMEOUT
-    return Promise.race([
-      withMutex(fn, context),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`cf-harvester mutex acquisition timeout (${context})`)), timeout),
-      ),
-    ])
+    let timer
+    let removeAbort = null
+    const guards = [
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`cf-harvester mutex acquisition timeout (${context})`)), timeout)
+      }),
+    ]
+    if (signal) {
+      guards.push(
+        new Promise((_, reject) => {
+          const onAbort = () => reject(abortedError())
+          signal.addEventListener('abort', onAbort, { once: true })
+          removeAbort = () => signal.removeEventListener('abort', onAbort)
+        }),
+      )
+    }
+    const result = Promise.race([withMutex(fn, context, signal), ...guards])
+    // Swallow late guard rejections: a queued call aborted before its race
+    // started would otherwise surface as an unhandled rejection.
+    for (const g of guards) g.catch(() => {})
+    return result.finally(() => {
+      clearTimeout(timer)
+      removeAbort?.()
+    })
   }
 
   // ── Safe executeJavaScript wrapper ──────────────────────────────
@@ -194,9 +222,10 @@ async function electronInit() {
     }
   }
 
-  async function _extractVideo(win, timeoutMs = 25_000) {
+  async function _extractVideo(win, timeoutMs = 25_000, signal) {
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
+      if (signal?.aborted) throw abortedError()
       const url = await safeExecuteJS(win, `
         (() => {
           // 1. Sniff actual network requests for HLS playlists or MP4 fragments.
@@ -308,8 +337,12 @@ async function electronInit() {
         try {
           const errData = JSON.parse(result.body)
           if (errData?.error === 'too_many_requests') {
-            // Notify the rate-limit tracker so the router can fall back
-            (await import('../../anidap.js')).markProviderRateLimited((apiUrl.match(/providerId=([^&]+)/)||[])[1]||'unknown', 15)
+            // Notify the rate-limit tracker so the router can fall back.
+            // chad 429s are per-IP, so also set the site-wide window using
+            // the retry_after the API tells us (capped by markChad429).
+            const { markProviderRateLimited, markChad429, chadRetryAfterMs } = await import('../../anidap.js')
+            markProviderRateLimited((apiUrl.match(/providerId=([^&]+)/)||[])[1]||'unknown', 15)
+            markChad429(chadRetryAfterMs(result.body))
             throw Object.assign(new Error('too_many_requests'), { upstream: 429 })
           }
         } catch (e) { if (e.upstream) throw e }
@@ -347,87 +380,14 @@ async function electronInit() {
         // 6s the session is probably stuck and we should fail fast.
         await safeLoadURL(win, watchUrl, { loadTimeoutMs: Math.min(10_000, timeLeft()), context })
 
-        // Poll performance entries for up to 4 s — the SPA usually fires the
-        // chad API within 1-3 s. If it hasn't fired by then, the pathname
-        // fallback below is authoritative and avoids wasting 10 s on every
-        // cold slug resolution.
-        for (let poll = 0; poll < 8 && !resolvedSlug; poll++) {
+        // The slug is static SSR data (a React prop in the watch page HTML),
+        // so it is available the moment the page loads — no 8s perf-entry
+        // poll. Try it immediately, then a few 1s retries in case the page
+        // is mid-render.
+        try { resolvedSlug = await safeExecuteJS(win, EXTRACT_SLUG_JS) } catch {}
+        for (let poll = 0; poll < 5 && !resolvedSlug; poll++) {
           await new Promise(r => setTimeout(r, 1000))
-          resolvedSlug = await safeExecuteJS(win, `
-            (() => {
-              const resources = performance.getEntriesByType('resource')
-              const anilistIdStr = ${JSON.stringify(String(anilistId))}
-              for (const r of resources) {
-                // Consider any chad API endpoint (episodes/servers fire before sources)
-                if (r.name.includes('chad.anidap.lol/rest/api/')) {
-                  const m = r.name.match(/[?&]id=([^&]+)/)
-                  if (m) {
-                    const val = decodeURIComponent(m[1])
-                    // Ignore the SPA's initial failed request that uses the raw AniList ID.
-                    // We need the actual text slug, not the numeric ID.
-                    if (val !== anilistIdStr) return val
-                  }
-                }
-              }
-              return null
-            })()
-          `)
-        }
-
-        // Fallback: the SPA redirects /watch?id=... to /watch/<slug>?...
-        // once the title resolves. The slug in the pathname is authoritative
-        // and avoids mis-reading the AniList ID from an earlier chad call.
-        if (!resolvedSlug) {
-          resolvedSlug = await safeExecuteJS(win, `
-            (() => {
-              const parts = location.pathname.split('/')
-              if (parts[1] === 'watch' && parts[2]) return decodeURIComponent(parts[2])
-              return null
-            })()
-          `)
-        }
-
-
-        // Fallback 2: Check DOM data attributes and meta tags for slug.
-        // Ignore values that are just the raw AniList ID — we need the text slug.
-        if (!resolvedSlug) {
-          resolvedSlug = await safeExecuteJS(win, `
-            (() => {
-              const anilistIdStr = ${JSON.stringify(String(anilistId))}
-              const el = document.querySelector('[data-anime-id], [data-slug], [data-id]')
-              if (el) {
-                const val = el.getAttribute('data-anime-id') || el.getAttribute('data-slug') || el.getAttribute('data-id')
-                if (val && val.length > 2 && val !== anilistIdStr) return val
-              }
-              const ogUrl = document.querySelector('meta[property="og:url"]')
-              if (ogUrl) {
-                const m = ogUrl.content.match(/\/watch\/([^?/]+)/)
-                if (m) {
-                  const val = decodeURIComponent(m[1])
-                  if (val !== anilistIdStr) return val
-                }
-              }
-              return null
-            })()
-          `)
-        }
-
-        // Fallback 3: Grep the static HTML for chad API URLs. The SPA's
-        // initial SSR/inline data contains the slug even when the player
-        // never fires a network request in headless mode.
-        if (!resolvedSlug) {
-          resolvedSlug = await safeExecuteJS(win, `
-            (() => {
-              const anilistIdStr = ${JSON.stringify(String(anilistId))}
-              const html = document.documentElement.innerHTML
-              const m = html.match(/chad\.anidap\.lol\/rest\/api\/(?:episodes|servers|sources)\?id=([^"&\s]+)/)
-              if (m) {
-                const val = decodeURIComponent(m[1])
-                if (val !== anilistIdStr) return val
-              }
-              return null
-            })()
-          `)
+          try { resolvedSlug = await safeExecuteJS(win, EXTRACT_SLUG_JS) } catch {}
         }
 
       if (resolvedSlug) {
@@ -471,8 +431,9 @@ async function electronInit() {
         console.log(`[cf-harvester] Direct HTTP chad fetch failed: status=${directResult.status} body=${(directResult.body || '').slice(0, 120)}`)
         if (directResult.status === 429) {
           const providerName = provider || 'unknown'
-          const { markProviderRateLimited } = await import('../../anidap.js')
+          const { markProviderRateLimited, markChad429, chadRetryAfterMs } = await import('../../anidap.js')
           markProviderRateLimited(providerName, 15)
+          markChad429(chadRetryAfterMs(directResult.body))
           throw Object.assign(new Error('too_many_requests'), { upstream: 429 })
         }
         // Non-2xx without a 429 — fall through to in-browser fetch in case
@@ -520,8 +481,9 @@ async function electronInit() {
       if (!result.ok) {
         console.warn(`[cf-harvester] chad sources API failed: status=${result.status}`)
         if (result.status === 429) {
-          const { markProviderRateLimited } = await import('../../anidap.js')
+          const { markProviderRateLimited, markChad429, chadRetryAfterMs } = await import('../../anidap.js')
           markProviderRateLimited(provider, 15)
+          markChad429(chadRetryAfterMs(result.body))
           throw Object.assign(new Error('too_many_requests'), { upstream: 429 })
         }
         throw new Error(`chad sources API returned ${result.status}: ${(result.body || '').slice(0, 100)}`)
@@ -543,8 +505,10 @@ async function electronInit() {
     // Cloudflare rate-limits heavily. Each attempt uses a fresh proxy and
     // a fresh hidden window so failures don't reuse a blocked IP.
     const GOGO_MAX_RETRIES = isGogo ? 2 : 0
+    const signal = options.signal
     for (let attempt = 0; attempt <= GOGO_MAX_RETRIES; attempt++) {
       try {
+        if (signal?.aborted) throw abortedError()
         return await withMutexBounded(async () => {
           const win = await ensureWindow(isGogo, isGogo && attempt > 0, context)
           console.log(`[cf-harvester] DOM extraction: ${watchUrl.slice(0, 100)}`)
@@ -600,7 +564,7 @@ async function electronInit() {
         // tag within 3-5 s. Cap at 8 s so we still have budget for the
         // iframe walk if this fails.
         const fastTimeout = Math.min(8_000, remainingBudget())
-        streamUrl = await _extractVideo(win, fastTimeout)
+        streamUrl = await _extractVideo(win, fastTimeout, signal)
         if (streamUrl) {
           console.log(`[cf-harvester] ✓ Direct video: ${streamUrl.slice(0, 80)}`)
           return { sources: [{ url: streamUrl, quality: 'auto' }], tracks: [] }
@@ -623,6 +587,7 @@ async function electronInit() {
         const pollAttempts = depth === 0 ? 8 : 3   // 8s vs 3s max wait (1s interval)
         let iframeSrc = null
         for (let poll = 0; poll < pollAttempts && !iframeSrc; poll++) {
+          if (signal?.aborted) throw abortedError()
           if (remainingBudget() < 2_000) {
             console.log(`[cf-harvester] Budget too low for iframe poll at depth ${depth}`)
             break
@@ -633,13 +598,13 @@ async function electronInit() {
 
         if (iframeSrc) {            console.log(`[cf-harvester] Depth ${depth} iframe -> ${trimUrl(iframeSrc)}`)
           await safeLoadURL(win, iframeSrc, { loadTimeoutMs: loadTimeout(), context })
-          streamUrl = await _extractVideo(win, Math.min(10_000, remainingBudget()))
+          streamUrl = await _extractVideo(win, Math.min(10_000, remainingBudget()), signal)
           if (streamUrl) break
           continue
         }
 
       // No iframe — try direct video
-      streamUrl = await _extractVideo(win, Math.min(10_000, remainingBudget()))
+      streamUrl = await _extractVideo(win, Math.min(10_000, remainingBudget()), signal)
       if (streamUrl) break
 
       // At depth 0: retry once with page refresh for gogoanime only.
@@ -650,17 +615,18 @@ async function electronInit() {
           // Poll for iframe on refreshed page
           iframeSrc = null
           for (let poll = 0; poll < 3 && !iframeSrc; poll++) {
+            if (signal?.aborted) throw abortedError()
             await new Promise(r => setTimeout(r, 1000))
             iframeSrc = await safeExecuteJS(win, EXTRACT_IFRAME_JS)
           }
           if (iframeSrc) {
             console.log(`[cf-harvester] Depth 0 retry iframe -> ${trimUrl(iframeSrc)}`)
             await safeLoadURL(win, iframeSrc, { loadTimeoutMs: loadTimeout(), context })
-            streamUrl = await _extractVideo(win, 15_000)
+            streamUrl = await _extractVideo(win, 15_000, signal)
             if (streamUrl) break
             continue
           }
-          streamUrl = await _extractVideo(win, 15_000)
+          streamUrl = await _extractVideo(win, 15_000, signal)
           if (streamUrl) break
         }
 
@@ -703,7 +669,7 @@ async function electronInit() {
 
       console.log(`[cf-harvester] ✓ Extracted video: ${streamUrl.slice(0, 80)}`)
       return { sources: [{ url: streamUrl, quality: 'auto' }], tracks: [] }
-    }, context)
+    }, context, signal)
   } catch (err) {
     const isRotateError = err?.message?.includes('ERR_ABORTED') ||
       err?.message?.includes('ERR_PROXY_CONNECTION_FAILED') ||

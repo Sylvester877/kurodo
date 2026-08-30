@@ -243,7 +243,7 @@ export const gogoanimeProvider = {
     return [{ name: 'gogoanime-sub', type: 'sub' }, { name: 'gogoanime-dub', type: 'dub' }]
   },
 
-  async getStream(slug, ep, providerName, type, anilistId) {
+  async getStream(slug, ep, providerName, type, anilistId, opts = {}) {
     if (!slug) return null
     if (!providerName || !providerName.startsWith('gogoanime-')) return null
     slug = await resolveGogoSlug(slug, anilistId)
@@ -265,7 +265,7 @@ export const gogoanimeProvider = {
     for (const watchUrl of urls) {
       console.log(`[gogoanime] Trying: ${watchUrl}${preferDub ? ' (preferDub)' : ''}`)
       try {
-        const data = await extractStreamFromWatchPage(watchUrl, { preferDub })
+        const data = await extractStreamFromWatchPage(watchUrl, { preferDub, signal: opts.signal })
         if (data && data.sources && data.sources.length > 0) {
           const streamUrl = data.sources[0].url
           console.log(`[gogoanime] Stream extracted: ${streamUrl.slice(0, 80)}`)

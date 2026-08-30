@@ -21,7 +21,7 @@ interface Check {
 
 const FAQ = [
   { symptom: 'Step 1 fails — CLIENT_ID missing',
-    fix: 'Create .env.local with VITE_ANILIST_CLIENT_ID=<number>, restart npm run dev.' },
+    fix: 'Create .env.local with VITE_ANILIST_CLIENT_ID=<number>, then restart the app (npm start).' },
   { symptom: "AniList shows 'redirect_uri_mismatch'",
     fix: "On anilist.co/settings/developer, your client Redirect URL must match the URL shown in Step 4 EXACTLY (protocol + port included)." },
   { symptom: 'Step 5 fails with 401',

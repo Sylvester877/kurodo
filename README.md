@@ -71,10 +71,10 @@ git clone https://github.com/Sylvester877/kurodo.git
 cd kurodo
 npm install
 
-# Web app (Vite + Express backend on :5173)
-npm run dev
+# Web app (single Express server on :5173)
+npm start
 
-# Or the Electron desktop app
+# Or the Electron desktop app (builds first, then runs on :5173)
 npm run electron:dev
 ```
 
@@ -147,8 +147,7 @@ kurodo/
 │   ├── tvdb-episodes.js  # TVDB v4 client (real episode screenshots)
 │   └── providers/        # anidap, gogoanime, consumet scrapers
 ├── electron/             # Main process (window, auto-update, IPC)
-├── build/                # Icons + NSIS installer config
-└── scripts/              # Tests & utilities
+└── build/                # Icons + NSIS installer config
 ```
 
 ---

@@ -2,12 +2,18 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import pkg from './package.json'
 
 // We deliberately DON'T extend vite.config.ts — pulling in the PWA plugin
 // + manualChunks config adds noise to the test pipeline. Tailwind is the
 // only plugin we need for the smoke suite: it's what processes index.css
 // and would surface an orphaned-block / "Missing opening {" error.
 export default defineConfig({
+  // Match vite.config.ts: components that render the injected version
+  // (Footer, Settings) need __APP_VERSION__ defined in tests too.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { '@': new URL('./src', import.meta.url).pathname },

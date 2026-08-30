@@ -45,7 +45,11 @@ describe('Page smoke', () => {
       routerProps: { initialEntries: ['/'] },
       withToaster: true,
     })
-  })
+    // Home is the heaviest page in the suite (Hero with YouTube iframes,
+    // parallax backdrops, featured slider, multiple feed rails). Under CI
+    // load it can take ~6s to mount, so the default 5s timeout is too
+    // tight — give it room without masking real failures.
+  }, 20000)
 
   it('Browse mounts', async () => {
     const { default: Browse } = await import('../pages/Browse')

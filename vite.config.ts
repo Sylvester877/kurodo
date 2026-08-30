@@ -3,8 +3,16 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'node:path'
+import pkg from './package.json'
 
 export default defineConfig({
+  // Single source of truth for the version: the web build (dist) and the
+  // Electron installer both read package.json, so the version pill in the
+  // footer / settings always matches the installer version. No more manual
+  // BUMP-ME edits that drift out of sync.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -210,24 +218,5 @@ export default defineConfig({
     cssMinify: 'lightningcss',
     // Preload hint injection for critical chunks
     modulePreload: { polyfill: true },
-  },
-  server: {
-    port: 3000,  // Vite dev server (HMR) — Express backend runs on 5173
-    open: true,
-    proxy: {
-      '/api/manga':    { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/atsu':     { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/mal':      { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/aniskip':  { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/anidap':   { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/anilist':  { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/anilist-gql': { target: 'https://graphql.anilist.co', changeOrigin: true, rewrite: (path: string) => path.replace(/^\/api\/anilist-gql/, '') },
-      '/api/jikan': { target: 'https://api.jikan.moe/v4', changeOrigin: true, rewrite: (path: string) => path.replace(/^\/api\/jikan/, '') },
-      '/api/diag':     { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/filler':   { target: 'http://localhost:5173', changeOrigin: true },
-      '/api/health':   { target: 'http://localhost:5173', changeOrigin: true },
-      '/proxy':      { target: 'http://localhost:5173', changeOrigin: true },
-      '/img':        { target: 'http://localhost:5173', changeOrigin: true },
-    },
   },
 })

@@ -38,6 +38,9 @@ interface Props {
   resumeAt?: number | null
   /** Initial seek position from deep link (?t=420). Applied on first load. */
   initialTime?: number | null
+  /** When false the video loads PAUSED (used after a crash-recovery so the
+   *  app doesn't auto-play itself). Defaults to true. */
+  autoPlay?: boolean
   /** Called every ~5 s while playing, plus on pause / unmount / ended,
    *  with the current playback position + total duration. */
   onProgressTick?: (currentTime: number, duration: number) => void
@@ -75,7 +78,7 @@ export default React.memo(function VideoPlayer({
   src, fallbackSrc, subtitles = [], poster, skipTimes,
   onNearEnd, onProgress, theaterMode, onToggleTheaterMode,
   resumeAt, onProgressTick, onResumeDismiss,
-  initialTime,
+  initialTime, autoPlay,
   hasNextEpisode, hasPrevEpisode, onNextEpisode, onPrevEpisode,
   streamType, episodeNumber, episodeTitle, onEnded, onStreamError,
 }: Props) {
@@ -714,7 +717,15 @@ export default React.memo(function VideoPlayer({
           lastProgressBucketRef.current = bucket
           onProgress?.(bucket / 10)
         }
-        if (!nearEndFiredRef.current && pct > 0.9) {
+        // Near-end fires ONLY when we're genuinely close to the end (past 90%
+        // AND within the last 2 minutes). Some HLS manifests report a short or
+        // wrong duration — pct alone would then trigger autoplay next-episode
+        // seconds into an episode, which felt like "the app switching episodes
+        // on its own".
+        if (!nearEndFiredRef.current &&
+            pct > 0.9 &&
+            v.duration > 30 &&
+            v.duration - t <= 120) {
           nearEndFiredRef.current = true
           onNearEnd?.()
         }
@@ -1383,11 +1394,26 @@ ${offset > 0 ? `
     `.trim()
   }, [captionSize, captionColor, captionBackgroundOpacity, captionEdgeStrength, captionPositionOffset, captionFont])
 
+  // ── Shared: cancel any in-flight auto-skip countdown (the interval that
+  // ticks the badge + the timeout that performs the seek). Single source of
+  // truth for timer teardown — used by skipSegment, cancelSkip and unmount,
+  // so a stale timer can never seek a different video. ─────────────────────
+  const clearSkipTimers = useCallback(() => {
+    if (skipCountdownRef.current) {
+      window.clearInterval(skipCountdownRef.current)
+      skipCountdownRef.current = null
+    }
+    if (skipTimeoutRef.current) {
+      window.clearTimeout(skipTimeoutRef.current)
+      skipTimeoutRef.current = null
+    }
+    setSkipCountdown(null)
+  }, [])
+
   // ── Cleanup skip timers on unmount ─────────────────────────────
   useEffect(() => () => {
-    if (skipCountdownRef.current) { window.clearInterval(skipCountdownRef.current); skipCountdownRef.current = null }
-    if (skipTimeoutRef.current) { window.clearTimeout(skipTimeoutRef.current); skipTimeoutRef.current = null }
-  }, [])
+    clearSkipTimers()
+  }, [clearSkipTimers])
 
   // ---- Skip segment (manual or auto) ----
   const skipSegment = useCallback(() => {
@@ -1399,13 +1425,24 @@ ${offset > 0 ? `
     else seg = skipTimes?.recap
     if (seg) {
       // Cancel any pending auto-skip countdown
-      setSkipCountdown(null)
-      if (skipCountdownRef.current) { window.clearInterval(skipCountdownRef.current); skipCountdownRef.current = null }
-      if (skipTimeoutRef.current) { window.clearTimeout(skipTimeoutRef.current); skipTimeoutRef.current = null }
+      clearSkipTimers()
       v.currentTime = seg.interval.endTime
       setActiveSkip(null)
     }
-  }, [activeSkip, skipTimes])
+  }, [activeSkip, skipTimes, clearSkipTimers])
+
+  // Abort a pending auto-skip countdown WITHOUT seeking — the user wants to
+  // keep watching this segment. Marks the segment as "don't auto-skip again"
+  // for this episode (same semantics as the ✕ dismiss on the manual prompt),
+  // so the countdown never re-arms while still inside the window.
+  const cancelSkip = useCallback(() => {
+    clearSkipTimers()
+    if (activeSkip === 'op') autoSkippedOpRef.current = true
+    else if (activeSkip === 'ed') autoSkippedEdRef.current = true
+    else if (activeSkip === 'recap') autoSkippedRecapRef.current = true
+    setActiveSkip(null)
+    flashHint('Keep watching')
+  }, [activeSkip, flashHint, clearSkipTimers])
 
   // ── Netflix-style skip button — bottom-right overlay ──────────────
   // Slides in from the right when the user enters an op/ed/recap window.
@@ -1482,7 +1519,7 @@ ${offset > 0 ? `
       <video
         ref={videoRef}
         playsInline
-        autoPlay
+        autoPlay={autoPlay !== false}
         poster={poster}
         crossOrigin="anonymous"
         className={`h-full w-full bg-black ${captionScopeRef.current}`}
@@ -1570,9 +1607,21 @@ ${offset > 0 ? `
       {/* Skip prompt — centered dialog (auto-skip OFF) */}
       {skipPrompt}
 
-      {/* Auto-skip countdown badge (auto-skip ON) */}
+      {/* Auto-skip countdown badge (auto-skip ON) — user can still abort */}
       {activeSkip && skipCountdown !== null && skipCountdown > 0 && (
-        <div className="absolute bottom-20 right-4 z-20 flex items-center gap-3 animate-[fadeInUp_0.3s_ease]">
+        <div className="absolute bottom-20 right-4 z-20 flex items-center gap-2 animate-[fadeInUp_0.3s_ease]">
+          {/* Abort the auto-skip — keep watching this segment */}
+          <button
+            onClick={cancelSkip}
+            aria-label="Keep watching — don't skip"
+            title="Keep watching — don't skip"
+            className="flex items-center gap-1.5 rounded-xl bg-black/60 border border-white/15 text-white/70 px-3 py-2 text-xs font-medium hover:text-white hover:bg-black/80 transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Keep watching
+          </button>
           <button
             onClick={skipSegment}
             className="flex items-center gap-2 rounded-xl bg-black/85 border border-white/10 text-white px-3 py-2 text-xs font-medium hover:bg-white/10 transition-colors"

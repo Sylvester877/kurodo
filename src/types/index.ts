@@ -140,6 +140,10 @@ export interface ElectronAPI {
   setAnilistCredentials: (clientId: string, clientSecret: string) => Promise<{ success: boolean; error?: string }>
   /** Clear the renderer cache and storage (used by the error page hard reload). */
   clearCache: () => Promise<{ success: boolean; error?: string }>
+  /** True when this window was recreated/reloaded after a renderer crash
+   *  within the last `maxAgeMs` (default 15s). Pages use this to avoid
+   *  auto-playing on boot. */
+  wasRecentlyRecovered: (maxAgeMs?: number) => boolean
 }
 
 declare global {

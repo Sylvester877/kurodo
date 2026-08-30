@@ -189,7 +189,7 @@ export default function DownloadsManager({ open, onClose }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="p-1.5 rounded-md text-white/30 hover:text-white hover:bg-white/5 transition-colors"
+            className="p-1.5 rounded-md text-white/45 hover:text-white hover:bg-white/5 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -525,7 +525,7 @@ function TorrentRow({ torrent: t, isActive }: { torrent: TorrentInfo; isActive?:
               onClick={handleProbeSubtitles}
               disabled={subProbing}
               title="Detect subtitles"
-              className="p-1.5 rounded-md text-white/20 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+              className="p-1.5 rounded-md text-white/45 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
             >
               {subProbing ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -19,8 +19,14 @@ async function fetchFillerFromAPI(malId: number, title: string): Promise<FillerI
   try {
     // Route through our backend proxy to avoid CORS issues with
     // the public filler APIs (anime-filler-api.vercel.app, kotori.workers.dev)
+    // 15s: for shows NOT on AnimeFillerList, the server falls back to Jikan's
+    // per-episode filler flags (paginated, deadline-capped). That path can
+    // take ~5-12s on a cold cache — the old 8s window aborted before the
+    // fallback ever returned, so non-AFL shows silently got zero filler data
+    // until the second visit. The query is deferred 2.5s and non-critical,
+    // so a 15s leash is fine.
     const res = await fetch(`${getBackendOrigin()}/api/filler/${malId}?title=${encodeURIComponent(title)}`, {
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(15000),
     })
     if (!res.ok) return null
     const data = await res.json()

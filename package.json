@@ -1,7 +1,7 @@
 {
   "name": "kurodo",
   "private": true,
-  "version": "0.3.19",
+  "version": "0.3.31",
   "type": "module",
   "main": "electron/main.js",
   "dependencies": {
@@ -39,9 +39,8 @@
   "description": "Discover & stream anime — a fast, keyboard-first anime streaming app with AniList integration, multi-provider scraper, PWA and desktop support.",
   "author": "Kurōdo",
   "scripts": {
-    "dev": "concurrently \"node server/index.js\" \"vite\"",
     "build": "vite build",
-    "electron:dev": "concurrently \"node server/index.js\" \"vite\" \"electron .\"",
+    "electron:dev": "vite build && electron .",
     "electron:build": "vite build && electron-builder --win --publish always",
     "electron:build:win": "vite build && electron-builder --win --publish always",
     "start": "node server/index.js"
@@ -91,7 +90,6 @@
   },
   "devDependencies": {
     "electron-builder": "^25.0.0",
-    "concurrently": "^9.0.0",
     "vite": "^6.0.0",
     "typescript": "^5.7.0"
   }

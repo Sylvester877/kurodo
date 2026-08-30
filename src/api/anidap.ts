@@ -3,7 +3,7 @@
 import axios from 'axios'
 import { getBackendOrigin } from '../lib/utils'
 
-// Vite proxies /api/anidap and /proxy to http://localhost:3001 (see vite.config.ts)
+// The single Express backend serves /api/anidap and /proxy on http://localhost:5173.
 // Timeout: 45s — first browser-bridge call may need to wait for Chrome launch (~10s)
 // + warm-up navigation (~5s) + API evaluation (~5s). Subsequent calls reuse the
 // warm browser and complete in 5-10s.

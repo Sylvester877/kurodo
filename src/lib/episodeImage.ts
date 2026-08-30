@@ -27,10 +27,11 @@ export function buildEpisodeImageUrl(
   ep: AniZipEpisode | null | undefined,
   opts: Options = {},
 ): string {
-  // ── TMDB images: return directly — they have CORS headers and load
+  // ── TMDB images + TVDB artworks (real episode screenshots from the
+  // anikage.cc source): return directly — both CDNs have CORS * and load
   // instant in the browser. Bypassing the /img proxy avoids a server
   // round-trip + buffer pass-through (~300-800ms saved per thumbnail).
-  if (ep?.image && ep.image.includes('image.tmdb.org')) {
+  if (ep?.image && (ep.image.includes('image.tmdb.org') || ep.image.includes('artworks.thetvdb.com'))) {
     return ep.image
   }
 

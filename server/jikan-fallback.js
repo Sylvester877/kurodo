@@ -256,10 +256,66 @@ export async function getAniListAnimeByMalAsJikan(malId) {
   return { data: mapMedia(media) }
 }
 
+/** Jikan-shaped /top/anime list from AniList (Jikan is often down).
+ *  Jikan's filters: (default) score, bypopularity, airing, upcoming, and
+ *  format filters (tv/movie/ova/special). AniList sorts cover the main
+ *  ones; format filters map to AniList's format enum. */
+export async function getTopAnimeFromAniList(page = 1, limit = 24, filter = '') {
+  const safePage = Math.max(1, Number.isFinite(page) ? page : 1)
+  const safeLimit = Math.max(1, Math.min(100, Number.isFinite(limit) ? limit : 24))
+  const f = String(filter || '').toLowerCase()
+
+  let mediaArgs = 'type: ANIME, sort: SCORE_DESC'
+  if (f === 'bypopularity') mediaArgs = 'type: ANIME, sort: POPULARITY_DESC'
+  else if (f === 'airing') mediaArgs = 'type: ANIME, status: RELEASING, sort: SCORE_DESC'
+  else if (f === 'upcoming') mediaArgs = 'type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC'
+  else if (['tv', 'movie', 'ova', 'special', 'ona', 'music'].includes(f)) {
+    mediaArgs = `type: ANIME, format: ${f.toUpperCase()}, sort: SCORE_DESC`
+  }
+
+  const query = `query ($page: Int, $perPage: Int) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { hasNextPage currentPage lastPage total }
+      media(${mediaArgs}) {
+        id idMal
+        title { romaji english native }
+        description(asHtml: false)
+        bannerImage
+        coverImage { extraLarge large }
+        episodes duration averageScore popularity format status season seasonYear genres
+        studios(isMain: true) { nodes { name } }
+        trailer { id site }
+      }
+    }
+  }`
+
+  const data = await anilistRequest(query, { page: safePage, perPage: safeLimit })
+  if (data?.errors?.length) {
+    throw new Error(data.errors[0]?.message || 'AniList GraphQL error')
+  }
+  const pageInfo = data?.data?.Page?.pageInfo || { hasNextPage: false, currentPage: 1, lastPage: 1 }
+  const media = data?.data?.Page?.media || []
+
+  return {
+    data: media.map(mapMedia),
+    pagination: {
+      has_next_page: pageInfo.hasNextPage,
+      current_page: pageInfo.currentPage,
+      last_visible_page: pageInfo.lastPage,
+      items: {
+        count: media.length,
+        total: pageInfo.total ?? media.length,
+        per_page: safeLimit,
+      },
+    },
+  }
+}
+
 /**
  * Route-level dispatcher: try to satisfy a Jikan-style request from AniList
  * when Jikan itself is down or returns a 504. Returns Jikan-shaped data for
- * /anime search and /anime/:id endpoints, or null for unsupported paths.
+ * /anime search, /anime/:id, and /top/anime endpoints, or null for
+ * unsupported paths.
  */
 export async function tryAniListFallback(targetPath, query) {
   const page = Math.max(1, Number.isFinite(Number(query.page)) ? Number(query.page) : 1)
@@ -270,6 +326,11 @@ export async function tryAniListFallback(targetPath, query) {
 
   if (targetPath === '/anime') {
     return await searchAniListAsJikan(rawQ ? String(rawQ) : undefined, page, limit)
+  }
+
+  if (targetPath === '/top/anime') {
+    const rawFilter = Array.isArray(query.filter) ? query.filter[0] : query.filter
+    return await getTopAnimeFromAniList(page, limit, rawFilter ? String(rawFilter) : '')
   }
 
   const animeIdMatch = targetPath.match(/^\/anime\/(\d+)(?:\/full)?$/)

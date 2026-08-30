@@ -19,6 +19,7 @@ import SubDubToggle, { filterBySubDub } from '../components/SubDubToggle'
 import SectionHeader from '../components/SectionHeader'
 import BackToTop from '../components/BackToTop'
 import ScrollReveal from '../components/ScrollReveal'
+import LazyMount from '../components/LazyMount'
 import GenreTiles from '../components/GenreTiles'
 import SeasonalCountdown from '../components/SeasonalCountdown'
 import { SkeletonRow } from '../components/Skeleton'
@@ -91,7 +92,10 @@ const FeedSection = memo(function FeedSection({ section }: { section: Section })
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['feed', section.key],
     queryFn: section.fetcher,
-    staleTime: 15 * 60 * 1000,
+    // 30min matches the hero's staleTime for the shared trending /
+    // mostFavorite keys, so mounting the row never triggers an extra
+    // background refetch the hero didn't already schedule.
+    staleTime: 30 * 60 * 1000,
     meta: { persist: true },
   })
   const animes = data ? filterBySubDub(feedToAnimeList(data), subDubFilter) : []
@@ -172,34 +176,53 @@ export default function Home() {
         <ContinueWatchingRail />
       </ScrollReveal>
 
+      {/* Below-fold sections are wrapped in <LazyMount> so they only
+          mount (and fire their AniList queries) as the user scrolls near
+          them. AniList's client paces requests 400ms apart — mounting all
+          ~9 sections at once would serialize ~3.5s before the hero paints. */}
+
       {/* Seasonal countdown — shows days until next anime season */}
-      <ScrollReveal delay={0.06}>
-        <SeasonalCountdown />
-      </ScrollReveal>
+      <LazyMount minHeight={200}>
+        <ScrollReveal delay={0.06}>
+          <SeasonalCountdown />
+        </ScrollReveal>
+      </LazyMount>
 
       {/* Recent Episodes — latest drops */}
-      <ScrollReveal delay={0.08}>
-        <RecentEpisodes />
-      </ScrollReveal>
+      <LazyMount minHeight={420}>
+        <ScrollReveal delay={0.08}>
+          <RecentEpisodes />
+        </ScrollReveal>
+      </LazyMount>
 
       {/* Explore by Genre — visual tile grid */}
-      <ScrollReveal delay={0.1}>
-        <GenreTiles />
-      </ScrollReveal>
+      <LazyMount minHeight={220}>
+        <ScrollReveal delay={0.1}>
+          <GenreTiles />
+        </ScrollReveal>
+      </LazyMount>
 
       {/* Top 10 — ranked list view */}
-      <ScrollReveal delay={0.12}>
-        <TopHundred />
-      </ScrollReveal>
+      <LazyMount minHeight={760}>
+        <ScrollReveal delay={0.12}>
+          <TopHundred />
+        </ScrollReveal>
+      </LazyMount>
 
       {/* Manga Continue Reading rail */}
-      <ScrollReveal delay={0.14}>
-        <MangaContinueReadingRail />
-      </ScrollReveal>
+      <LazyMount minHeight={380}>
+        <ScrollReveal delay={0.14}>
+          <MangaContinueReadingRail />
+        </ScrollReveal>
+      </LazyMount>
 
-      {/* Main feed grids */}
+      {/* Main feed grids — each row mounts + fetches near the viewport.
+          The trending/mostFavorite rows share their query with the hero,
+          so they paint instantly from the hero's already-warm cache. */}
       {SECTIONS.map((s) => (
-        <FeedSection key={s.key} section={s} />
+        <LazyMount key={s.key} minHeight={520}>
+          <FeedSection section={s} />
+        </LazyMount>
       ))}
 
       <BackToTop />

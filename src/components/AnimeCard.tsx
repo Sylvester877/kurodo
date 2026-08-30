@@ -4,7 +4,7 @@ import { preloadHandlers } from '../lib/routePreloaders'
 import { Star, Play } from 'lucide-react'
 import { getImageUrl, formatScore, buildPosterSrcSet, pickTitle, getBackendOrigin } from '../lib/utils'
 import { useSettings } from '../store/useSettings'
-import { prefetchAnimeEpInfo } from '../lib/prefetch'
+import { prefetchAnimeDetails, prefetchAnimeEpInfo } from '../lib/prefetch'
 import AnimeHoverCard from './AnimeHoverCard'
 import AnimeCardQuickActions from './AnimeCardQuickActions'
 import MagneticCard from './MagneticCard'
@@ -83,8 +83,12 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
         onMouseEnter={() => {
           onMouseEnter()
           prefetchAnimeEpInfo(anime.mal_id)
+          prefetchAnimeDetails(anime)
         }}
-        onFocus={() => prefetchAnimeEpInfo(anime.mal_id)}
+        onFocus={() => {
+          prefetchAnimeEpInfo(anime.mal_id)
+          prefetchAnimeDetails(anime)
+        }}
         onMouseLeave={onMouseLeave}
         onMouseMove={onMouseMove}
       >

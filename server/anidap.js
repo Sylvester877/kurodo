@@ -1,8 +1,19 @@
 // server/anidap.js — AniDap.lol scraper (Jul 2026).
 //
-// Pure DOM extraction via Puppeteer (cf-harvester.js). Navigates to
-// the anidap.lol watch page and extracts the video src from the loaded
-// player. No API calls — chad REST API is dead, old API blocks bots.
+// Hybrid architecture:
+//   1. FAST PATH (default): the chad REST API at chad.anidap.lol/rest/api
+//      returns real sources/providers/episodes over plain HTTP with just
+//      Referer/Origin/UA headers (the old api.anidap.lol host is dead).
+//      The only requirement is the real text slug (e.g. "one-piece-p8k27"),
+//      which is embedded in the watch page SSR HTML and cached after the
+//      first resolve. This path is browser-free and resolves in ~0.5-1.5s
+//      once the slug is cached.
+//   2. BROWSER CHAD PATH: when the Node fetch gets bot_detected (403), the
+//      browser context with real anidap.lol cookies still returns sources
+//      (~2-6s).
+//   3. DOM FALLBACK: if chad is unreachable and the slug can't be resolved,
+//      navigate to the watch page via cf-harvester and extract the video
+//      src from the loaded player (~15-25s).
 //
 // Exports
 // ───────
@@ -17,7 +28,7 @@
 //   markProviderRateLimited()      → per-provider 429 tracking
 //   isProviderRateLimited()        → check single provider
 
-import { extractStreamFromWatchPage } from './cf-harvester.js'
+import { extractStreamFromWatchPage, fetchChadSources } from './cf-harvester.js'
 
 // ── Constants ────────────────────────────────────────────────────────
 const BASE = 'https://anidap.lol'
@@ -126,6 +137,9 @@ export function markRateLimited(seconds = RATE_LIMIT_COOLDOWN, provider = null) 
 /** Returns true only if >= 60% of all known providers are simultaneously
  *  rate-limited, indicating a site-wide Cloudflare block. */
 export function isRateLimited() {
+  // Site-wide chad blocks (429 by IP, or confirmed hard block) mean every
+  // provider is down together — treat as globally rate-limited.
+  if (isChad429Blocked() || isChadHardBlocked()) return true
   const allProviders = [...new Set([...ALL_SUB_SERVERS, ...ALL_DUB_SERVERS])]
   let limited = 0
   for (const name of allProviders) {
@@ -136,6 +150,15 @@ export function isRateLimited() {
 }
 
 export function getRateLimitRemaining() {
+  // Site-wide chad cooldowns win (longest window): 429 backoff first,
+  // then the hard block (503). Without the hard-block term, a hard block
+  // with no 429 would report "0s remaining" and the UI would loop.
+  const chadRemaining = getChad429Remaining()
+  if (chadRemaining > 0) return chadRemaining
+  const hardBlockRemaining = isChadHardBlocked()
+    ? Math.ceil((chadHardBlockedUntil - Date.now()) / 1000)
+    : 0
+  if (hardBlockRemaining > 0) return hardBlockRemaining
   // Return the longest remaining cooldown among all limited providers
   let maxRemaining = 0
   const now = Date.now()
@@ -241,12 +264,276 @@ async function resolveAnilistId(slug, anilistId, titles = {}) {
   return null
 }
 
+// ── CHAD REST API fast path (browser-free) ───────────────────────────
+// The chad API moved to chad.anidap.lol/rest/api (the old api.anidap.lol
+// host is dead). It returns REAL sources / providers / episodes directly
+// over plain HTTP with just Referer/Origin/UA headers — no browser, no
+// cookies, no mutex. The only requirement is the correct text slug (e.g.
+// "one-piece-p8k27", NOT the AniList ID and NOT a kebab-cased title), which
+// anidap embeds in the watch page's SSR HTML and which we cache here after
+// the first resolve.
+// bot_detected gate: when chad 403s once, it usually keeps blocking our IP
+// for a while (request-burst fingerprint). While blocked we skip the chad
+// fast path entirely and go straight to DOM extraction — and the router
+// races only ONE candidate so the DOM path fits inside the route cap.
+// The gate auto-clears after CHAD_BLOCK_TTL so a recovered chad API is
+// picked up again without a server restart.
+let chadBlockedUntil = 0
+const CHAD_BLOCK_TTL = 5 * 60 * 1000
+
+// Hard block: once chad 403s AND the browser-cookie chad path THROWS at
+// the network level (the block reached our browser too), fail fast with a
+// clear "upstream blocked" error instead of burning 20-25s per request on
+// a doomed DOM extraction. NOTE: a browser path that returns EMPTY is NOT
+// a hard block — that's a per-provider no-stream answer and must not take
+// down the other providers for 10 minutes.
+let chadHardBlockedUntil = 0
+// Hard block is a LAST-RESORT kill-switch for confirmed bot blocks (403
+// + browser network failure + real DOM timeout). Keep it short — the
+// site-wide 429 backoff (retry_after-aware, ≤3 min) already covers IP
+// rate-limits, and chad's own cooldowns are ~60s. A 10-min block turns
+// one hiccup into "the whole app is broken" for the user.
+const CHAD_HARD_BLOCK_TTL = 2 * 60 * 1000
+
+export function isChadBlocked() {
+  return Date.now() < chadBlockedUntil
+}
+
+function isChadHardBlocked() {
+  return Date.now() < chadHardBlockedUntil
+}
+
+function markChadBlocked() {
+  if (Date.now() >= chadBlockedUntil) {
+    console.warn('[anidap] chad API bot_detected via Node fetch — switching to browser-cookie path for 5 min')
+  }
+  chadBlockedUntil = Date.now() + CHAD_BLOCK_TTL
+}
+
+function markChadHardBlocked() {
+  chadHardBlockedUntil = Date.now() + CHAD_HARD_BLOCK_TTL
+  console.warn(`[anidap] chad hard block confirmed (DOM path also failed) — fast-failing for ${Math.round(CHAD_HARD_BLOCK_TTL / 60000)} min`)
+}
+
+// Site-wide chad 429 tracking. chad rate-limits by IP, NOT per-provider:
+// when one request gets a 429, every provider will 429 for the same
+// window (the retry_after in the response body). Track that window and
+// fail fast with a clean 429 instead of retrying every provider through
+// the slow DOM path — the UI already shows a countdown + auto-retry.
+let chad429Until = 0
+const CHAD_429_MAX_TTL = 3 * 60 * 1000 // never block longer than 3 min
+
+function markChad429(retryAfterMs) {
+  const capped = Math.min(
+    Math.max(Number(retryAfterMs) || 60_000, 15_000),
+    CHAD_429_MAX_TTL,
+  )
+  chad429Until = Date.now() + capped
+  console.warn(`[anidap] chad site-wide rate-limit — backing off ${Math.round(capped / 1000)}s`)
+}
+
+export function isChad429Blocked() {
+  return Date.now() < chad429Until
+}
+
+export function getChad429Remaining() {
+  return isChad429Blocked() ? Math.ceil((chad429Until - Date.now()) / 1000) : 0
+}
+
+/** Parse `retry_after` (ms) out of a chad 429 response body. */
+export function chadRetryAfterMs(body) {
+  try {
+    const parsed = typeof body === 'string' ? JSON.parse(body) : body
+    const ms = Number(parsed?.retry_after)
+    if (Number.isFinite(ms) && ms > 0) return ms
+  } catch { /* not JSON */ }
+  return 60_000
+}
+
+const CHAD_API = 'https://chad.anidap.lol/rest/api'
+const CHAD_HEADERS = {
+  'Referer': 'https://anidap.lol/',
+  'Origin': 'https://anidap.lol',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+}
+const slugResolveCache = new Map() // anilistId -> { at, slug }
+const SLUG_RESOLVE_TTL = 12 * 60 * 60 * 1000 // 12h — slugs rarely change
+// Single-flight map: while a slug resolve for an anilistId is in flight,
+// concurrent requests await the same promise instead of re-fetching the
+// watch page N times (wasted upstream load + extra bot-fingerprint risk).
+const slugResolveInFlight = new Map() // anilistId -> Promise<string|null>
+
+/** Drop a cached slug (and any in-flight resolve) so the next request
+ *  re-resolves fresh. Called when chad reports the slug is gone, so a
+ *  stale 12h cache entry can never trap the fast path in a 404 loop. */
+function invalidateSlug(anilistId) {
+  slugResolveCache.delete(anilistId)
+  slugResolveInFlight.delete(anilistId)
+}
+
+/** Pull the real anidap text slug out of the watch page's SSR HTML.
+ *  The page embeds it as a React prop: ..."http://anidap.lol/watch?id=21...",
+ *  "id","one-piece-p8k27","anilistId",21 (with optional JSON backslash
+ *  escapes). Anchor on the "id","<slug>","anilistId" prop sequence — the
+ *  watch URL is a full http URL and varies, so URL anchoring is fragile. */
+function extractSlugFromWatchHtml(html) {
+  if (!html) return null
+  const clean = html.replace(/\\"/g, '"').replace(/\\u0026/g, '&')
+  const m = clean.match(/"id","([a-z0-9][a-z0-9-]{1,60})","anilistId"/)
+  return m ? m[1] : null
+}
+
+/** Resolve AniList ID -> real anidap text slug (cached 12h).
+ *  One cheap HTTP fetch of the watch page HTML — no browser needed. */
+async function resolveAnidapSlug(anilistId) {
+  if (!anilistId) return null
+  const cached = slugResolveCache.get(anilistId)
+  if (cached && Date.now() - cached.at < SLUG_RESOLVE_TTL) return cached.slug
+
+  // Single-flight: concurrent callers share one watch-page fetch.
+  const inFlight = slugResolveInFlight.get(anilistId)
+  if (inFlight) return inFlight
+
+  const p = (async () => {
+    try {
+      const watchUrl = `${BASE}/watch?id=${anilistId}&ep=1`
+      const res = await fetch(watchUrl, {
+        headers: { 'User-Agent': CHAD_HEADERS['User-Agent'] },
+        signal: AbortSignal.timeout(9_000),
+      })
+      if (!res.ok) return null
+      const html = await res.text()
+      const slug = extractSlugFromWatchHtml(html)
+      if (slug) {
+        slugResolveCache.set(anilistId, { at: Date.now(), slug })
+        console.log(`[anidap] Resolved slug: #${anilistId} -> ${slug}`)
+        return slug
+      }
+    } catch (e) {
+      console.warn(`[anidap] Slug resolve failed for #${anilistId}:`, e.message)
+    }
+    return null
+  })().finally(() => slugResolveInFlight.delete(anilistId))
+
+  slugResolveInFlight.set(anilistId, p)
+  return p
+}
+
+/**
+ * Minimal "is this a usable stream?" check on a resolved source.
+ *
+ * Earlier versions tried to detect "image slideshow" streams by inspecting
+ * segment extensions and magic bytes, but that backfired: these CDNs serve
+ * REAL MPEG-TS video under .jpg filenames (playeng/ani4.nukitashith.top),
+ * prepend ByteDance ad-tracker PNGs to otherwise-fine playlists
+ * (vivibebe), and flap between responses per request. Every heuristic
+ * false-positived and turned working streams into "No stream available".
+ *
+ * We verify (a) the manifest isn't an HTML/empty error page, and (b) it
+ * doesn't 4xx through the proxy. A definitive 4xx (the 404 placeholder the
+ * chad API hands back when it has no real source, e.g.
+ * vivibebe.site/public/stream/0) is rejected so the router falls through to
+ * a provider that actually serves video instead of showing a black player.
+ * 5xx + network errors stay lenient — a transient CDN hiccup shouldn't mark
+ * a working stream dead. Cost: ONE ~200-400ms request through the internal
+ * /proxy.
+ */
+async function isRealVideoStream(streamUrl, headers = null) {
+  try {
+    // Fetch THROUGH the internal /proxy — that's the exact path the
+    // player uses, with the full anti-bot header set + referer rotation.
+    // Direct server fetches are fingerprint-blocked by these CDNs (403
+    // bot pages), which made direct validation useless.
+    const origin = `http://127.0.0.1:${Number(process.env.PORT) || 5173}`
+    // Prefer upstream-provided headers (e.g. chad tells us the CDN needs
+    // Referer: megaplay.buzz) — validating with a guessed referer can 403
+    // and reject a stream that would actually play.
+    const referer = headers?.Referer || headers?.referer || playerRefererFor(streamUrl)
+    const h = encodeURIComponent(
+      Buffer.from(JSON.stringify({ Referer: referer })).toString('base64'),
+    )
+    const res = await fetch(`${origin}/proxy?url=${encodeURIComponent(streamUrl)}&h=${h}`, {
+      signal: AbortSignal.timeout(4_000),
+    })
+    // Definitive 4xx through the proxy (404/410 gone, 403/401 blocked, 429
+    // rate-limited) means the player — which loads via this SAME /proxy —
+    // will fail identically. Reject it so the router falls through to a real
+    // provider. Previously this returned `true` (lenient), which let upstream
+    // placeholder streams (vivibebe.site/public/stream/0 → 404) through as
+    // "playable" and produced a black player.
+    if (res.status >= 400 && res.status < 500) return false
+    if (!res.ok) return true // 5xx/transient — be lenient, let the player try
+    const body = (await res.text()).trim()
+    if (!body) return false // empty manifest is not a real stream
+    if (body.startsWith('<') || body.startsWith('Request failed')) return false // HTML/bot error page
+    return true // anything m3u8-shaped is playable
+  } catch {
+    return true // validation failure — let the player try
+  }
+}
+
+/** Pick the player Referer that unlocks a stream host's CDN.
+ *  The fast path sets this directly so the /proxy doesn't need a 403
+ *  retry round-trip on every manifest/segment request. */
+function playerRefererFor(streamUrl) {
+  try {
+    const host = new URL(streamUrl).hostname
+    // kryntal.top (anidap's current CDN, Aug 2026) requires the megaplay
+    // referer — anidap.lol/no-referer both get 403 (verified live).
+    if (host.includes('kryntal')) return 'https://megaplay.buzz/'
+    if (host.includes('akirax') || host.includes('megaplay')) return 'https://megaplay.buzz/'
+    if (host.includes('kwik') || host.includes('uwucdn')) return 'https://kwik.cx/'
+    if (host.includes('mewstream')) return 'https://megaplay.buzz/'
+    if (host.includes('anicrush') || host.includes('gniyonna')) return 'https://anicrush.to/'
+    if (host.includes('vidwish')) return 'https://vidwish.live/'
+    if (host.includes('24stream') || host.includes('fast4speed')) return 'https://anidap.lol/'
+  } catch { /* fall through */ }
+  return 'https://anidap.lol/'
+}
+
+/** Thin chad-API client. Returns parsed JSON on success, { _error: status }
+ *  on an HTTP error (429 / 404 / 5xx), or null on a network failure/timeout.
+ *  Callers can then tell "slug is gone" (404) from "chad hiccup" (null).
+ *  timeoutMs defaults to 8s — the episodes endpoint serves up to ~1MB
+ *  (long anime like One Piece have 1100+ eps) and needs a longer leash. */
+async function chadGet(path, params = {}, timeoutMs = 8_000) {
+  const qs = new URLSearchParams(params).toString()
+  const url = `${CHAD_API}/${path}${qs ? `?${qs}` : ''}`
+  try {
+    const res = await fetch(url, { headers: CHAD_HEADERS, signal: AbortSignal.timeout(timeoutMs) })
+    if (res.status === 429) {
+      // chad rate-limits by IP — read the cooldown it tells us to respect
+      // and set the site-wide window so every provider backs off together.
+      let retryAfterMs = 60_000
+      try {
+        const body = await res.json()
+        if (body && body.retry_after) retryAfterMs = Number(body.retry_after) || 60_000
+      } catch { /* keep default */ }
+      markChad429(retryAfterMs)
+      return { _error: 429, retryAfterMs }
+    }
+    if (!res.ok) return { _error: res.status }
+    return await res.json()
+  } catch (e) {
+    console.warn(`[anidap] chad ${path} fetch failed:`, e.message)
+    return null // network failure — NOT a definitive answer
+  }
+}
+
 // ── Resolve AniList ID -> metadata ───────────────────────────────────
-// Returns a stub with the AniList ID as slug (used directly by downstream
-// functions). The frontend gets title/poster from AniList GraphQL.
+// Fast path returns the REAL anidap text slug (embedded in the watch page
+// SSR HTML) so the frontend can use it directly for all chad API calls.
+// Falls back to a stub with the AniList ID as slug.
 export async function getInfoByAniListId(anilistId) {
   const id = Number(anilistId)
   if (!id || isNaN(id)) throw Object.assign(new Error('Invalid AniList ID'), { upstream: 400 })
+
+  try {
+    const slug = await resolveAnidapSlug(id)
+    if (slug) {
+      return { slug, title: null, poster: null, totalEpisodes: null, anilistId: id, source: 'anidap' }
+    }
+  } catch { /* fall back to stub */ }
 
   return {
     slug: String(id),
@@ -260,15 +547,55 @@ export async function getInfoByAniListId(anilistId) {
 }
 
 // ── Episode list ──────────────────────────────────────────────────────
-// Returns stub episodes (1-50). Real episode data and thumbnails come
-// from AniZip on the frontend.
+// Fast path: REAL episodes from the chad API (accurate counts, localized
+// titles, dub/sub flags) instead of a 50-episode stub. Falls back to the
+// stub when the slug can't be resolved (anime not on anidap).
+// The full list is cached server-side (30 min) — it's a large payload for
+// long anime (~1MB for 1100+ eps) and doesn't change between visits.
+const episodesCache = new Map() // anilistId -> { at, episodes }
+const EPISODES_CACHE_TTL = 30 * 60 * 1000
+
 export async function getEpisodes(slug, anilistId, titles = {}) {
   const id = await resolveAnilistId(slug, anilistId, titles)
   if (!id) return []
+
+  const cached = episodesCache.get(id)
+  if (cached && Date.now() - cached.at < EPISODES_CACHE_TTL) return cached.episodes
+
+  try {
+    const resolved = await resolveAnidapSlug(id)
+    if (resolved) {
+      const list = await chadGet('episodes', { id: resolved }, 20_000)
+      if (list?._error === 404) invalidateSlug(id)
+      if (Array.isArray(list) && list.length > 0) {
+        const eps = list.map((ep) => ({
+          number: Number(ep.number) || 0,
+          id: `${id}-${ep.number}`,
+          title: ep.titles?.en || ep.titles?.['x-jat'] || ep.titles?.ja || '',
+          hasDub: !!ep.hasDub,
+          hasSub: !!ep.hasSub,
+          img: ep.img || undefined,
+        })).filter((ep) => ep.number > 0)
+        if (eps.length > 0) {
+          episodesCache.set(id, { at: Date.now(), episodes: eps })
+          console.log(`[anidap] ✓ ${eps.length} real episodes for #${id}`)
+          return eps
+        }
+      }
+    }
+  } catch (e) { console.warn(`[anidap] chad episodes failed for #${id}:`, e.message) }
+
   return Array.from({ length: 50 }, (_, i) => ({
     number: i + 1,
     id: `${id}-${i + 1}`,
   }))
+}
+
+function pruneEpisodesCache() {
+  const now = Date.now()
+  for (const [key, entry] of episodesCache) {
+    if (now - entry.at > EPISODES_CACHE_TTL) episodesCache.delete(key)
+  }
 }
 
 // ── Server health cache helpers ───────────────────────────────────────
@@ -302,9 +629,54 @@ export function getServerHealth(name, type) {
 // ── Provider/server list for an episode ───────────────────────────────
 // Returns ALL known anidap servers — no filtering, no health probes.
 // Every server is always shown. The user clicks to try each one.
+//
+// The chad 'servers' response is cached per (anilistId, ep) for 5 min.
+// Provider lists rarely change and this saves ~0.5-8s per new episode.
+const providerListCache = new Map()
+const PROVIDER_LIST_TTL = 5 * 60 * 1000
+function pruneProviderListCache() {
+  const now = Date.now()
+  for (const [key, entry] of providerListCache) {
+    if (now - entry.at > PROVIDER_LIST_TTL) providerListCache.delete(key)
+  }
+}
+
 export async function getProviders(slug, ep, anilistId, titles = {}) {
   const id = await resolveAnilistId(slug, anilistId, titles)
   if (!id) return []
+
+  // ── Provider-list cache: the list of servers for an episode changes
+  // rarely. A 5-min TTL saves the ~0.5-8s chad API round-trip on every
+  // episode-switch and app-restart, dramatically reducing "fetching servers"
+  // spinner time for dub+sub users who see 2-3 rounds of this per episode.
+  const cacheKey = `${id}:${Number(ep) || 1}`
+  const cachedProviders = providerListCache.get(cacheKey)
+  if (cachedProviders && Date.now() - cachedProviders.at < PROVIDER_LIST_TTL) {
+    return cachedProviders.data
+  }
+
+  // Fast path: REAL per-episode provider lists from the chad API.
+  // The site only lists servers that actually have this episode, so the
+  // picker stops showing dead servers for episodes they don't cover.
+  try {
+    const resolved = await resolveAnidapSlug(id)
+    if (resolved) {
+      const data = await chadGet('servers', { id: resolved, epNum: Number(ep) || 1 })
+      if (data?._error === 404) invalidateSlug(id)
+      if (data && !data._error) {
+        const out = []
+        for (const [key, type] of [['subProviders', 'sub'], ['dubProviders', 'dub'], ['hsubProviders', 'hsub']]) {
+          for (const p of data[key] || []) {
+            out.push({ name: p.id, type, default: !!p.default, tip: p.tip || null })
+          }
+        }
+        if (out.length > 0) {
+          providerListCache.set(cacheKey, { at: Date.now(), data: out })
+          return out
+        }
+      }
+    }
+  } catch (e) { console.warn(`[anidap] chad servers failed for #${id}:`, e.message) }
 
   return [
     ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub' })),
@@ -347,19 +719,198 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
     return null
   }
 
-  // ── DOM extraction — the only reliable path (chad API is dead) ──
-  // Skip the chad REST API entirely: it returns 403 bot_detected or 404
-  // for every provider. Going straight to Puppeteer DOM extraction saves
-  // 5-10 seconds per provider.
+  // ── FAST PATH: chad REST API (browser-free) ──
+  // The chad API moved to chad.anidap.lol/rest/api (the old api.anidap.lol
+  // host is dead) and returns real sources over plain HTTP with just
+  // Referer/Origin/UA — no browser, no cookies, no mutex. Once the slug is
+  // cached this resolves in ~0.5-1.5s instead of the 10-30s DOM extraction.
+  //
+  // Hard block check FIRST: chad 403'd AND the browser path already proved
+  // useless — fail fast (this request would only burn 2-6s on the browser
+  // path and throw anyway). Stream-cache hits above are still served.
+  if (isChadHardBlocked()) {
+    throw Object.assign(
+      new Error('AniDap upstream is temporarily blocking this connection (bot detection). Try again in a few minutes.'),
+      { upstream: 503 },
+    )
+  }
+
+  // Site-wide chad 429 (IP rate-limit): skip the fast path, the browser
+  // path, AND the DOM fallback — they all hit the same blocked IP and each
+  // would burn 8-18s before failing. Throw immediately so the router and
+  // the client fail fast with the countdown the UI already renders.
+  if (isChad429Blocked()) {
+    const remainingSec = getChad429Remaining()
+    throw Object.assign(
+      new Error(`Anidap is temporarily rate-limited. Retry in ~${remainingSec}s.`),
+      { upstream: 429, retryAfterSec: remainingSec },
+    )
+  }
+
+  let chadSlug = null
+  let chadFallbackNeeded = false // chad failed in a way the browser might recover (403 / network / 5xx)
+  let browserPathThrew = false   // browser chad fetch threw at the network level (vs returned empty)
+
+  // While chad is bot-blocking our IP, skip this path entirely — the 403
+  // is site-wide, not per-provider, so we don't waste the route budget on
+  // a call we know will fail.
+  if (!isChadBlocked()) {
+  try {
+    const tFast = Date.now()
+    chadSlug = await resolveAnidapSlug(id)
+    if (chadSlug) {
+      const data = await chadGet('sources', {
+        id: chadSlug, epNum, type, providerId: bareProvider,
+      })
+      if (data?._error === 429) {
+        // Throw (not return null) so the router labels this provider
+        // rate-limited instead of "empty stream", and the post-race 429
+        // check in the router surfaces the real status.
+        markProviderRateLimited(bareProvider, RATE_LIMIT_COOLDOWN)
+        throw Object.assign(new Error('too_many_requests'), { upstream: 429 })
+      }
+      if (data && Array.isArray(data.sources) && data.sources.length > 0) {
+        const streamUrl = data.sources[0]?.url
+        if (streamUrl) {
+          // Skip streams whose manifest is an HTML error page — the
+          // router then auto-falls through to the next provider. Short
+          // TTL so a transient CDN hiccup recovers quickly.
+          if (!(await isRealVideoStream(streamUrl, data.headers))) {
+            setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
+            console.log(`[anidap] Skipping unusable stream (HTML error page): ${streamUrl.slice(0, 70)}`)
+            return null
+          }
+          const tracks = (data.tracks || []).map((t) => ({
+            file: t.url || t.file || '',
+            label: t.label || '',
+            kind: t.kind || 'captions',
+            default: t.default || false,
+            lang: t.lang || undefined,
+          }))
+          // Prefer the headers chad tells us to use (e.g. kryntal CDN needs
+          // Referer: megaplay.buzz) — playerRefererFor is only a guess by
+          // host and goes stale when anidap switches CDNs.
+          const result = {
+            url: streamUrl,
+            raw: streamUrl,
+            headers: data.headers && Object.keys(data.headers).length > 0
+              ? data.headers
+              : { Referer: playerRefererFor(streamUrl) },
+            tracks: tracks.length > 0 ? tracks : null,
+          }
+          setStreamCache(noStreamKey, result)
+          console.log(`[anidap] ✓ chad API stream: ${streamUrl.slice(0, 80)} (${Date.now() - tFast}ms)`)
+          return result
+        }
+      }
+      // chad returned no sources for this provider/ep.
+      if (data === null) {
+        // Network failure/timeout — the browser path may still succeed.
+        chadFallbackNeeded = true
+        console.log(`[anidap] chad network failure for ${id}:${epNum}/${bareProvider}/${type} - trying browser path`)
+      } else if (data._error === 404) {
+        // The slug is stale/gone (anidap regenerates random-suffix slugs) —
+        // invalidate so the next request re-resolves instead of 404-looping
+        // against the 12h cache. Short failure TTL too.
+        invalidateSlug(id)
+        setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
+        console.log(`[anidap] chad 404 for slug (invalidating): ${id}:${epNum}/${bareProvider}/${type}`)
+        return null
+      } else if (data._error === 403) {
+        // bot_detected — the chad API is temporarily blocking our Node
+        // fingerprint. NOT a per-provider failure: don't cache a no-stream
+        // verdict and don't let the router cool down every provider. The
+        // browser-cookie path below usually still works.
+        markChadBlocked()
+        chadFallbackNeeded = true
+        console.log(`[anidap] chad bot_detected (403) for ${id}:${epNum}/${bareProvider}/${type} - trying browser path`)
+      } else if (data && Array.isArray(data.sources) && data.sources.length === 0) {
+        // chad CONFIRMED no sources for this provider/episode.
+        setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
+        console.log(`[anidap] chad confirmed no sources for ${id}:${epNum}/${bareProvider}/${type}`)
+        return null
+      } else {
+        // 5xx or unexpected shape — the browser may still get through.
+        chadFallbackNeeded = true
+        console.log(`[anidap] chad error for ${id}:${epNum}/${bareProvider}/${type}:`, data?._error || 'empty')
+      }
+    }
+  } catch (fastErr) {
+    // A 429 is site-wide (IP rate-limit): the browser path would hit the
+    // same blocked IP and burn 2-6s before failing too. Re-throw so the
+    // router surfaces it immediately — the client shows the countdown.
+    if (fastErr?.upstream === 429 || fastErr?.message?.includes('too_many_requests')) {
+      throw fastErr
+    }
+    console.warn(`[anidap] chad fast path failed for ${id}:${epNum}/${bareProvider}/${type}:`, fastErr.message)
+  }
+  }
+
+  // ── BROWSER CHAD PATH (cookies) ──
+  // Plain Node fetch gets bot_detected (403) once the API fingerprints it;
+  // the browser context with real anidap.lol cookies still returns real
+  // sources (verified live). Runs when the Node fast path failed in a way
+  // the browser might recover from (403 / network failure / 5xx).
+  // Cost: ~2-6s (the browser is pre-warmed at startup).
+  if (chadSlug && chadFallbackNeeded) {
+    try {
+      const tBrowser = Date.now()
+      const browserData = await fetchChadSources(id, chadSlug, epNum, bareProvider, type)
+      if (browserData && Array.isArray(browserData.sources) && browserData.sources.length > 0) {
+        const streamUrl = browserData.sources[0]?.url
+        if (streamUrl) {
+          if (!(await isRealVideoStream(streamUrl, browserData.headers))) {
+            setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
+            console.log(`[anidap] Skipping unusable browser stream (HTML error page): ${streamUrl.slice(0, 70)}`)
+            return null
+          }
+          const tracks = (browserData.tracks || []).map((t) => ({
+            file: t.url || t.file || '',
+            label: t.label || '',
+            kind: t.kind || 'captions',
+            default: t.default || false,
+            lang: t.lang || undefined,
+          }))
+          const result = {
+            url: streamUrl,
+            raw: streamUrl,
+            headers: browserData.headers && Object.keys(browserData.headers).length > 0
+              ? browserData.headers
+              : { Referer: playerRefererFor(streamUrl) },
+            tracks: tracks.length > 0 ? tracks : null,
+          }
+          setStreamCache(noStreamKey, result)
+          console.log(`[anidap] ✓ browser chad stream: ${streamUrl.slice(0, 80)} (${Date.now() - tBrowser}ms)`)
+          return result
+        }
+      }
+      console.log(`[anidap] browser chad returned no sources for ${id}:${epNum}/${bareProvider}/${type}`)
+    } catch (browserErr) {
+      // A 429 here is an IP rate-limit (site-wide, handled by markChad429),
+      // NOT evidence of a bot block — don't let it contribute to the hard
+      // block. Only network-level failures (fetch threw, 403, 5xx) do.
+      const isBrowser429 = browserErr?.upstream === 429 || browserErr?.message?.includes('too_many_requests')
+      if (!isBrowser429) browserPathThrew = true
+      console.warn(`[anidap] browser chad path failed for ${id}:${epNum}/${bareProvider}/${type}:`, browserErr.message)
+    }
+  }
+
+  // ── DOM extraction — browser fallback (chad API down / slug unknown) ──
   try {
     const tStart = Date.now()
     const watchUrl = `${BASE}/watch?id=${id}&ep=${epNum}&type=${type}&provider=${bareProvider}`
     console.log(`[anidap] DOM extraction: ${watchUrl.slice(0, 120)}`)
-    const domData = await extractStreamFromWatchPage(watchUrl, { maxDurationMs: 18_000 })
+    const domData = await extractStreamFromWatchPage(watchUrl, { maxDurationMs: 18_000, signal: opts.signal })
     if (domData && Array.isArray(domData.sources) && domData.sources.length > 0) {
       const streamUrl = domData.sources[0]?.url
       if (!streamUrl) {
         setNoStream(noStreamKey, NO_STREAM_TTL_CONFIRMED)
+        return null
+      }
+      // Same fake-stream guard as the fast path (slideshow segments).
+      if (!(await isRealVideoStream(streamUrl, domData.headers))) {
+        setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
+        console.log(`[anidap] Skipping unusable DOM stream (HTML error page): ${streamUrl.slice(0, 70)}`)
         return null
       }
       const tracks = (domData.tracks || []).map((t) => ({
@@ -371,7 +922,9 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
       const result = {
         url: streamUrl,
         raw: streamUrl,
-        headers: { Referer: watchUrl },
+        headers: domData.headers && Object.keys(domData.headers).length > 0
+          ? domData.headers
+          : { Referer: watchUrl },
         tracks: tracks.length > 0 ? tracks : null,
       }
       setStreamCache(noStreamKey, result)
@@ -382,6 +935,18 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
     setNoStream(noStreamKey, NO_STREAM_TTL_CONFIRMED)
   } catch (domErr) {
     console.warn(`[anidap] DOM extraction failed for ${id}:${epNum}/${bareProvider}/${type}:`, domErr.message)
+    // If chad was blocked AND the browser-cookie path THREW at the network
+    // level (the block reached our browser too), the SPA couldn't render
+    // the player — confirm the hard block so subsequent requests fail fast
+    // instead of spinning. A browser path that merely returned EMPTY is a
+    // per-provider no-stream answer and must NOT hard-block everything.
+    // CRITICAL: an ABORTED extraction (the route cap or a race winner's
+    // abort signal) is NOT a failure — it usually means ANOTHER provider
+    // already won. Hard-blocking on an abort is the "fix one thing, break
+    // everything" bug: one successful stream would fast-fail all of anidap
+    // for 10 minutes. Aborts never confirm the block.
+    const domWasAborted = domErr?.message?.includes('aborted') || domErr?.name === 'AbortError'
+    if (isChadBlocked() && browserPathThrew && !domWasAborted) markChadHardBlocked()
     // Only mark rate-limited for actual 429s — not for timeouts or other errors
     if (domErr.upstream === 429 || domErr.message?.includes('too_many_requests')) {
       markProviderRateLimited(bareProvider, RATE_LIMIT_COOLDOWN)
@@ -424,6 +989,8 @@ setInterval(() => {
   pruneNoStreamCache()
   pruneProviderRateLimit()
   pruneStreamCache()
+  pruneEpisodesCache()
+  pruneProviderListCache()
 }, 60_000).unref()
 
 // ── Download (chad REST download API is dead) ────────────────────────

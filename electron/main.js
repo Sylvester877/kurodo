@@ -71,26 +71,73 @@ app.on('second-instance', () => {
 // a bounded retry count to avoid an infinite crash/reload loop.
 let renderCrashReloadCount = 0
 const MAX_RENDER_CRASH_RELOADS = 3
+let quitting = false
+app.on('before-quit', () => { quitting = true })
+
+/** Append a line to the startup.log diagnostic file (best-effort). */
+function writeDiag(line) {
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'startup.log'), `[${new Date().toISOString()}] ${line}\n`)
+  } catch { /* ignore */ }
+}
+
+
+// ── GPU self-heal marker ────────────────────────────────────────
+// When the renderer crashes repeatedly (almost always GPU/video-decode
+// related on Windows), we write a marker file and relaunch with software
+// rendering (--disable-gpu) so the user can keep using the app instead of
+// hitting an instant crash loop. The marker is cleared once the app has
+// run stably for 60s, so a later transient crash can still self-heal again.
+function gpuHealPath() { return path.join(app.getPath('userData'), 'gpu-selfheal.json') }
+function markGpuSelfHeal() {
+  try { fs.writeFileSync(gpuHealPath(), JSON.stringify({ at: Date.now() })) } catch { /* ignore */ }
+  writeDiag('GPU self-heal marker written — next launch will use --disable-gpu')
+}
+function clearGpuSelfHeal() {
+  try { fs.rmSync(gpuHealPath(), { force: true }) } catch { /* ignore */ }
+}
+function hasGpuSelfHeal() {
+  try {
+    const d = JSON.parse(fs.readFileSync(gpuHealPath(), 'utf8'))
+    return d && d.at && Date.now() - d.at < 5 * 60 * 1000
+  } catch { return false }
+}
 
 app.on('child-process-gone', (_event, details) => {
-  console.error('[electron] child-process-gone:', details.type, details.reason, details.exitCode, details.serviceName)
+  const msg = `[electron] child-process-gone: ${details.type} ${details.reason} ${details.exitCode} ${details.serviceName || ''}`
+  console.error(msg)
+  writeDiag(msg)
 })
 
 app.on('render-process-gone', (_event, webContents, details) => {
-  console.error('[electron] render-process-gone:', details.reason, details.exitCode)
+  const msg = `[electron] render-process-gone: ${details.reason} ${details.exitCode}`
+  console.error(msg)
+  writeDiag(msg)
 
-  // Try to reload the main window so the user isn't stuck on a blank page,
-  // but cap retries to avoid an infinite crash/reload loop.
-  const win = mainWindow || BrowserWindow.getAllWindows()[0]
-  if (win && !win.isDestroyed() && win.webContents === webContents) {
-    if (renderCrashReloadCount >= MAX_RENDER_CRASH_RELOADS) {
-      console.error('[electron] Renderer keeps crashing — stopping automatic reloads.')
-      return
-    }
-    renderCrashReloadCount++
-    console.log(`[electron] Attempting to reload main window after render process crash (retry ${renderCrashReloadCount}/${MAX_RENDER_CRASH_RELOADS})...`)
-    win.reload()
+  // Only recover the MAIN app window. The hidden harvester window crashes
+  // are handled by the harvester itself (it recreates its window on demand).
+  const win = mainWindow
+  if (!win || win.isDestroyed() || win.webContents !== webContents) return
+
+  if (renderCrashReloadCount >= MAX_RENDER_CRASH_RELOADS) {
+    // Repeated crashes — self-heal by relaunching with GPU disabled.
+    console.error('[electron] Renderer keeps crashing — relaunching with --disable-gpu (self-heal)')
+    markGpuSelfHeal()
+    app.relaunch({ args: process.argv.slice(1).concat(['--disable-gpu']) })
+    app.exit(0)
+    return
   }
+  renderCrashReloadCount++
+  console.log(`[electron] Attempting to reload main window after render process crash (retry ${renderCrashReloadCount}/${MAX_RENDER_CRASH_RELOADS})...`)
+  try {
+    win.reload()
+    // Tell the freshly-booted page this was a crash recovery, not a normal
+    // navigation — the Watch page uses this to stay paused instead of
+    // auto-playing the episode again.
+    win.webContents.once('did-finish-load', () => {
+      if (!win.isDestroyed()) win.webContents.send('app:recovered')
+    })
+  } catch (e) { console.error('[electron] Reload failed:', e.message) }
 })
 
 // ── GPU / sandbox stability for packaged app ───────────────────
@@ -115,8 +162,23 @@ app.on('render-process-gone', (_event, webContents, details) => {
 // the crash without sacrificing hardware decode performance.
 app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames')
 app.commandLine.appendSwitch('disable-gpu-sandbox')
-app.commandLine.appendSwitch('disable-software-rasterizer')
-app.commandLine.appendSwitch('disable-features', 'IsolateOrigins,site-per-process')
+// NOTE (v0.3.26): disable-software-rasterizer was REMOVED. It disabled the
+// software compositing fallback — when the GPU process hiccups (driver
+// recovery, hybrid-GPU switch, video-decode fault) the renderer had NO
+// fallback and the whole window died silently ("app crashes on episode
+// open"). With the fallback enabled, a GPU hiccup degrades to slower
+// rendering instead of killing the window.
+// disable-features=IsolateOrigins,site-per-process was also removed: it
+// spawned a separate renderer per origin (app + anidap hidden window + YouTube
+// iframes), tripling renderer memory pressure on low-end machines.
+
+// GPU self-heal: if a previous session ended with repeated renderer crashes,
+// run THIS session with software rendering so the app stays usable. The
+// marker is cleared after 60s of stable running (see showApp).
+if (hasGpuSelfHeal()) {
+  app.commandLine.appendSwitch('disable-gpu')
+  console.log('[electron] GPU self-heal active — running with --disable-gpu this session')
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PORT = 5173
@@ -125,6 +187,10 @@ const SERVER_URL = `http://localhost:${PORT}`
 // Reference to the main application window, used by the second-instance
 // handler so it focuses the real app window (not the splash window).
 let mainWindow = null
+// When the main window was created — used to avoid recreating a window the
+// user just closed (a fresh window dying <4s after creation is a close/quit
+// race, not a crash we should resurrect).
+let mainWinCreatedAt = 0
 
 // Current update feed URL (can be changed at runtime via settings page)
 let currentFeedUrl = process.env.UPDATE_FEED_URL || ''
@@ -190,6 +256,7 @@ function createMainWindow() {
 
   win.setMenuBarVisibility(false)
   win.removeMenu()
+  mainWinCreatedAt = Date.now()
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http')) {
@@ -198,7 +265,69 @@ function createMainWindow() {
     return { action: 'deny' }
   })
 
+  // ── Main-window lifecycle guards ─────────────────────────────
+  // 1. Closing the main window quits the app (normal desktop behavior).
+  //    Without this, the hidden harvester window keeps the app alive in
+  //    the background after the user closes the main window.
+  // 2. If the window/webContents is DESTROYED without a close (renderer or
+  //    GPU-process death — the "app crashes when opening an episode" bug),
+  //    automatically recreate it so the user is never left with a dead app.
+  win.on('close', () => {
+    if (!quitting) {
+      quitting = true
+      app.quit()
+      // Belt-and-braces: if quit is ever blocked (pending async work, a stuck
+      // window, a mid-extraction harvester page), force-exit after a few
+      // seconds so the app never lingers silently playing audio in the
+      // background after the user closed it.
+      setTimeout(() => {
+        if (quitting) app.exit(0)
+      }, 4000)
+    }
+  })
+  win.on('closed', () => {
+    if (!quitting) recreateMainWindow()
+  })
+  win.webContents.on('destroyed', () => {
+    if (!quitting) recreateMainWindow()
+  })
+
   return win
+}
+
+/** Recreate the main window after it died unexpectedly (crash / GPU death). */
+function recreateMainWindow() {
+  if (quitting) return
+  if (mainWindow && !mainWindow.isDestroyed()) return
+  // If the window died within the first moments of its life it was almost
+  // certainly a user close (or a close/quit race), not a crash we can heal.
+  // Recreating it would resurrect the app after the user tried to quit — the
+  // "closes the app but it comes back / keeps playing in the background" bug.
+  // (A user X-click always fires 'close' → sets quitting, so this guard only
+  // protects against unknown destroy paths; 2s keeps early real-crash
+  // recovery intact.)
+  if (Date.now() - mainWinCreatedAt < 2000) {
+    console.error('[electron] Main window died <2s after creation — not recreating (user close).')
+    writeDiag('Main window died <2s after creation — not recreating')
+    return
+  }
+  console.error('[electron] Main window destroyed unexpectedly — recreating...')
+  writeDiag('Main window destroyed unexpectedly — recreating')
+  try {
+    const w = createMainWindow()
+    mainWindow = w
+    w.loadURL(SERVER_URL).catch(() => {})
+    w.show()
+    w.focus()
+    // Signal the freshly-booted page that this was a crash recovery, NOT a
+    // normal launch — the Watch page uses this to stay paused instead of
+    // auto-playing (fixes "the app opens an anime by itself").
+    w.webContents.once('did-finish-load', () => {
+      if (!w.isDestroyed()) w.webContents.send('app:recovered')
+    })
+  } catch (e) {
+    console.error('[electron] Failed to recreate main window:', e.message)
+  }
 }
 
 // ── Create the splash window (frameless overlay with the animation) ──
@@ -210,8 +339,12 @@ function createSplashWindow() {
     frame: false,
     transparent: false,
     backgroundColor: '#000',
-    alwaysOnTop: true,
+    // Deliberately NOT alwaysOnTop: an intro that force-steals focus from
+    // other windows feels broken. A normal window stays behind the user's
+    // current app and can be minimized/clicked away like any other window.
     show: true,
+    minimizable: true,
+    maximizable: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -338,12 +471,20 @@ function resetFeedErrorGuard() { reportedFeedError = false }
 //
 // To disable auto-update entirely, set DISABLE_AUTO_UPDATE=true.
 
+// Idempotency guard: showApp() can be triggered by both splash:done and the
+// 8s safety timeout — this prevents registering updater events twice.
+let updaterStarted = false
+
 function setupAutoUpdater() {
   // Skip in development (no published versions to compare)
   if (!app.isPackaged || process.env.DISABLE_AUTO_UPDATE === 'true') {
     console.log('[updater] Skipped — not packaged or DISABLE_AUTO_UPDATE=true')
     return
   }
+
+  // Never double-register events or double-check the feed.
+  if (updaterStarted) return
+  updaterStarted = true
 
   // Allow overriding the update feed URL via env var (useful for
   // self-hosted update servers or testing)
@@ -461,10 +602,7 @@ function checkLocalUpdate() {
   const log = (...args) => {
     const line = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')
     console.log(line)
-    try {
-      const logPath = path.join(app.getPath('userData'), 'startup.log')
-      fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${line}\n`)
-    } catch { /* ignore */ }
+    writeDiag(line)
   }
 
   // Only meaningful when packaged — in dev mode the project IS the source.
@@ -1492,10 +1630,8 @@ app.whenReady().then(async () => {
   })
 
   // ── File-based diagnostic log ──────────────────────────────────
-  const diagLog = path.join(app.getPath('userData'), 'startup.log')
   const diag = (...args) => {
-    const line = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ') + '\n'
-    try { fs.appendFileSync(diagLog, `[${new Date().toISOString()}] ${line}`) } catch {}
+    writeDiag(args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' '))
   }
   diag('=== Kurōdo starting v' + app.getVersion() + ' ===')
 
@@ -1530,9 +1666,9 @@ app.whenReady().then(async () => {
         const eq = trimmed.indexOf('=')
         if (eq === -1) continue
         const key = trimmed.slice(0, eq).trim()
-        // Only forward server-side keys (TMDB + proxy config). Never
+        // Only forward server-side keys (TMDB/TVDB + proxy config). Never
         // touch PORT/KURODO_BACKEND_ORIGIN which we set above.
-        if (!/^(TMDB_|RESIDENTIAL_PROXY_URL|GOGO_PROXIES|ANIWATCH_DOMAIN)/.test(key)) continue
+        if (!/^(TMDB_|TVDB_|RESIDENTIAL_PROXY_URL|GOGO_PROXIES|ANIWATCH_DOMAIN)/.test(key)) continue
         if (process.env[key] !== undefined) continue
         process.env[key] = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
       }
@@ -1560,6 +1696,37 @@ app.whenReady().then(async () => {
   // so a later transient crash can still trigger an auto-reload.
   mainWin.webContents.on('did-finish-load', () => {
     renderCrashReloadCount = 0
+    // If we're running a GPU self-heal session, clear the marker once the
+    // app has been stable for 60s so future crashes can self-heal again.
+    if (hasGpuSelfHeal()) {
+      setTimeout(() => { if (!quitting) clearGpuSelfHeal() }, 60_000)
+    }
+  })
+
+  // ── Load-failure guard: never leave the user staring at a blank window ──
+  // A failed page load (server hiccup, renderer init error) shows a silent
+  // black window that looks like the app "instantly crashed". Log it to the
+  // startup file and retry once; if it fails again the showApp() path still
+  // hands control to the React error page instead of quitting silently.
+  let loadFailRetried = false
+  mainWin.webContents.on('did-fail-load', (_event, errorCode, errorDesc, _validatedURL, isMainFrame) => {
+    // Ignore subframe failures (e.g. a missing favicon or an ad frame) —
+    // only the main page failing should trigger recovery.
+    if (!isMainFrame) return
+    // -3 = ERR_ABORTED — normal when a navigation replaces another.
+    if (errorCode === -3) return
+    const msg = `[electron] did-fail-load ${errorCode} ${errorDesc} (retried: ${loadFailRetried})`
+    console.error(msg)
+    writeDiag(msg)
+    if (!loadFailRetried) {
+      loadFailRetried = true
+      // Give the server a moment to recover, then retry once.
+      setTimeout(() => {
+        if (mainWin && !mainWin.isDestroyed()) {
+          mainWin.loadURL(SERVER_URL).catch(() => {})
+        }
+      }, 1200)
+    }
   })
 
   // ── Start server in parallel ───────────────────────────────────
@@ -1602,8 +1769,12 @@ app.whenReady().then(async () => {
   })
 
   // ── Emergency quit at 35 s ─────────────────────────────────────
+  // Only force-quit when the server is stuck starting with NO error page
+  // shown. If serverError is set, showApp() already displays the friendly
+  // "Couldn't start the backend server" page with a Retry button — quitting
+  // on top of that would look like the app "instantly closes" for no reason.
   setTimeout(() => {
-    if (!serverReady) {
+    if (!serverReady && !serverError) {
       diag('EMERGENCY QUIT: server never started after 35 s')
       console.error('[electron] Emergency quit — server never started')
       app.quit()
@@ -1628,6 +1799,9 @@ app.whenReady().then(async () => {
     if (serverError) {
       console.error('[electron] Server failed to start — showing error page instead of quitting')
       diag('Server failed, showing error page:', serverError?.message || String(serverError))
+      // Prevent the did-fail-load retry from ever replacing this error page
+      // with a second (also-failing) load of SERVER_URL.
+      loadFailRetried = true
       if (!splashWin.isDestroyed()) splashWin.close()
 
       // Show an error page instead of quitting — the user can retry.
@@ -1687,24 +1861,28 @@ app.whenReady().then(async () => {
     }, 150)
 
 
-    // Start checking for updates (local first, remote only if feed URL is set).
+    // Start checking for updates (local first, remote via electron-updater).
     // Delay 3s so the React app has time to mount and register its IPC
     // listeners — otherwise the update-available / update-ready events are
     // silently dropped because no one is listening yet.
     setTimeout(() => {
-      try {
-        const logPath = path.join(app.getPath('userData'), 'startup.log')
-        fs.appendFileSync(logPath, `[${new Date().toISOString()}] [updater] Starting local update check...\n`)
-      } catch { /* ignore */ }
+      writeDiag('[updater] Starting local update check...')
       checkLocalUpdate()
-      if (currentFeedUrl) {
+      // Always enable the remote GitHub updater when packaged: electron-updater
+      // reads the feed from resources/app-update.yml (generated by
+      // electron-builder from build.publish). UPDATE_FEED_URL, when set, is
+      // applied inside setupAutoUpdater as an override. Previously this was
+      // gated on currentFeedUrl, which silently disabled GitHub auto-updates
+      // in normal installs (only the local-release path ran).
+      //
+      // If checkLocalUpdate already found a newer installer (pendingLocalUpdate
+      // set), skip the remote check so the two paths can't race or shadow each
+      // other — the local path wins by design on dev machines.
+      if (!pendingLocalUpdate) {
         setupAutoUpdater()
       } else {
-        try {
-          const logPath = path.join(app.getPath('userData'), 'startup.log')
-          fs.appendFileSync(logPath, `[${new Date().toISOString()}] [updater] No remote feed configured — local-only update mode\n`)
-        } catch { /* ignore */ }
-        console.log('[updater] No remote feed configured — local-only update mode')
+        writeDiag('[updater] Local update pending — skipping remote GitHub check')
+        console.log('[updater] Local update pending — skipping remote GitHub check')
       }
     }, 3000)
   }

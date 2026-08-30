@@ -1,9 +1,9 @@
 // Express backend: anidap scraper API + HLS manifest proxy + static frontend.
 //
 // Single-server architecture — one process serves everything:
-//   npm run build   (build the React PWA once)
-//   npm run dev     (build + start → one server on port 5173)
-//   npm start       (start without rebuilding)
+//   npm run build       (build the React PWA once)
+//   npm start           (start the single server on port 5173)
+//   npm run electron:dev (build + run the Electron desktop app)
 //
 // This single process serves:
 //   1. The built React PWA (dist/) with SPA routing
@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { Transform } from 'node:stream'
 
 // Read the app version from package.json at startup (not hardcoded) so the
 // health endpoint and diagnostics always report the true installed version.
@@ -96,6 +97,14 @@ import {
   initGogoProxyPool,
 } from './proxy-config.js'
 import { register as registerAnikageEpisodes } from './anikage-episodes.js'
+import {
+  aflSlugify,
+  parseAFLPage,
+  buildJikanFiller,
+  resolveFiller,
+  FILLER_CACHE_TTL,
+  FILLER_FAIL_TTL,
+} from './filler-lib.js'
 
 // Keep-alive: reuse TCP connections, save 200-500ms per request
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 })
@@ -250,14 +259,17 @@ const STREAM_FAIL_TTL = 60 * 1000  // 1 min — long enough to stop retry storms
 // instead of hitting the upstream twice.
 const inFlight = new Map()
 
-const cached = async (key, ttl, fn, { timeoutMs = 15_000 } = {}) => {
+const cached = async (key, ttl, fn, { timeoutMs = 15_000, skipFailCache = false } = {}) => {
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < ttl) return hit.value
 
   // If this key recently failed, throw immediately instead of waiting on a
   // long upstream timeout — the user can retry once it expires.
+  // `skipFailCache` routes (server lists) bypass this: a transient chad 429
+  // or slow upstream would otherwise poison the key for FAIL_TTL (5 min),
+  // leaving the server picker broken long after the upstream recovered.
   const failed = failCache.get(key)
-  if (failed && Date.now() - failed.at < FAIL_TTL) {
+  if (!skipFailCache && failed && Date.now() - failed.at < FAIL_TTL) {
     const err = new Error(failed.message)
     err.response = { status: failed.upstream || 502 }
     err.cachedFailure = true
@@ -287,11 +299,16 @@ const cached = async (key, ttl, fn, { timeoutMs = 15_000 } = {}) => {
       cache.set(key, { at: Date.now(), value })
       return value
     } catch (e) {
-      failCache.set(key, {
-        at: Date.now(),
-        message: e?.message || 'upstream error',
-        upstream: e?.response?.status ?? null,
-      })
+      // skipFailCache routes don't poison the negative cache — the failure
+      // is almost always a transient rate-limit/timeout that recovers in
+      // seconds, and a 5-min stale 502 is worse than a slow retry.
+      if (!skipFailCache) {
+        failCache.set(key, {
+          at: Date.now(),
+          message: e?.message || 'upstream error',
+          upstream: e?.response?.status ?? null,
+        })
+      }
       throw e
     } finally {
       inFlight.delete(key)
@@ -355,6 +372,21 @@ app.get('/api/anidap/info/:anilistId', async (req, res) => {
   } catch (e) { fail(res, e) }
 })
 
+// ── Pre-warm slug resolution (PERFORMANCE: fire from AnimeCard onClick
+// so the slug is cached before the user reaches the Watch page).
+// Same logic as getInfoByAniListId but returns 204 immediately — the sole
+// purpose is populating the server's 12h slug cache.
+// POST /api/anidap/prewarm-slug/:anilistId
+app.post('/api/anidap/prewarm-slug/:anilistId', async (req, res) => {
+  try {
+    const { resolveAnidapSlug } = await import('./anidap.js')
+    // Fire-and-forget: don't block the response on slug resolution.
+    // The cache warms asynchronously; the caller only cares that we started.
+    resolveAnidapSlug(Number(req.params.anilistId)).catch(() => {})
+    res.status(204).end()
+  } catch { res.status(204).end() }
+})
+
 // Episode list for a slug. The slug is provider-specific; we also accept
 // `?anilistId=` so the router can re-resolve if the slug doesn't match.
 // Optional `?title_english=&title_romaji=` for hianime fallback search.
@@ -382,9 +414,22 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
     const anilistId = req.query.anilistId ? Number(req.query.anilistId) : null
     const title = { english: req.query.title_english, romaji: req.query.title_romaji }
     const cacheKey = `srv:${slug}:${ep}:${anilistId || ''}:${title.english || ''}`
-    // 8s hard cap — provider list is usually fast; don't let a dead upstream stall the UI
+    // 8s hard cap — provider list is usually fast; don't let a dead upstream
+    // stall the UI. skipFailCache: a transient chad 429 / slow upstream must
+    // NOT poison this key for 5 min (the picker would 502 even after chad
+    // recovers). The empty-list protection below already shortens the TTL.
     const data = await cached(cacheKey, TTL, () =>
-      routedGetProviders(anilistId, slug, Number(ep), title), { timeoutMs: 8_000 })
+      routedGetProviders(anilistId, slug, Number(ep), title), { timeoutMs: 8_000, skipFailCache: true })
+    // ── Empty-list protection ──
+    // When anidap is briefly rate-limited / bot-blocked, the provider list
+    // comes back EMPTY and the generic cache would lock that in for the
+    // full 10-min TTL — leaving the user with a blank server picker and
+    // "stuck on fetching streams". Shrink the cached entry's remaining
+    // lifetime to 60s so the list re-resolves on the next visit.
+    if (!Array.isArray(data.providers) || data.providers.length === 0) {
+      const entry = cache.get(cacheKey)
+      if (entry) entry.at = Date.now() - (TTL - 60_000)
+    }
     // Annotate servers with health status but NEVER hide them.
     // The background health scheduler can produce false negatives when
     // anidap is rate-limited or Puppeteer is cold. Filtering dead servers
@@ -414,16 +459,28 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
       }))
     }
     if (!Array.isArray(data.providers)) data.providers = []
-    if (!data.unavailable) {
-      try {
-        const { isRateLimited, getRateLimitRemaining } = await import('./anidap.js')
-        if (isRateLimited() && data.providers.length === 0) {
-          data.unavailable = true
-          data.reason = `rate-limited (${getRateLimitRemaining()}s)`
-        }
-      } catch {
-        // ignore rate-limit probe failures
+    // ── Rate-limit surfaced to the UI ──
+    // When anidap is site-wide rate-limited (chad 429 on this IP), the
+    // server picker must show the countdown instead of an endless spinner.
+    // The client polls /api/health for rateLimitRemaining and auto-retries
+    // when the cooldown expires. Previously this only triggered when the
+    // provider list was EMPTY — but the fallback list is never empty, so
+    // the countdown never showed and users stared at a 25s spinner.
+    try {
+      const { isRateLimited, getRateLimitRemaining } = await import('./anidap.js')
+      if (isRateLimited()) {
+        const remaining = getRateLimitRemaining()
+        data.unavailable = true
+        data.rateLimitRemaining = remaining
+        data.reason = `rate-limited (${remaining}s)`
+        // Shorten the cached entry's TTL to 60s so the list re-resolves as
+        // soon as the cooldown expires instead of serving the stale
+        // rate-limited state for the full 10-min cache window.
+        const entry = cache.get(cacheKey)
+        if (entry) entry.at = Date.now() - (TTL - 60_000)
       }
+    } catch {
+      // ignore rate-limit probe failures
     }
     ok(res, data)
   } catch (e) { fail(res, e) }
@@ -453,17 +510,28 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
     return ok(res, streamHit.data)
   }
 
+  // When this route gives up at 25s it ABORTS the in-flight extraction
+  // chain (routedGetStream → cf-harvester). Without this, timed-out
+  // requests left zombie extractions running 30-120s in the background,
+  // holding the browser mutex and serialising every later request.
+  // (The chad fast path normally resolves in ~1-3s; the DOM fallback needs
+  // the headroom for a cold watch-page load.)
+  const extractionAbort = new AbortController()
   try {
-    // 30s hard cap on stream extraction — the chad API is capped at 5s and
-    // the DOM fallback needs up to 16s, so 20s was killing the request before
-    // extraction could finish. 15s gives the chad API + DOM fallback room
-    // to run while ensuring the UI never spins for more than ~15 seconds.
     const data = await Promise.race([
-      routedGetStream(anilistId, slug, Number(ep), provider, type, req.query, title),
+      routedGetStream(anilistId, slug, Number(ep), provider, type, req.query, title, extractionAbort.signal),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Stream extraction timed out')), 15_000),
+        setTimeout(() => {
+          extractionAbort.abort(new Error('Stream extraction timed out'))
+          reject(new Error('Stream extraction timed out'))
+        }, 25_000),
       ),
     ])
+    // The request settled (success or definitive failure) — abort the
+    // remaining race-pool candidates NOW so they don't keep extracting
+    // behind the mutex (each leftover holds it for another 8-10s and
+    // starves the next episode click).
+    extractionAbort.abort()
     if (!data) {
       streamFailCache.set(streamKey, { at: Date.now(), message: 'No stream found', upstream: 404 })
       return fail(res, new Error('No stream found'), 404)
@@ -526,9 +594,15 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
       }
     }
   } catch (e) {
+    // Kill any leftover candidates (timeout already aborts; this covers
+    // early errors like a 404 while cross-type fallbacks are still queued).
+    extractionAbort.abort()
     // Record failure in stream negative cache so the router doesn't retry
     const upstream = e?.response?.status || e?.upstream || 502
-    if (!streamFailCache.has(streamKey)) {
+    // 429 is site-wide (chad rate-limit on this IP) and self-clears via the
+    // isChad429Blocked window — never cache it here or retries would be
+    // blocked up to 60s AFTER the cooldown already expired.
+    if (upstream !== 429 && !streamFailCache.has(streamKey)) {
       streamFailCache.set(streamKey, {
         at: Date.now(),
         message: e?.message || 'upstream failure',
@@ -841,24 +915,22 @@ app.get('/api/discover/recent', async (req, res) => {
   }
 })
 
-// ────────── TMDB episode stills (real per-episode thumbnails) ─────────
+// ────────── Episode thumbnails (real per-episode screenshots) ─────────
 // AniZip only ships episode screenshots for a handful of episodes of long
 // shows (Bleach: 21/366) and Jikan's episodes endpoint carries no images.
-// TMDB has a real still for EVERY episode (e.g. Bleach 366/366) and its
-// season endpoint returns them all in one request. The API key lives in
-// .env.local (server-side only — never in the client bundle or repo).
+// TVDB v4 (the anikage.cc source) has a real still for EVERY episode and
+// returns them all in one request via artworks.thetvdb.com. TMDB fills any
+// gaps. Keys live in .env.local (server-side only — never in the client
+// bundle or repo).
 //
-//   GET /api/episode-thumbs/:malId → { eps: { "1": "https://image.tmdb.org/t/p/w500/x.jpg", … } }
+//   GET /api/episode-thumbs/:malId → { eps: { "1": "https://artworks.thetvdb.com/banners/…", … } }
 //
-// Resolution chain: AniZip mapping → themoviedb_id → TMDB /tv/{id}/season/N.
-// Seasons 1-4 are merged by running episode count (handles multi-season
-// TMDB entries where episode numbers restart per season). Cached 24h.
-// TMDB key lookup order: explicit server var → VITE_ var (Vite embeds it
-// in the client bundle and dotenv loads it here too in dev) → empty. In
-// packaged builds electron/main.js pre-loads .env.local from resources/
-// into process.env before importing this module, so TMDB_API_KEY is set.
+// Resolution chain: AniZip mapping → tvdbShowId → TVDB v4 extended (per-ep
+// artwork), fallback TMDB /tv/{id}/season/N for missing. Cached 24h.
+// TVDB key lookup: TVDB_API_KEY from .env.local (electron/main.js
+// pre-loads resources/.env.local into process.env in packaged builds).
 const TMDB_API_KEY = (process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '').trim()
-const tmdbThumbCache = new Map() // malId → { at, eps }
+const thumbCache = new Map() // malId → { at, eps }
 const TMDB_THUMB_TTL = 24 * 60 * 60 * 1000
 const TMDB_EMPTY_TTL = 60 * 60 * 1000 // short TTL for no-mapping results
 const tmdbIdCache = new Map() // malId → { at, id } (from AniZip)
@@ -918,20 +990,76 @@ async function fetchTmdbStills(malId) {
 }
 
 // Real per-episode thumbnail map for an anime (all episodes in one call).
+// TVDB v4 artworks win (real screenshots — anikage.cc source); TMDB stills
+// fill gaps for episodes TVDB lacks artwork for.
 app.get('/api/episode-thumbs/:malId', async (req, res) => {
   try {
     const malId = Number(req.params.malId)
     if (!malId || isNaN(malId)) return res.status(400).json({ ok: false, error: 'Invalid MAL id' })
-    const hit = tmdbThumbCache.get(malId)
+    const hit = thumbCache.get(malId)
     if (hit) {
       const ttl = Object.keys(hit.eps).length > 0 ? TMDB_THUMB_TTL : TMDB_EMPTY_TTL
       if (Date.now() - hit.at < ttl) return ok(res, { eps: hit.eps })
     }
-    const eps = await fetchTmdbStills(malId)
-    tmdbThumbCache.set(malId, { at: Date.now(), eps })
-    if (tmdbThumbCache.size > 200) {
+    // ── TVDB v4 first: real per-episode artwork in one request. When it
+    // covers the show, skip the TMDB round-trips entirely. ──
+    let eps = {}
+    let anizipCount = 0
+    let maxLocal = 0
+    try {
+      const { getTvdbEpisodes } = await import('./tvdb-episodes.js')
+      const tvdbMap = await getTvdbEpisodes(malId)
+      if (tvdbMap && tvdbMap.size > 0) {
+        // TVDB keys episodes by ABSOLUTE number. For continuation shows
+        // (Bleach TYBW = MAL 41467 → TVDB series 74796, TYBW eps live at
+        // abs 367-379) the client needs LOCAL episode numbers. Remap via
+        // AniZip's per-episode absoluteEpisodeNumber so every sequel gets
+        // ITS OWN thumbnails instead of the prequel's.
+        let anizipEps = null
+        try {
+          const r = await axios.get(`https://api.ani.zip/mappings?mal_id=${malId}`, {
+            timeout: 10_000,
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            validateStatus: (s) => s >= 200 && s < 300,
+          })
+          anizipEps = r.data?.episodes || null
+        } catch { /* AniZip unavailable — keep absolute keys as a fallback */ }
+        anizipCount = anizipEps ? Object.keys(anizipEps).length : 0
+        if (anizipCount > 0) {
+          for (const [localKey, e] of Object.entries(anizipEps)) {
+            const local = Number(localKey)
+            if (!Number.isFinite(local) || local < 1) continue
+            const abs = Number(e.absoluteEpisodeNumber)
+            const key = Number.isFinite(abs) && abs > 0 ? abs : local
+            const tvdb = tvdbMap.get(key)
+            if (tvdb?.image) eps[local] = tvdb.image
+            if (local > maxLocal) maxLocal = local
+          }
+        } else {
+          for (const [num, tvdb] of tvdbMap) if (tvdb.image) eps[num] = tvdb.image
+        }
+      }
+      // TMDB gap-fill — TVDB wins where both exist. Measure coverage against
+      // the REMAPPED map, not tvdbMap.size: for sequel shows the raw TVDB map
+      // includes the prequel's episodes (size can be 400+), so a size gate
+      // would wrongly skip TMDB even when the sequel's own eps lack artwork.
+      const covered = Object.keys(eps).length
+      const tmdbNeeded = anizipCount > 0 ? covered < anizipCount : covered === 0
+      if (tmdbNeeded) {
+        const tmdbEps = await fetchTmdbStills(malId)
+        for (const [num, url] of Object.entries(tmdbEps)) {
+          // TMDB merges franchises under one id (Bleach: 1-408), so cap
+          // its stills at the anime's own episode range — otherwise every
+          // sequel response drags in the whole franchise's thumbnails.
+          if (maxLocal > 0 && Number(num) > maxLocal) continue
+          if (!eps[num]) eps[num] = url
+        }
+      }
+    } catch { /* TVDB unavailable — TMDB/AniZip data stands */ }
+    thumbCache.set(malId, { at: Date.now(), eps })
+    if (thumbCache.size > 200) {
       const n = Date.now()
-      for (const [k, v] of tmdbThumbCache) if (n - v.at > TMDB_THUMB_TTL) tmdbThumbCache.delete(k)
+      for (const [k, v] of thumbCache) if (n - v.at > TMDB_THUMB_TTL) thumbCache.delete(k)
     }
     return ok(res, { eps })
   } catch (e) {
@@ -1005,6 +1133,8 @@ function pickReferers(targetUrl) {
     const refs = []
     if (host.includes('vidwish'))       { refs.push('https://vidwish.live/', cdnSelf) }
     else if (host.includes('mewstream')) { refs.push('https://megaplay.buzz/', 'https://mewstream.buzz/', 'https://anidap.lol/', cdnSelf) }
+    else if (host.includes('kryntal'))   { refs.push('https://megaplay.buzz/', cdnSelf) }
+    else if (host.includes('akirax'))    { refs.push('https://megaplay.buzz/', cdnSelf) }
     else if (host.includes('megaplay'))  { refs.push('https://megaplay.buzz/', cdnSelf) }
     else if (host.includes('rapid-cloud')) { refs.push('https://rapid-cloud.co/', cdnSelf) }
     else if (host.includes('megacloud')) { refs.push('https://megacloud.blog/', cdnSelf) }
@@ -1042,6 +1172,30 @@ function pickReferers(targetUrl) {
   } catch {
     return ['https://anidap.lol/']
   }
+}
+
+// ── Anti-bot PNG disguise stripping ──────────────────────────────
+// ByteDance CDNs (p*-ad-sg.ibyteimg.com — used by vivibebe streams, the
+// current anidap CDN) serve each REAL MPEG-TS segment wrapped in a tiny
+// 1x1 PNG (~70 bytes): PNG magic → IHDR → … → IEND → then the TS sync
+// byte 0x47 and the actual video. This passes Cloudflare-style checks,
+// but hls.js REQUIRES the 0x47 sync byte at the very start of a segment
+// — a PNG prefix makes it throw a fatal parse error (the recurring
+// "works via curl, black screen in hls.js" bug). We trim the prefix
+// whenever the magic pattern matches, in both the streamed and buffered
+// proxy paths.
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+function stripPngDisguise(buf) {
+  if (!buf || buf.length < 32) return buf
+  for (let i = 0; i < 8; i++) if (buf[i] !== PNG_MAGIC[i]) return buf
+  const iend = buf.indexOf(Buffer.from('IEND'))
+  // IEND chunk = 4-byte length + 'IEND' + 4-byte CRC, so the TS data (if
+  // any) begins at iend + 8. Require those bytes to exist.
+  if (iend === -1 || iend + 8 > buf.length) return buf
+  const after = iend + 8
+  // Only strip when real MPEG-TS data follows (sync byte 0x47)
+  if (buf[after] !== 0x47) return buf
+  return buf.subarray(after)
 }
 
 // Dirty-dedupe subtitle 404s so we don't spam the console
@@ -1227,6 +1381,10 @@ app.get('/proxy', async (req, res) => {
       /\.(ts|mp4|webm|m4s|m2ts|mp2t|aac|mp3|m4a|mov|mkv|ogv)(\?|$)/i.test(urlLower) ||
       contentType.startsWith('video/') ||
       contentType.startsWith('audio/') ||
+      // PNG-disguised segments: ByteDance/vivibebe CDNs label real TS
+      // segments as image/png (with a tiny PNG prefix over the video).
+      // /proxy only ever fetches media, so a PNG here IS a segment.
+      (contentType.startsWith('image/png') && !isVttUrl && !isSrtUrl && !isM3u8) ||
       // Fallback: unknown binary from proxy path is almost certainly a
       // segment. We detect this because it's not VTT, SRT, M3U8, text,
       // JSON, and it came through our proxy (has h= or is relative path).
@@ -1236,7 +1394,13 @@ app.get('/proxy', async (req, res) => {
                    (!contentType && !isVideoSegment)
 
     if (isVideoSegment && !isVttUrl && !isSrtUrl && !isM3u8) {
-      res.set('content-type', contentType || 'application/octet-stream')
+      // PNG-disguised segments carry image/png — fix the MIME before
+      // streaming (hls.js ignores MIME, but the player UI shows it).
+      if (contentType.startsWith('image/')) {
+        res.set('content-type', 'application/octet-stream')
+      } else {
+        res.set('content-type', contentType || 'application/octet-stream')
+      }
       // Cache video segments in browser for 1h — they are immutable.
       res.set('cache-control', 'public, max-age=3600, immutable')
 
@@ -1271,7 +1435,31 @@ app.get('/proxy', async (req, res) => {
         else if (!res.writableEnded) res.end()
       })
 
-      response.data.pipe(res)
+      // ── Anti-bot PNG disguise stripping (ByteDance/vivibebe) ──
+      // Trim the tiny PNG prefix off the FIRST chunk so hls.js sees the
+      // 0x47 sync byte. The upstream content-length/content-range become
+      // inaccurate after trimming — drop them so Express sends chunked
+      // encoding and the client reads until the true end.
+      let firstSegmentChunk = true
+      const stripTransform = new Transform({
+        transform(chunk, _enc, cb) {
+          if (firstSegmentChunk) {
+            firstSegmentChunk = false
+            const trimmed = stripPngDisguise(chunk)
+            if (trimmed.length !== chunk.length) {
+              res.removeHeader('content-length')
+              if (res.statusCode === 206) {
+                res.removeHeader('content-range')
+                res.status(200)
+              }
+            }
+            cb(null, trimmed)
+          } else {
+            cb(null, chunk)
+          }
+        },
+      })
+      response.data.pipe(stripTransform).pipe(res)
       return
     }
 
@@ -1297,6 +1485,21 @@ app.get('/proxy', async (req, res) => {
       content = Buffer.concat(chunks)
     } catch (streamErr) {
       return res.status(502).send('Failed to read upstream response')
+    }
+
+    // ─── Anti-bot PNG disguise stripping (defense-in-depth) ──────────
+    // Buffered path for disguised segments that didn't classify as video
+    // (e.g. a PNG-wrapped blob with an unusual content-type). Same rule:
+    // PNG magic → IEND → 0x47 = real TS data, strip the prefix.
+    if (content.length > 32 && content.subarray(0, 8).equals(PNG_MAGIC)) {
+      const stripped = stripPngDisguise(content)
+      if (stripped.length !== content.length) {
+        content = stripped
+        if (contentType.startsWith('image/')) {
+          contentType = 'application/octet-stream'
+          res.set('content-type', contentType)
+        }
+      }
     }
 
     // ─── Subtitle MIME-fixing ────────────────────────────────────────
@@ -1753,7 +1956,12 @@ const anilistFailCache = new Map()
 const anilistInFlight = new Map()
 
 function getAnilistCacheKey(query, variables, token) {
-  return `anilist:${crypto.createHash('sha256').update(JSON.stringify({ query, variables, token })).digest('hex')}`
+  // Normalize whitespace in the query so semantically identical queries
+  // (e.g. the boot-time feed warm-up vs. the client's formatted copy) hash
+  // to the SAME cache key. These GraphQL strings contain no string literals
+  // with meaningful whitespace, so collapsing \s+ is safe.
+  const normalizedQuery = String(query || '').replace(/\s+/g, '')
+  return `anilist:${crypto.createHash('sha256').update(JSON.stringify({ query: normalizedQuery, variables, token })).digest('hex')}`
 }
 
 // Prune stale AniList cache entries every 60s to prevent unbounded growth
@@ -1837,7 +2045,7 @@ app.post('/api/anilist-gql', async (req, res) => {
       inFlight = (async () => {
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
-            const { data, status } = await axios.post(
+            const { data, status, headers: respHeaders } = await axios.post(
               'https://graphql.anilist.co',
               { query, variables: variables || {} },
               { headers: reqHeaders, timeout: 15_000, validateStatus: () => true },
@@ -1849,19 +2057,24 @@ app.post('/api/anilist-gql', async (req, res) => {
               return { data, status }
             }
 
-            // 429 — extract wait time from Retry-After header, or use exponential backoff
+            // 429 — respect Retry-After (real response header), retry at
+            // most ONCE with a bounded wait, then fail fast. The old path
+            // retried 3 extra times with exponential backoff — when Jikan
+            // is also down and every rail fires fallback queries, that 4x
+            // amplification turned one 429 into a full request storm that
+            // locked the app in negative-cache 502s for minutes.
             if (status === 429) {
-              const retryAfter = parseInt(data?.headers?.['retry-after'] || '0', 10)
+              const retryAfter = parseInt(respHeaders?.['retry-after'] || '0', 10)
               const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.pow(2, attempt) * 1000
-              const capped = Math.min(waitMs, 10000)
+              const capped = Math.min(waitMs, 4000)
 
-              if (attempt < MAX_RETRIES) {
-                console.warn(`[anilist-gql] 429 rate-limited (attempt ${attempt + 1}/${MAX_RETRIES + 1}), waiting ${capped}ms...`)
+              if (attempt === 0) {
+                console.warn(`[anilist-gql] 429 rate-limited (attempt 1/2), waiting ${capped}ms...`)
                 await new Promise((r) => setTimeout(r, capped))
                 continue
               }
 
-              console.error(`[anilist-gql] 429 after ${MAX_RETRIES + 1} attempts, giving up`)
+              console.warn('[anilist-gql] 429 twice — failing fast (fail-cache engages for 5s)')
               return { data: { data: null, errors: [{ message: 'AniList is rate-limiting — please wait a moment and try again.' }] }, status: 429 }
             }
 
@@ -2136,6 +2349,11 @@ app.get('/api/health', async (_req, res) => {
     isRateLimited = rl.isRateLimited()
     rateLimitRemaining = rl.getRateLimitRemaining()
   } catch { /* anidap may not be loaded yet */ }
+  let tvdb = null
+  try {
+    const { getTvdbStatus } = await import('./tvdb-episodes.js')
+    tvdb = getTvdbStatus()
+  } catch { /* tvdb module not loaded */ }
   res.json({
     ok: true,
     service: 'kurodo-backend',
@@ -2153,6 +2371,7 @@ app.get('/api/health', async (_req, res) => {
     browserReady,
     isRateLimited,
     rateLimitRemaining,
+    tvdb,
     version: APP_VERSION,
   })
 })
@@ -2191,8 +2410,9 @@ function parseKeyRow(key, v) {
 // headers. Rather than fighting browser preflight, proxy through here.
 // Filler lists are essentially static, so cache successes for 1 hour and
 // failures for 5 minutes to avoid hammering these small free APIs.
-const FILLER_CACHE_TTL = 60 * 60 * 1000
-const FILLER_FAIL_TTL = 5 * 60 * 1000
+// FILLER_CACHE_TTL / FILLER_FAIL_TTL are imported from ./filler-lib.js so the
+// route logic (resolveFiller) and the prune interval below share one source
+// of truth for TTL values.
 const fillerCache = new Map()
 const fillerFailCache = new Map()
 
@@ -2207,46 +2427,184 @@ setInterval(() => {
   }
 }, 60_000)
 
+// ── AnimeFillerList.com scraper ───────────────────────────────────────
+// The two public filler APIs (anime-filler-api.vercel.app and
+// api-filler.kotori.workers.dev) are both dead (404 as of 2026-08). The
+// canonical source AnimeFillerList.com is alive, so we scrape it directly.
+// Its show pages render condensed episode-range lists like
+//   <div class="manga_canon"><span class="Label">Manga Canon Episodes:</span><span class="Episodes"><a onclick="jumpToNum(1);">1-7</a>, ...</span></div>
+// which we expand into plain episode-number arrays.
+//
+// aflSlugify / parseAFLPage / buildJikanFiller / resolveFiller live in
+// ./filler-lib.js (pure, unit-tested) — imported at the top of this file.
+
+// The /shows/ index page lists every show (356 entries) with links like
+//   <a href="/shows/attack-titan">Attack on Titan (Shingeki no Kyojin)</a>
+// Slugs are irregular ("attack-titan" not "attack-on-titan"), and the site's
+// own /search/node returns a static popular list rather than ranked results,
+// so we fetch the full index once (24h cache) and fuzzy-match titles.
+const AFL_CATALOG_TTL = 24 * 60 * 60 * 1000
+let aflCatalogCache = null
+let aflCatalogAt = 0
+let aflCatalogPromise = null // in-flight dedup: cold-start concurrent requests share one fetch
+
+// Suffix tokens that mark derivative entries (films/OVAs/movies/recaps) so a
+// query for the main show doesn't match "Attack on Titan OADs" first.
+const AFL_BAD_TOKENS = new Set(['film','films','ova','oad','oads','ovas','movie','movies','special','specials','junior','high','recap','recaps','relight','spin','off','spinoff','live','action','crossover','short','shorts','music','video','pv','trailer','teaser','saga','remake','reboot','season','ova0'])
+// Common words that add noise ("no", "de", "la" are frequent in JP titles).
+const AFL_STOP_TOKENS = new Set(['the','a','an','of','and','or','for','to','in','at','by','no','de','la','le','les','du','x','s'])
+
+function aflTokens(s) {
+  const out = new Set()
+  for (const t of String(s).toLowerCase().split(/[^a-z0-9]+/)) {
+    if (t && !AFL_STOP_TOKENS.has(t)) out.add(t)
+  }
+  return out
+}
+
+/** Lexicographic score: [ratio of query tokens matched, fewer-extra-tokens tiebreak]. */
+function aflScore(query, candidate) {
+  const qs = aflTokens(query)
+  const ts = aflTokens(candidate)
+  let inter = 0
+  for (const t of qs) if (ts.has(t)) inter++
+  if (inter === 0) return { ratio: 0, extra: 0 }
+  let extra = 0
+  for (const t of ts) if (!qs.has(t)) extra++
+  let badPenalty = 0
+  for (const t of ts) if (!qs.has(t) && AFL_BAD_TOKENS.has(t)) badPenalty++
+  return { ratio: inter / qs.size, extra: extra + 5 * badPenalty }
+}
+
+/** Fetch + cache the full show catalog (slug → display title). */
+async function getAFLCatalog() {
+  if (aflCatalogCache && Date.now() - aflCatalogAt < AFL_CATALOG_TTL) return aflCatalogCache
+  const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' }
+  if (aflCatalogPromise) return aflCatalogPromise
+  aflCatalogPromise = (async () => {
+    const r = await axios.get('https://www.animefillerlist.com/shows', {
+      timeout: 8000, headers: UA, validateStatus: (st) => st >= 200 && st < 300,
+    })
+    const catalog = new Map()
+    for (const m of r.data.matchAll(/<a href="\/shows\/([a-z0-9-]+)"[^>]*>([^<]+)<\/a>/gi)) {
+      if (!catalog.has(m[1])) catalog.set(m[1], m[2].replace(/&#0*39;/g, "'").trim())
+    }
+    if (catalog.size > 0) {
+      aflCatalogCache = catalog
+      aflCatalogAt = Date.now()
+    }
+    return catalog
+  })().finally(() => { aflCatalogPromise = null })
+  return aflCatalogPromise
+}
+
+/** Fetch filler data from AnimeFillerList.com, or null on failure. */
+async function fetchFillerFromAFL(title) {
+  const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36' }
+  const candidates = []
+
+  // 1) Direct slug guess: "Naruto Shippuden" → /shows/naruto-shippuden
+  const slug = aflSlugify(title)
+  if (slug) candidates.push({ url: `https://www.animefillerlist.com/shows/${slug}`, priority: 0 })
+
+  // 2) Catalog fuzzy match — covers irregular slugs like "attack-titan"
+  try {
+    const catalog = await getAFLCatalog()
+    let best = null
+    for (const [cSlug, cTitle] of catalog) {
+      const s = aflScore(title, cTitle)
+      if (s.ratio < 0.5) continue
+      if (!best || s.ratio > best.s.ratio || (s.ratio === best.s.ratio && s.extra < best.s.extra)) {
+        best = { cSlug, s }
+      }
+    }
+    if (best) candidates.push({ url: `https://www.animefillerlist.com/shows/${best.cSlug}`, priority: 1 })
+  } catch { /* catalog unavailable — direct slug only */ }
+
+  for (const cand of candidates.sort((a, b) => a.priority - b.priority)) {
+    try {
+      const r = await axios.get(cand.url, { timeout: 6000, headers: UA, validateStatus: (st) => st >= 200 && st < 300 })
+      const parsed = parseAFLPage(r.data)
+      if (parsed) return parsed
+    } catch { /* try next candidate */ }
+  }
+  return null
+}
+
+// ── Jikan per-episode filler fallback (covers the ENTIRE MAL catalog) ──
+// AnimeFillerList only indexes ~356 shows. For everything else, Jikan's
+// /anime/{malId}/episodes endpoint marks every episode with a `filler`
+// boolean — so any MAL anime gets real filler detection even when it's
+// not on AFL. Response shape matches the AFL scraper so the client and
+// the filler cache treat both sources identically.
+// Paginated (100 eps/page), deadline-capped so a rate-limited Jikan never
+// stalls the Watch page for long — partial results still return. Jikan's
+// rate limit is ~3 req/s per IP, so this is one sequential request per
+// page with a short timeout each.
+const JIKAN_FILLER_MAX_PAGES = 8 // covers up to 800 eps
+async function fetchFillerFromJikan(malId) {
+  const flags = new Map() // episode → { filler, recap }
+  let total = 0
+  const deadline = Date.now() + 12_000 // hard ceiling for the whole loop
+  for (let page = 1; page <= JIKAN_FILLER_MAX_PAGES; page++) {
+    if (Date.now() > deadline) break
+    try {
+      const { data } = await axios.get(`https://api.jikan.moe/v4/anime/${malId}/episodes`, {
+        params: { page },
+        timeout: Math.min(4500, Math.max(1200, deadline - Date.now())),
+        validateStatus: (st) => st >= 200 && st < 300,
+      })
+      const list = data?.data
+      if (!Array.isArray(list) || list.length === 0) break
+      for (const e of list) {
+        const num = Number(e.episode ?? e.mal_id)
+        if (num > 0) flags.set(num, { filler: !!e.filler, recap: !!e.recap })
+      }
+      total = Number(data?.pagination?.items?.total) || Math.max(total, list.length * page)
+      if (!data?.pagination?.has_next_page) break
+    } catch { break /* Jikan down / rate-limited — return partial */ }
+  }
+  return buildJikanFiller(flags, total)
+}
+
 app.get('/api/filler/:malId', async (req, res) => {
   const malId = Number(req.params.malId)
   const title = String(req.query.title || '')
   if (!malId) return res.status(400).json({ error: 'malId required' })
 
-  const cacheKey = `filler:${malId}`
-
-  // Check cache
-  const cached = fillerCache.get(cacheKey)
-  if (cached && Date.now() - cached.at < FILLER_CACHE_TTL) {
-    console.log(`[filler] cache hit ${malId}`)
-    return res.json(cached.data)
-  }
-
-  // Check negative cache
-  const failed = fillerFailCache.get(cacheKey)
-  if (failed && Date.now() - failed.at < FILLER_FAIL_TTL) {
-    console.warn(`[filler] negative cache hit ${malId}`)
-    return res.status(404).json({ error: 'No filler data found' })
-  }
-
-  const apis = [
-    `https://anime-filler-api.vercel.app/anime/${encodeURIComponent(title)}`,
-    `https://api-filler.kotori.workers.dev/${malId}`,
-  ]
-
-  for (const url of apis) {
-    try {
-      const { data } = await axios.get(url, { timeout: 5000, validateStatus: (s) => s >= 200 && s < 300 })
-      if (data && (data.filler_episodes || data.filler)) {
-        fillerCache.set(cacheKey, { at: Date.now(), data })
-        return res.json(data)
+  // All decision logic (cache / negative cache / AFL → Jikan → legacy order /
+  // title-aware fail-caching) lives in resolveFiller (./filler-lib.js) so it
+  // can be unit-tested without booting the server. Real fetchers are injected
+  // here; the legacy loop stays inline as the third fetcher.
+  const result = await resolveFiller({
+    malId,
+    title,
+    cache: fillerCache,
+    failCache: fillerFailCache,
+    fetchAFL: fetchFillerFromAFL,
+    fetchJikan: fetchFillerFromJikan,
+    fetchLegacy: async (t, id) => {
+      const apis = [
+        `https://anime-filler-api.vercel.app/anime/${encodeURIComponent(t)}`,
+        `https://api-filler.kotori.workers.dev/${id}`,
+      ]
+      for (const url of apis) {
+        try {
+          const { data } = await axios.get(url, { timeout: 4000, validateStatus: (s) => s >= 200 && s < 300 })
+          if (data && (data.filler_episodes || data.filler)) return data
+        } catch { /* try next */ }
       }
-    } catch { /* try next */ }
-  }
+      return null
+    },
+  })
 
-  // Cache failure briefly
-  fillerFailCache.set(cacheKey, { at: Date.now() })
+  if (result.status === 200) {
+    console.log(`[filler] ${result.hit ? 'cache hit' : `served (${result.source || '?'})`} ${malId} → ${result.data.total_episodes} eps, ${result.data.filler_episodes.length} filler`)
+    return res.json(result.data)
+  }
+  console.warn(`[filler] ${result.negativeHit ? 'negative cache hit' : 'not found'} ${malId}`)
   // Return empty — the frontend has offline fallback data for popular anime
-  res.status(404).json({ error: 'No filler data found' })
+  res.status(404).json({ error: result.error })
 })
 
 // ────────── MAL username animelist proxy ──────────────────────────────
@@ -2880,6 +3238,75 @@ if (isProduction) {
   })
 }
 
+// ── Boot-time feed warm-up ───────────────────────────────────────
+// The Home page fires 4 AniList GraphQL queries on first visit (trending,
+// this season, most-favorite, upcoming). Each takes ~1s against AniList,
+// so a cold start pays ~4s of GraphQL latency before any row paints. By
+// warming these exact queries into the SWR cache right after the server
+// boots, the FIRST visitor hits warm cache (~0ms) instead of waiting.
+// Mirrors src/api/anilist.ts pageQuery() + MEDIA_FIELDS exactly.
+
+const HOME_FEED_FILTERS = [
+  'sort: TRENDING_DESC, status_in: [RELEASING, FINISHED]', // Trending Now
+  'status: RELEASING, sort: POPULARITY_DESC',               // Popular This Season
+  'sort: SCORE_DESC, status_in: [FINISHED, RELEASING]',     // Most Favorite
+  'status: NOT_YET_RELEASED, sort: POPULARITY_DESC',        // Coming Soon
+]
+
+const HOME_FEED_MEDIA_FIELDS = `
+  id idMal
+  title { romaji english native }
+  coverImage { extraLarge large color }
+  bannerImage
+  episodes duration averageScore popularity format status season seasonYear genres
+  studios(isMain: true) { nodes { name } }
+  nextAiringEpisode { episode airingAt }
+  description(asHtml: false)
+  trailer { id site }
+`
+
+function homeFeedQuery(filter) {
+  return `query ($perPage: Int) {
+    Page(page: 1, perPage: $perPage) {
+      media(type: ANIME, ${filter}) { ${HOME_FEED_MEDIA_FIELDS} }
+    }
+  }`
+}
+
+async function warmAnilistFeeds() {
+  // Same upstream headers as the /api/anilist-gql route (public queries,
+  // no token). reqHeaders in other handlers is function-local — don't reuse.
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json' }
+  for (const filter of HOME_FEED_FILTERS) {
+    try {
+      const query = homeFeedQuery(filter)
+      const variables = { perPage: 18 }
+      const cacheKey = getAnilistCacheKey(query, variables, '')
+      const existing = anilistCache.get(cacheKey)
+      if (existing && Date.now() - existing.at < ANILIST_STALE_TTL) continue
+
+      const { data, status } = await axios.post(
+        'https://graphql.anilist.co',
+        { query, variables },
+        { headers, timeout: 15_000, validateStatus: () => true },
+      )
+      const label = filter.split(',')[0].trim()
+      if (status >= 200 && status < 300 && data?.data?.Page?.media?.length) {
+        anilistCache.set(cacheKey, { at: Date.now(), data })
+        console.log(`[anilist-warm] ✓ cached ${label} (${data.data.Page.media.length} items)`)
+      } else {
+        anilistFailCache.set(cacheKey, { at: Date.now(), message: `warm status ${status}` })
+        console.warn(`[anilist-warm] failed ${label}: status ${status}`)
+      }
+    } catch (err) {
+      console.warn('[anilist-warm] error:', err.message)
+    }
+    // Pace the boot requests — don't hammer AniList the moment the server starts.
+    await new Promise((r) => setTimeout(r, 300))
+  }
+  console.log('[anilist-warm] feed warm-up complete')
+}
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 Kurōdo listening on http://localhost:${PORT}`)
   console.log(`   • Scraper API: /api/anidap/*`)
@@ -2892,6 +3319,11 @@ const server = app.listen(PORT, () => {
   // Boot the background health-check scheduler — warms the cache so the
   // first user of a new session doesn't pay the full probe cost.
   startHealthCheckScheduler()
+
+  // Warm the Home page's 4 AniList feed queries into the SWR cache so the
+  // FIRST visitor paints the hero + feed rows instantly instead of waiting
+  // ~4s of GraphQL latency. Non-blocking; failures are logged and ignored.
+  setTimeout(() => warmAnilistFeeds(), 300)
 
   // Pre-warm the Puppeteer browser bridge on startup so the first user
   // click doesn't wait 10-15s for Chrome cold-launch. The warmUp() call
@@ -2912,11 +3344,20 @@ const server = app.listen(PORT, () => {
 // ── Port-conflict recovery ──────────────────────────────────────
 // When a second Kurōdo instance starts while the first is still running,
 // node crashes with an unhandled EADDRINUSE. Instead of dying, check if
-// the port is already serving a healthy Kurōdo backend and exit quietly —
-// the Electron single-instance lock handles the GUI, but the standalone
-// server (dev mode / scripts) can still hit this.
+// the port is already serving a healthy Kurōdo backend:
+//   • Standalone server (dev mode / scripts): exit quietly — the duplicate
+//     isn't needed, the first instance serves the app.
+//   • INSIDE ELECTRON: NEVER process.exit(). The server runs in-process in
+//     the Electron main process, so process.exit() here would silently kill
+//     the entire app — exactly what the user sees as "the app instantly
+//     closes" whenever any stale dev/standalone server squats :5173. In
+//     that case we simply reuse the healthy backend on the port (the main
+//     process's waitForServer() already confirmed it) or, if the port is
+//     held by something else, leave it to the main process to show the
+//     friendly error page instead of committing suicide.
 server.on('error', (err) => {
   if (err && err.code === 'EADDRINUSE') {
+    const insideElectron = !!process.versions.electron
     console.warn(`[server] Port ${PORT} already in use — checking if it's a healthy Kurōdo instance…`)
     const probe = http.get(`http://localhost:${PORT}/api/health`, (res) => {
       let body = ''
@@ -2925,19 +3366,38 @@ server.on('error', (err) => {
         try {
           const health = JSON.parse(body)
           if (health && health.ok && health.service === 'kurodo-backend') {
+            if (insideElectron) {
+              // Reuse the healthy backend already on the port. The main
+              // process's waitForServer() already got a 200 from it, so the
+              // app will load the UI against it — no need to exit.
+              console.log(`[server] Port ${PORT} has a healthy Kurōdo — reusing it (Electron).`)
+              return
+            }
             console.log(`[server] Existing healthy Kurōdo on :${PORT} — exiting this duplicate.`)
             process.exit(0)
           }
         } catch { /* not our server */ }
+        if (insideElectron) {
+          console.error(`[server] Port ${PORT} in use by another app — main process will show the error page.`)
+          return
+        }
         console.error(`[server] Port ${PORT} in use by another app — cannot start.`)
         process.exit(1)
       })
     })
     probe.on('error', () => {
+      if (insideElectron) {
+        console.error(`[server] Port ${PORT} in use and unresponsive — main process will show the error page.`)
+        return
+      }
       console.error(`[server] Port ${PORT} in use by another app — cannot start.`)
       process.exit(1)
     })
     probe.setTimeout(3000, () => {
+      if (insideElectron) {
+        console.error(`[server] Port ${PORT} in use and unresponsive — main process will show the error page.`)
+        return
+      }
       console.error(`[server] Port ${PORT} in use and unresponsive — cannot start.`)
       process.exit(1)
     })

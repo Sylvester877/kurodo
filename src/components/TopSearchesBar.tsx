@@ -17,8 +17,8 @@ import { preloadHandlers } from '../lib/routePreloaders'
  */
 export default function TopSearchesBar() {
   const { data } = useQuery({
-    queryKey: ['hero-featured'], // shared cache key with <Hero/> — no extra fetch
-    queryFn: () => getTrending(12),
+    queryKey: ['feed', 'trending'], // shared with <Hero/> + Home row — no extra fetch
+    queryFn: () => getTrending(18),
     staleTime: 30 * 60 * 1000,
     meta: { persist: true },
   })

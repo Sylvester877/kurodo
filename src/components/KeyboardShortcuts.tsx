@@ -100,6 +100,12 @@ export default function KeyboardShortcuts() {
       if (e.key === 'g' && !open) {
         const handler = (e2: KeyboardEvent) => {
           window.removeEventListener('keydown', handler)
+          // The SECOND keypress can land inside an input (user typing a
+          // search) — never navigate away from a text field, and ignore
+          // modifier combos.
+          const t2 = (e2.target as HTMLElement)?.tagName
+          if (t2 === 'INPUT' || t2 === 'TEXTAREA' || (e2.target as HTMLElement)?.isContentEditable) return
+          if (e2.metaKey || e2.ctrlKey || e2.altKey) return
           if (e2.key === 'h') navigate('/')
           if (e2.key === 'b') navigate('/browse')
           if (e2.key === 'w') navigate('/watchlist')

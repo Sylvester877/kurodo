@@ -13,7 +13,7 @@ import { getEpisodeInfoFromMal } from '../api/anilist'
 import { getEpisodesByMalId, getAniListIdFromMal, type AniZipEpisode } from '../api/anizip'
 import { useAnikageEpisodes } from '../hooks/useAnikageEpisodes'
 import {
-  fetchAnidapInfo, fetchAnidapServers, fetchAnidapStream,
+  fetchAnidapServers, fetchAnidapStream,
   type AnidapProvider, type AnidapStream,
 } from '../api/anidap'
 import { getSkipTimes, type SkipTimes } from '../api/aniskip'
@@ -30,7 +30,7 @@ import NextEpisodeCountdown from '../components/NextEpisodeCountdown'
 import EpisodeRangePicker from '../components/EpisodeRangePicker'
 import DownloadButton from '../components/DownloadButton'
 import EpisodePreviewTooltip from '../components/EpisodePreviewTooltip'
-import Relations from '../components/Relations'
+import RelatedAnime from '../components/RelatedAnime'
 import { toast } from '../components/Toaster'
 import { pickPreferredProvider } from '../lib/providers'
 import {
@@ -290,7 +290,10 @@ export default function Watch() {
   // episodesQuery; as soon as it lands we merge the real images into the
   // AniZip list. The existing buildEpisodeImageUrl already passes TMDB
   // URLs through directly — no rendering changes needed.
-  const anikageEpQuery = useAnikageEpisodes(malId, episodesQuery.isSuccess)
+  // Fire in parallel with episodesQuery (no gate): the server endpoint does
+  // its own AniZip/TVDB/TMDB/Jikan fetches, so waiting on AniZip episodes
+  // here only delayed the TVDB thumbnails. The merge is order-independent.
+  const anikageEpQuery = useAnikageEpisodes(malId)
   const episodes: AniZipEpisode[] = useMemo(() => {
     const base = episodesQuery.data ?? []
     const anikageMap = new Map(anikageEpQuery.data?.episodes?.map(e => [e.number, e]) ?? [])
@@ -361,51 +364,19 @@ export default function Watch() {
     }
   }, [episodes.length, currentEp, shouldVirtualize, episodeVirtualizer])
 
-  // Anidap slug resolution — patient 25s timeout so slow upstreams
-  // (cold Puppeteer, rate-limit backoff) don't trip the UI into
-  // "No stream source found". Falls back to the numeric anilistId as the
-  // slug, which the router already accepts and resolves correctly.
-  const slugQuery = useQuery({
-    queryKey: ['anidap', 'slug', anilistId],
-    enabled: anilistId != null,
-    staleTime: 15 * 60 * 1000,
-    queryFn: async (): Promise<string | 'unavailable'> => {
-      if (!anilistId) return 'unavailable'
-      const ctrl = new AbortController()
-      const timeout = new Promise<{ slug: null }>((resolve) =>
-        window.setTimeout(() => {
-          ctrl.abort()
-          resolve({ slug: null })
-        }, 25000),
-      )
-      try {
-        const res = await Promise.race([fetchAnidapInfo(anilistId, ctrl.signal), timeout])
-        // If the backend is slow or returns no slug, fall back to the
-        // numeric id as a slug. The router accepts numeric slugs and
-        // resolves streams via anilistId, so this keeps the page usable
-        // instead of showing "No stream source found".
-        if (!res || res.slug == null) {
-          console.warn('[Watch] slug resolution fallback, using numeric id:', anilistId)
-          return String(anilistId)
-        }
-        return res.slug
-      } catch (e: any) {
-        if (e?.name === 'AbortError') return String(anilistId)
-        return String(anilistId)
-      }
-    },
-  })
-  // 'pending' while we haven't even tried yet, otherwise the resolved value.
-  const anidapSlug: 'pending' | 'unavailable' | string = (() => {
-    // Wait for either AniList or AniZip mapping to settle.
-    // Only wait for the AniZip fallback if it is enabled (i.e. AniList id unknown).
+  // ── Anidap slug (PERFORMANCE: pass numeric anilistId directly).
+  // The server already resolves numeric IDs to text slugs internally
+  // (resolveAnidapSlug, cached 12h). Removing the blocking slugQuery
+  // saves up to 25s of cold-start latency — providers + stream now fire
+  // as soon as the AniList ID is known.
+  const anidapSlug: string = (() => {
     const mappingLoading = epInfoQuery.isLoading ||
       (anizipAnilistIdQuery.isLoading && anizipAnilistIdQuery.fetchStatus !== 'idle')
-    if (mappingLoading) return 'pending'
-    if (!anilistId) return 'unavailable'
-
-    if (slugQuery.isLoading || slugQuery.isFetching) return 'pending'
-    return slugQuery.data ?? 'pending'
+    if (!anilistId) {
+      if (mappingLoading) return ''          // still resolving — !anidapSlug shows spinner
+      return 'unavailable'                   // no ID after load — skip effects, show missing UI
+    }
+    return String(anilistId)
   })()
 
   // Skip times for the current episode (AniSkip).
@@ -499,6 +470,19 @@ export default function Watch() {
   currentEpRef.current = currentEp
   const autoplayCountdownRef = useRef(autoplayCountdown)
   autoplayCountdownRef.current = autoplayCountdown
+
+  // If the main window was just recreated after a renderer crash, stay PAUSED
+  // — the app reopened itself and must wait for the user to press play,
+  // instead of auto-playing the episode again ("the app randomly opens an
+  // anime / switches episodes on its own").
+  const [recoveredPaused] = useState<boolean>(() => Boolean(
+    typeof window !== 'undefined' && window.electronAPI?.wasRecentlyRecovered?.(),
+  ))
+
+  useEffect(() => {
+    if (!recoveredPaused) return
+    toast.info('The app recovered from a crash — press play to continue', 4000)
+  }, [recoveredPaused])
   // Guard against rapid double-firing of the autoplay next action.
   const isNavigatingRef = useRef(false)
   const goToNextEpisode = useCallback(() => {
@@ -547,14 +531,14 @@ export default function Watch() {
       // Warm skip-times + server list early so both are cached before
       // the user clicks "next episode" or autoplay fires.
       prefetchSkipTimes(malId, nextEp)
-      if (anidapSlug !== 'pending' && anidapSlug !== 'unavailable') {
+      if (anidapSlug && anidapSlug !== 'unavailable') {
         prefetchAnidapServers(anidapSlug, nextEp, anilistId, {
           english: anime?.title_english,
           romaji: anime?.title,
         })
       }
     } else if (pct === 0.7 &&
-               anidapSlug !== 'pending' &&
+               anidapSlug &&
                anidapSlug !== 'unavailable') {
       // Expensive: prefetch the actual decrypted stream URL.
       void prefetchStream({
@@ -567,7 +551,7 @@ export default function Watch() {
         titles: { english: anime?.title_english, romaji: anime?.title },
       })
     } else if (pct === 0.75 &&
-               anidapSlug !== 'pending' &&
+               anidapSlug &&
                anidapSlug !== 'unavailable') {
       // Redundant safety net: re-trigger if 70% was missed or aborted
       void prefetchStream({
@@ -626,7 +610,7 @@ export default function Watch() {
   // This is cheap (one HTTP request) so we do it unconditionally rather
   // than gating on prefetchNext.
   useEffect(() => {
-    if (anidapSlug === 'pending' || anidapSlug === 'unavailable') return
+    if (!anidapSlug || anidapSlug === 'unavailable') return
     const total = episodes.length || anime?.episodes || 0
     const nextEp = currentEp + 1
     if (total && nextEp <= total) {
@@ -660,12 +644,15 @@ export default function Watch() {
   // ---- When episode or slug changes, load providers ----
   // Bumping `serverReloadKey` re-runs this effect — used by the Retry button.
   const [serverReloadKey, setServerReloadKey] = useState(0)
+  // Bumped when a rate-limit cooldown expires so the stream effect re-runs
+  // even if the picked provider is unchanged (auto-retry after 429).
+  const [streamRetryKey, setStreamRetryKey] = useState(0)
   const retryTimerRef = useRef<number | null>(null)
   // Clean up the Retry button's setTimeout on unmount to prevent
   // setState-on-unmounted-component warnings and stale provider flips.
   useEffect(() => () => { if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current) }, [])
   useEffect(() => {
-    if (anidapSlug === 'pending' || anidapSlug === 'unavailable') {
+    if (!anidapSlug || anidapSlug === 'unavailable') {
       setProviders([])
       return
     }
@@ -719,6 +706,12 @@ export default function Watch() {
         if (remaining <= 0 && providersUnavailable) {
           setProvidersUnavailable(false)
           setServerReloadKey((k) => k + 1)
+          // Force the stream effect to re-run even if the picked provider
+          // didn't change — otherwise the player stays on the error screen
+          // after the cooldown clears and the "auto-retry" promise is half-
+          // delivered (reviewer catch).
+          setStreamRetryKey((k) => k + 1)
+          setStreamError(null)
         }
       } catch { /* health endpoint may be busy */ }
     }, 10000)
@@ -732,7 +725,7 @@ export default function Watch() {
   // Fast path: if we prefetched this episode while watching the previous one,
   // use it immediately and skip the decryption round-trip.
   useEffect(() => {
-    if (anidapSlug === 'pending' || anidapSlug === 'unavailable' || !activeProvider || !malId) {
+    if (!anidapSlug || anidapSlug === 'unavailable' || !activeProvider || !malId) {
       setStream(null)
       return
     }
@@ -776,6 +769,25 @@ export default function Watch() {
       } catch (e) {
         if (cancelled) return
 
+        const rawMsg = e instanceof Error ? e.message : String(e)
+        const errMsg = friendlyError(e)
+
+        // Site-wide rate-limit (chad 429 on this IP): every anidap provider
+        // fails the SAME way, so cycling through all 8 servers would just
+        // burn time and spam toasts. Stop, surface the countdown, and let
+        // the health poll below auto-retry when the cooldown expires.
+        if (/rate.?limited|too_many_requests|too many requests|retry in ~|status code 429/i.test(rawMsg)) {
+          setStreamLoading(false)
+          setStreamError(errMsg)
+          setProvidersUnavailable(true)
+          // Fetch the countdown immediately so the UI shows "retry in Xs"
+          fetch(`${getBackendOrigin()}/api/health`).then((r) => r.json()).then((j: any) => {
+            const remaining = j?.data?.rateLimitRemaining ?? 0
+            setRateLimitSec(remaining > 0 ? remaining : null)
+          }).catch(() => {})
+          return
+        }
+
         // Track this provider as failed
         const newFailed = new Set(failedProviders)
         newFailed.add(providerName)
@@ -797,13 +809,13 @@ export default function Watch() {
         } else {
           // All servers exhausted for this type
           setStreamLoading(false)
-          setStreamError(friendlyError(e))
+          setStreamError(errMsg)
           toast.error(`All ${streamType.toUpperCase()} servers exhausted — try another audio type.`)
         }
       }
     })(activeProvider, fallbackCount.current + 1)
     return () => { cancelled = true }
-  }, [anidapSlug, currentEp, activeProvider, streamType, malId, anilistId])
+  }, [anidapSlug, currentEp, activeProvider, streamType, malId, anilistId, streamRetryKey])
 
   // TMDB title logo — branded PNG for the current anime. Fetched once per
   // anime (cached in tmdb.ts for 24h). Null while loading or if no logo
@@ -1073,7 +1085,7 @@ export default function Watch() {
         {/* ---- Player + episode info ---- */}
         <div className="space-y-4 min-w-0">
           {/* Player */}
-          {anidapSlug === 'pending' ? (
+          {!anidapSlug ? (
             <div className="aspect-video w-full rounded-xl bg-gradient-to-b from-zinc-900 via-zinc-900/90 to-black/70 grid place-items-center overflow-hidden relative border border-white/10">
               {getImageUrl(anime) && (
                 <img
@@ -1157,7 +1169,7 @@ export default function Watch() {
                 ← Back to details
               </Link>
               {/* No servers available — slug resolved but 0 providers */}
-              {!streamError && !streamLoading && providers.length === 0 && anidapSlug !== 'pending' ? (
+              {!streamError && !streamLoading && providers.length === 0 && anidapSlug ? (
                 <div className="relative text-center p-6 max-w-sm">
                   <AlertCircle className="h-10 w-10 text-yellow-400 mx-auto mb-3" />
                   <p className="text-sm text-white/80 font-semibold mb-1">
@@ -1302,6 +1314,7 @@ export default function Watch() {
                 src={stream.proxiedUrl}
                 fallbackSrc={stream.fallbackProxiedUrl}
                 initialTime={timeParam}
+                autoPlay={!recoveredPaused}
                 poster={buildEpisodeImageUrl(currentEpisodeMeta, {
                   showCover: getImageUrl(anime),
                   label: currentEp,
@@ -1421,7 +1434,7 @@ export default function Watch() {
                     </h1>
                   )}
                 </Link>
-                {anidapSlug !== 'pending' && anidapSlug !== 'unavailable' && (
+                {anidapSlug && anidapSlug !== 'unavailable' && (
                   <p className="text-sm text-white/70 mt-1 line-clamp-1">
                     <span className="text-primary font-mono font-semibold mr-2">
                       EP {currentEp}
@@ -1517,7 +1530,7 @@ export default function Watch() {
                 })()}
 
                 {/* Download — only useful when we have a known slug + active provider */}
-                {anidapSlug !== 'pending' && anidapSlug !== 'unavailable' && activeProvider && (
+                {anidapSlug && anidapSlug !== 'unavailable' && activeProvider && (
                   <DownloadButton
                     slug={anidapSlug}
                     episode={currentEp}
@@ -1613,7 +1626,7 @@ export default function Watch() {
           )}
 
           {/* ---- Server picker ---- */}
-          {anidapSlug !== 'pending' && anidapSlug !== 'unavailable' && (
+          {anidapSlug && anidapSlug !== 'unavailable' && (
             <ServerPicker
               providers={providers}
               streamType={streamType}
@@ -1881,10 +1894,11 @@ export default function Watch() {
             </div>
           </div>
 
-          {/* Relations — next season, OVA, sequel */}
-          <Relations anilistId={anilistId} />
         </aside>
       </div>
+
+      {/* Related anime — anikoto-style franchise rail (sequels, prequels, spin-offs) */}
+      <RelatedAnime anilistId={anilistId} />
 
       {/* Sync confirmation dialog */}
       <SyncConfirmDialog

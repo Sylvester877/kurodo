@@ -363,7 +363,7 @@ function MangaRow({
           )}
           <button
             onClick={onRemove}
-            className="p-1.5 rounded-md text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+            className="p-1.5 rounded-md text-white/45 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
             title="Remove from list"
           >
             <Trash2 className="h-3.5 w-3.5" />

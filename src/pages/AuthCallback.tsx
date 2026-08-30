@@ -218,7 +218,7 @@ export default function AuthCallback() {
                     >
                       anilist.co/settings/developer
                     </a>
-                    . Restart <code>npm run dev</code> after editing.
+                    . Restart the app (<code>npm start</code>) after editing.
                   </li>
                 )}
                 {/grant_type|unsupported/i.test(msg) && (

@@ -8,6 +8,7 @@ import { anidapProvider } from './anidap.js'
 import { gogoanimeProvider } from './gogoanime.js'
 import {
   isProviderRateLimited, markProviderRateLimited,
+  isChadBlocked, isChad429Blocked, getChad429Remaining,
 } from '../anidap.js'
 
 const IS_ELECTRON = typeof process !== 'undefined' && process.type === 'browser'
@@ -165,12 +166,29 @@ export async function routedGetProviders(anilistId, slug, ep, title) {
   }
 }
 
-export async function routedGetStream(anilistId, slug, ep, providerName, type, _query, title) {
+export async function routedGetStream(anilistId, slug, ep, providerName, type, _query, title, signal) {
   const normalized = normalizeProviderName(providerName)
   const effectiveSlug = slug || String(anilistId || '')
   const tried = new Set()
 
+  // Site-wide chad 429 (IP rate-limit): every anidap provider will 429
+  // together, and each would otherwise burn seconds in the race pool before
+  // failing. Fail fast with the upstream 429 so the client shows the
+  // countdown it already renders instead of a 25s spinner. Gogoanime does
+  // NOT use chad, so an explicit gogoanime server pick still goes through.
+  if (isChad429Blocked() && !providerName?.startsWith('gogoanime-')) {
+    const remainingSec = getChad429Remaining()
+    console.warn(`[router] chad site-wide rate-limit — failing fast (~${remainingSec}s remaining)`)
+    const err = new Error(`Anidap is temporarily rate-limited. Retry in ~${remainingSec}s.`)
+    err.upstream = 429
+    err.retryAfterSec = remainingSec
+    throw err
+  }
+
   const tryStream = async (candidateProvider, candidateType = type, opts = {}) => {
+    // If the route already gave up, stop immediately — don't queue more
+    // browser work behind the mutex or mark the provider as failed.
+    if (signal?.aborted) return null
     const key = `${candidateProvider}:${candidateType}`
     if (tried.has(key)) return null
     tried.add(key)
@@ -188,14 +206,20 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
     }
 
     try {
-      const data = await anidapProvider.getStream(effectiveSlug, ep, candidateProvider, candidateType, anilistId, { ...opts, titles: title })
+      const data = await anidapProvider.getStream(effectiveSlug, ep, candidateProvider, candidateType, anilistId, { ...opts, titles: title, signal })
       if (!data) {
+        // getStream swallows aborts internally and returns null — don't
+        // punish a healthy provider because the route timed out.
+        if (signal?.aborted) return null
         markProviderCooldown(candidateProvider, 'empty stream')
         return null
       }
       clearProviderCooldown(candidateProvider)
       return { ...data, source: 'anidap' }
     } catch (e) {
+      // Aborts are the caller giving up, not a provider failure — never
+      // cool down a provider because the route timed out.
+      if (e?.name === 'AbortError' || e?.message?.includes('aborted')) return null
       const is429 = e?.upstream === 429 || e?.message?.includes('too_many_requests')
       if (is429) {
         const bareName = candidateProvider.replace(/^anidap-/, '')
@@ -207,37 +231,13 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
     }
   }
 
-  // ── Fast path: explicit anidap provider requested ─────────────────
-  // Most user clicks pick a specific server (e.g. anidap-yuki). Going
-  // straight to that provider avoids the ~7s multi-provider race and
-  // the mutex contention that serialises browser work in cf-harvester.
-  // If it fails or times out, fall through to the normal racing pool.
-  const isExplicitAnidap = normalized && normalized.startsWith('anidap-') &&
-    !['anidap-auto', 'anidap-default'].includes(normalized)
-  if (isExplicitAnidap && !shouldSkipProvider(normalized)) {
-    try {
-      const fastResult = await Promise.race([
-        tryStream(normalized, type),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('fast path timeout')), 20_000),
-        ),
-      ])
-      if (fastResult) {
-        console.log(`[router] Fast path succeeded: ${normalized}/${type}`)
-        return fastResult
-      }
-    } catch (e) {
-      if (e?.upstream === 429 || e?.message?.includes('too_many_requests')) {
-        const bareName = normalized.replace(/^anidap-/, '')
-        markProviderRateLimited(bareName, 15)
-        console.warn(`[router] Fast path provider ${bareName} rate-limited`)
-      } else {
-        console.warn(`[router] Fast path failed for ${normalized}/${type}: ${e?.message || e}`)
-      }
-      // Fall through to the racing pool below; the `tried` set will
-      // skip this provider so the pool doesn't repeat the same call.
-    }
-  }
+  // ── Single racing pool (no sequential fast path) ──────────────────
+  // A sequential "fast path" that tried the user's provider alone for 8s
+  // wasted the whole route budget when the provider was slow-but-working
+  // (~9-10s extractions), leaving the fallback pool zero time. Instead the
+  // user's provider is queued FIRST in the pool below: a working provider
+  // resolves in ~5-8s, dead providers fail fast and the next candidate runs.
+  // The `tried` set prevents any candidate from being extracted twice.
 
   // Try gogoanime if the provider name starts with gogoanime-
   if (providerName && providerName.startsWith('gogoanime-')) {
@@ -246,7 +246,7 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
       // for the same cf-harvester mutex that anidap uses. Give it enough
       // time to acquire the mutex and finish extraction.
       const gogoData = await Promise.race([
-        gogoanimeProvider.getStream(effectiveSlug, ep, providerName, type, anilistId),
+        gogoanimeProvider.getStream(effectiveSlug, ep, providerName, type, anilistId, { signal }),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('gogoanime stream timeout')), 25_000),
         ),
@@ -276,23 +276,35 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
           .map((p) => normalizeProviderName(p.name))
           .filter((name) => name && name !== normalized)
 
-        // Build the racing pool: the user's provider + up to 3 fastest
-        const fastFallbacks = sameTypeAll
-          .filter((name) => FAST_PROVIDERS.includes(name))
-          .slice(0, 3)
-        const candidates = Array.from(new Set([...fastFallbacks, normalized]))
+        // While chad is bot-blocked, every candidate falls through to the
+        // browser DOM path (mutex-serialised, ~10-20s each). Racing several
+        // then just queues them behind the mutex and blows the route cap —
+        // race ONLY the user's provider so one DOM extraction fits.
+        let allCandidates
+        if (isChadBlocked()) {
+          allCandidates = [normalized]
+        } else {
+          // Build the racing pool: the user's provider + up to 2 fastest.
+          // cf-harvester serialises browser work through a mutex (~5-6s per
+          // provider), so a big pool just queues requests — 3 candidates max
+          // keeps the whole race under the route cap.
+          const fastFallbacks = sameTypeAll
+            .filter((name) => FAST_PROVIDERS.includes(name))
+            .slice(0, 2)
+          const candidates = Array.from(new Set([normalized, ...fastFallbacks]))
 
-        // Also include up to 3 extra non-fast providers in the race
-        const extraProviders = sameTypeAll
-          .filter((name) => !candidates.includes(name))
-          .slice(0, 3)
-        let allCandidates = [...candidates, ...extraProviders]
+          // Also include up to 1 extra non-fast provider in the race
+          const extraProviders = sameTypeAll
+            .filter((name) => !candidates.includes(name))
+            .slice(0, 1)
+          allCandidates = [...candidates, ...extraProviders]
+        }
 
-        // Per-provider timeout: 20 s. cf-harvester serialises browser work
-        // with a mutex, so queued providers need headroom to start after the
-        // current one finishes. Fast providers resolve in <1s; 20s still
-        // gives slow providers a chance without letting them block the
-        // mutex for an excessive time.
+        // Per-provider timeout: 20 s. The browser-free chad fast path
+        // resolves in ~1-3s once the slug is cached; the DOM fallback
+        // (slug unknown, chad down) needs ~6s page load + ~5s extraction,
+        // so 20s gives it room without letting a dead provider block the
+        // mutex forever.
         const TRY_TIMEOUT_MS = 20_000
         const tryStreamWithTimeout = (candidate, candidateType = type) =>
           Promise.race([
@@ -387,7 +399,7 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
         return null
       })(),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('anidap provider racing timeout')), 30_000),
+        setTimeout(() => reject(new Error('anidap provider racing timeout')), 25_000),
       ),
     ])
 
@@ -400,6 +412,19 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
       console.warn(`[router] Provider ${bareName} rate-limited (per-provider, 15s)`)
     }
     console.warn(`[router] anidap stream failed: ${e?.message || e}`)
+  }
+
+  // ── Site-wide 429 after the race: fail fast instead of burning the
+  // 25s gogoanime fallback (which the client would see as another
+  // endless spinner). The block auto-clears via retry_after and the
+  // client auto-retries when the health countdown hits zero. ──
+  if (isChad429Blocked() && !providerName?.startsWith('gogoanime-')) {
+    const remainingSec = getChad429Remaining()
+    console.warn(`[router] race exhausted while chad blocked — failing fast 429 (~${remainingSec}s)`)
+    const err = new Error(`Anidap is temporarily rate-limited. Retry in ~${remainingSec}s.`)
+    err.upstream = 429
+    err.retryAfterSec = remainingSec
+    throw err
   }
 
   // ── Fallback to gogoanime when anidap has no stream ──
@@ -415,7 +440,7 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
       if (gogoInfo?.slug) {
         const gogoProvider = type === 'dub' ? 'gogoanime-dub' : 'gogoanime-sub'
         const gogoData = await Promise.race([
-          gogoanimeProvider.getStream(gogoInfo.slug, ep, gogoProvider, type, anilistId),
+          gogoanimeProvider.getStream(gogoInfo.slug, ep, gogoProvider, type, anilistId, { signal }),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('gogoanime stream timeout')), 25_000),
           ),
