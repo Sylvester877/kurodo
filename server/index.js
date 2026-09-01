@@ -1315,7 +1315,31 @@ app.get('/proxy', async (req, res) => {
         proxy: shouldUseProxy(targetUrl) ? RESIDENTIAL_PROXY : undefined,
       })
     } catch (firstErr) {
-      if (firstErr.response?.status === 403 && refCandidates.length > 1) {
+      // ── Transient network errors: one quick retry ──
+      // ENOTFOUND / ECONNRESET / socket hang-up are DNS or connection
+      // blips — the same URL works a moment later (verified live: vibevibe
+      // workers.dev flapped mid-episode and self-recovered). Without this
+      // retry the player gets a 500 and hls.js shows an error attempt.
+      const netErrMsg = String(firstErr?.message || '')
+      const isTransientNetErr =
+        !firstErr?.response &&
+        (firstErr?.code === 'ENOTFOUND' ||
+          firstErr?.code === 'ECONNRESET' ||
+          firstErr?.code === 'EAI_AGAIN' ||
+          firstErr?.code === 'ETIMEDOUT' ||
+          /ECONNRESET|ENOTFOUND|socket hang up|EAI_AGAIN/i.test(netErrMsg))
+      if (isTransientNetErr) {
+        console.warn(`[proxy] ${netErrMsg.slice(0, 60)} — transient network error, retrying once: ${String(targetUrl).slice(0, 90)}`)
+        await new Promise((r) => setTimeout(r, 700))
+        response = await axios.get(targetUrl, {
+          headers: reqHeaders,
+          responseType: 'stream',
+          maxRedirects: 5,
+          timeout: 20000,
+          validateStatus: (s) => s >= 200 && s < 400,
+          proxy: shouldUseProxy(targetUrl) ? RESIDENTIAL_PROXY : undefined,
+        })
+      } else if (firstErr.response?.status === 403 && refCandidates.length > 1) {
         // Try remaining referer candidates (skip the first one — already failed)
         let succeeded = false
         for (let i = 1; i < refCandidates.length; i++) {

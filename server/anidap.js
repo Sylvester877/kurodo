@@ -854,9 +854,32 @@ export async function getProviders(slug, ep, anilistId, titles = {}) {
   }
 }
 
-// ── Fetch stream URL via chad API ─────────────────────────────────────
-// Fetches sources from the browser context via cf-harvester.
+// ── Fetch stream URL via chad API ────────────────────────────────────
+// ROOT FIX — in-flight dedupe: the router's candidate race + a client retry
+// overlap in time, and BOTH used to extract the same title/ep/provider
+// concurrently. Duplicate extractions doubled page-pool pressure and tripped
+// the 18s work budget for both copies (the "everything times out" cascade).
+// Concurrent identical requests now share ONE attempt.
+const streamInFlight = new Map()
 export async function getStream(slug, ep, provider, type, anilistId, opts = {}) {
+  const id = await resolveAnilistId(slug, anilistId, opts.titles)
+  if (!id || !provider || !type) return getStreamOnce(slug, ep, provider, type, anilistId, opts)
+  const epNum = Number(ep) || 1
+  const bareProvider = provider.replace(/^anidap-/, '')
+  const key = `${id}:${epNum}:${bareProvider}:${type}`
+  const existing = streamInFlight.get(key)
+  if (existing) {
+    console.log(`[anidap] Deduped concurrent request: ${key}`)
+    return existing
+  }
+  const attempt = getStreamOnce(slug, ep, provider, type, anilistId, opts).finally(() =>
+    streamInFlight.delete(key),
+  )
+  streamInFlight.set(key, attempt)
+  return attempt
+}
+
+async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
   const id = await resolveAnilistId(slug, anilistId, opts.titles)
   if (!id) return null
   if (!provider || !type) return null

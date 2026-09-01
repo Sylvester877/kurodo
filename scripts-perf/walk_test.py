@@ -25,9 +25,13 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 TITLES = [
     (171627, "Reze movie"),
-    (21,     "One Piece"),
-    (5114,   "FMA Brotherhood"),
     (113415, "Jujutsu Kaisen"),
+    # ── unknown / mid-tier anime (AniList popularity 20k-60k) ──
+    (144144, "Kaina of the Great Snow Sea"),
+    (155982, "AYAKA"),
+    (101368, "Planet With"),
+    (21321,  "Shounen Maid"),
+    (1606,   "Kekkaishi"),
 ]
 SERVERS = ["sora", "kiwi", "neko", "beep", "mimi", "yuki"]
 TYPES   = ["sub", "dub", "hsub"]

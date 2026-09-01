@@ -92,64 +92,192 @@ async function puppeteerInit() {
   const GOGO_THROTTLE_MS = 5000
   let _lastGogoRequest = 0
 
-  // Single mutex for ALL Puppeteer page operations. The shared page is
-  // not thread-safe: concurrent navigations/evaluations cause "detached
-  // Frame" errors and cross-contaminate state between requests.
-  let _pageMutex = Promise.resolve()
-  function withPageMutex(fn, signal) {
-    const prev = _pageMutex
-    let release
-    _pageMutex = new Promise(r => { release = r })
-    const run = async () => {
-      try {
-        // If the caller gave up while queued, never touch the shared page.
-        if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
-        return await fn()
-      } finally {
-        release()
-      }
-    }
-    return prev.then(run, run)
+  // ── Page pool (ROOT FIX — replaces the single-page mutex) ──
+  // One shared page meant every extraction for EVERY anime queued on ONE
+  // mutex. Under load each extra waiter hit the 18s cap → "Page operation
+  // timed out" → provider cooldown → a server that actually works marked
+  // dead. A small pool of interchangeable pages lets N extractions run
+  // concurrently: same browser + context, so cookies and Cloudflare
+  // clearance are shared — it still looks like one user with a few tabs.
+  // Pool size 2: measured on the target machine, 3 concurrent SPA extractions
+  // thrash CPU and push every load past the work budget; 2 keeps both loads
+  // within it while still covering a winner + a race loss in parallel.
+  const PAGE_POOL_SIZE = 2
+  const pagePoolFree = []
+  const pagePoolAll = new Set()
+  const poolWaiters = []
+  let poolCreating = false
+
+  function isBrokenPageErr(e) {
+    const m = String(e?.message || '')
+    return /Target closed|detached|Execution context was destroyed|Session closed|page has been closed|Navigating context was destroyed/i.test(m)
   }
 
-  // Bounded mutex: if a page operation hangs, don't block forever.
-  // An optional AbortSignal lets the route cancel queued work — without it,
-  // 7 racing providers × 18s extraction budget = 126s of mutex occupancy.
-  //
-  // The old 32s cap WAITED OUT the whole 18s DOM budget + 6s goto + queue —
-  // after the caller's 20-25s route cap had already aborted the extraction,
-  // the mutex was still held while the caller returned 404. The NEXT request
-  // then queued behind the zombie for another 20s+ → the observed cascade of
-  // "sources 404 in 21-24s" (each failure making the next one slower until
-  // the mutex freed). 18s lets the route abort land BEFORE the mutex guard
-  // does, so the lock releases as soon as the caller gives up.
-  const PAGE_MUTEX_TIMEOUT = 18_000
-  function withPageMutexBounded(fn, signal) {
+  function teardownPool() {
+    for (const p of pagePoolAll) { try { p.close() } catch {} }
+    pagePoolAll.clear()
+    pagePoolFree.length = 0
+    const waiters = poolWaiters.splice(0, poolWaiters.length)
+    for (const w of waiters) { try { w(false) } catch {} }
+  }
+
+  /** Shared per-page setup: viewport, proxy auth, ad-blocking, stealth. */
+  async function setupPage(p) {
+    await p.setViewport({ width: 1280, height: 720 })
+    if (_currentProxy && _currentProxy.auth) {
+      await p.authenticate({
+        username: _currentProxy.auth.username,
+        password: _currentProxy.auth.password,
+      })
+    }
+    await p.setRequestInterception(true)
+    p.on('request', (req) => {
+      const type = req.resourceType()
+      const url = req.url()
+      if (['image', 'stylesheet', 'font'].includes(type)) {
+        return req.abort('aborted')
+      }
+      if (url.includes('google') || url.includes('doubleclick') || url.includes('facebook') || url.includes('googletagmanager') || url.includes('adsystem')) {
+        return req.abort('aborted')
+      }
+      req.continue()
+    })
+    await p.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false })
+    })
+    await p.evaluateOnNewDocument(() => {
+      window.chrome = { runtime: {} }
+    })
+    await p.evaluateOnNewDocument(() => {
+      const originalQuery = window.navigator.permissions.query
+      window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : originalQuery(parameters)
+      )
+    })
+    return p
+  }
+
+  async function acquirePoolPage(signal) {
+    for (;;) {
+      if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
+      if (pagePoolFree.length) return pagePoolFree.pop()
+      // Lazy-launch: the pool no longer sits behind ensureBrowser, so make
+      // sure the browser exists before creating pool pages (idempotent —
+      // concurrent callers share the same initPromise).
+      if (!browser || !ready) {
+        await ensureBrowser(false)
+        continue
+      }
+      if (pagePoolAll.size < PAGE_POOL_SIZE && !poolCreating) {
+        poolCreating = true
+        try {
+          const p = await browser.newPage()
+          await setupPage(p)
+          pagePoolAll.add(p)
+          return p
+        } finally { poolCreating = false }
+      }
+      // Pool exhausted — wait for a release (or abort). The outer bounded
+      // guard still enforces the overall deadline.
+      const woke = await new Promise((resolve) => {
+        poolWaiters.push(resolve)
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            const i = poolWaiters.indexOf(resolve)
+            if (i >= 0) poolWaiters.splice(i, 1)
+            resolve(false)
+          }, { once: true })
+        }
+      })
+      if (woke === false) throw new Error('cf-harvester aborted (caller timed out)')
+      // released — loop and take the freed page
+    }
+  }
+
+  function releasePoolPage(pg) {
+    if (!pg || pg.isClosed() || !pagePoolAll.has(pg)) {
+      pagePoolAll.delete(pg)
+      return
+    }
+    pagePoolFree.push(pg)
+    const w = poolWaiters.shift()
+    if (w) { try { w(true) } catch {} }
+  }
+
+  // Bounded pool checkout. IMPORTANT deadline semantics (the first pool
+  // version got this wrong and it WORSED timeouts): the 18s work deadline
+  // starts when the page is GRANTED, not when the call was made. Waiting
+  // for a page is bounded only by the caller's abort signal plus a generous
+  // outer queue cap — racing providers queue, then each gets a fair full
+  // work budget once checked out.
+  const PAGE_MUTEX_TIMEOUT = 20_000   // work budget once a page is granted
+  const PAGE_QUEUE_TIMEOUT = 32_000   // hard cap on waiting for a page
+  async function withPageMutexBounded(fn, signal) {
     if (signal?.aborted) return Promise.reject(new Error('cf-harvester aborted (caller timed out)'))
-    let timer
-    let removeAbort = null
-    const guards = [
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Page operation timed out')), PAGE_MUTEX_TIMEOUT)
-      }),
+
+    // Outer guards: queue wait + total abort safety.
+    const outerGuards = [
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Page queue timed out')), PAGE_QUEUE_TIMEOUT)),
     ]
     if (signal) {
-      guards.push(
+      outerGuards.push(
         new Promise((_, reject) => {
-          const onAbort = () => reject(new Error('cf-harvester aborted (caller timed out)'))
-          signal.addEventListener('abort', onAbort, { once: true })
-          removeAbort = () => signal.removeEventListener('abort', onAbort)
+          signal.addEventListener('abort', () =>
+            reject(new Error('cf-harvester aborted (caller timed out)')), { once: true })
         }),
       )
     }
-    const result = withPageMutex(() => Promise.race([fn(), ...guards]), signal)
-    // Swallow late guard rejections: a queued call aborted before its race
-    // started would otherwise surface as an unhandled rejection.
-    for (const g of guards) g.catch(() => {})
-    return result.finally(() => {
-      clearTimeout(timer)
-      removeAbort?.()
-    })
+    for (const g of outerGuards) g.catch(() => {})
+
+    const work = (async () => {
+      const pg = await acquirePoolPage(signal)
+      // Inner guards: the WORK budget starts now (page in hand).
+      let workTimer = null
+      const innerGuards = [
+        new Promise((_, reject) => {
+          workTimer = setTimeout(() => reject(new Error('Page operation timed out')), PAGE_MUTEX_TIMEOUT)
+        }),
+      ]
+      if (signal) {
+        innerGuards.push(
+          new Promise((_, reject) => {
+            signal.addEventListener('abort', () =>
+              reject(new Error('cf-harvester aborted (caller timed out)')), { once: true })
+          }),
+        )
+      }
+      for (const g of innerGuards) g.catch(() => {})
+
+      let broken = false
+      try {
+        return await Promise.race([fn(pg), ...innerGuards])
+      } catch (e) {
+        // A page whose context/frame died is poisoned — recycle it instead
+        // of handing a broken page to the next extraction.
+        if (isBrokenPageErr(e)) broken = true
+        throw e
+      } finally {
+        clearTimeout(workTimer)
+        if (broken || pg.isClosed()) {
+          pagePoolAll.delete(pg)
+          try { await pg.close() } catch {}
+          // A freed SLOT isn't a free PAGE — wake one waiter so it can create.
+          const w = poolWaiters.shift()
+          if (w) { try { w(true) } catch {} }
+        } else {
+          releasePoolPage(pg)
+        }
+      }
+    })()
+
+    const result = await Promise.race([work, ...outerGuards])
+    // An outer guard won but the work may still be running in the background
+    // holding its page; its own inner guards/abort checks end it shortly.
+    work.catch(() => {})
+    return result
   }
 
   function resetIdleTimer() {
@@ -158,6 +286,7 @@ async function puppeteerInit() {
       if (browser && Date.now() - lastUsed >= IDLE_TIMEOUT_MS) {
         console.log('[cf-harvester] Closing idle browser')
         ready = false
+        teardownPool()
         try { await page?.close() } catch {}
         try { await browser.close() } catch {}
         browser = null; page = null
@@ -177,6 +306,7 @@ async function puppeteerInit() {
           : 'direct'
         if (currentKey === proxyKey) { lastUsed = now; resetIdleTimer(); return page }
         // Proxy mode changed — close the browser so we relaunch with the right proxy.
+        teardownPool()
         try { await browser.close() } catch {}
         browser = null; page = null; ready = false
       }
@@ -210,52 +340,7 @@ async function puppeteerInit() {
           executablePath: chromePath || undefined,
           ignoreDefaultArgs: ['--enable-automation'],  // removes the "Chrome is being controlled by automated test software" banner
         })
-        page = await browser.newPage()
-        await page.setViewport({ width: 1280, height: 720 })
-
-        // Authenticate with the gogoanime proxy if credentials are provided.
-        if (_currentProxy && _currentProxy.auth) {
-          await page.authenticate({
-            username: _currentProxy.auth.username,
-            password: _currentProxy.auth.password,
-          })
-        }
-
-        // Block heavy ad/tracking resources to speed up gogoanime loads.
-        await page.setRequestInterception(true)
-        page.on('request', (req) => {
-          const type = req.resourceType()
-          const url = req.url()
-          // Block images, CSS, and fonts (not needed for extraction) but
-          // allow 'media' resources — some gogoanime players load MP4 video
-          // directly via a <video> tag, and blocking 'media' would prevent
-          // _extractVideo from finding the stream via Performance API.
-          if (['image', 'stylesheet', 'font'].includes(type)) {
-            return req.abort('aborted')
-          }
-          if (url.includes('google') || url.includes('doubleclick') || url.includes('facebook') || url.includes('googletagmanager') || url.includes('adsystem')) {
-            return req.abort('aborted')
-          }
-          req.continue()
-        })
-
-        // Hide webdriver痕迹 — Cloudflare checks navigator.webdriver
-        await page.evaluateOnNewDocument(() => {
-          Object.defineProperty(navigator, 'webdriver', { get: () => false })
-        })
-        // Override chrome.runtime to look like a real browser
-        await page.evaluateOnNewDocument(() => {
-          window.chrome = { runtime: {} }
-        })
-        // Override permissions to avoid automation detection
-        await page.evaluateOnNewDocument(() => {
-          const originalQuery = window.navigator.permissions.query
-          window.navigator.permissions.query = (parameters) => (
-            parameters.name === 'notifications'
-              ? Promise.resolve({ state: Notification.permission })
-              : originalQuery(parameters)
-          )
-        })
+        page = await setupPage(await browser.newPage())
 
         if (!warmupDone) {
           console.log(`[cf-harvester] Warming up on ${ANIDAP_BASE}...`)
@@ -270,6 +355,7 @@ async function puppeteerInit() {
         console.error('[cf-harvester] Browser init failed:', e.message)
         ready = false
         try { await browser?.close() } catch {}; browser = null; page = null
+        teardownPool()
         throw e
       } finally { initPromise = null }
     })()
@@ -331,9 +417,8 @@ async function puppeteerInit() {
 
   async function fetchChadApiImpl(apiUrl, watchReferer) {
     const watchUrl = watchReferer || ANIDAP_BASE
-    return withPageMutexBounded(async () => {
+    return withPageMutexBounded(async (pg) => {
       // Anidap API calls always go direct (no gogo proxy).
-      const pg = await ensureBrowser(false)
       console.log(`[cf-harvester] Navigating to: ${watchUrl.slice(0, 100)}`)
       await safeGoto(pg, watchUrl)
 
@@ -417,10 +502,10 @@ async function puppeteerInit() {
     // relaunch (and detached-frame races) on the very next request.
     const signal = options.signal
     if (signal?.aborted) return Promise.reject(new Error('cf-harvester aborted (caller timed out)'))
-    return withPageMutexBounded(async () => {
+    return withPageMutexBounded(async (pg) => {
       if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
       return Promise.race([
-        _doExtractStream(watchUrl, options),
+        _doExtractStream(watchUrl, { ...options, poolPage: pg }),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('DOM extraction hard timeout')), HARD_GOTO_TIMEOUT),
         ),
@@ -429,8 +514,7 @@ async function puppeteerInit() {
   }
 
   async function fetchChadSourcesImpl(anilistId, slug, ep, provider, type) {
-    return withPageMutexBounded(async () => {
-    const pg = await ensureBrowser(false)
+    return withPageMutexBounded(async (pg) => {
     const tStart = Date.now()
 
     let resolvedSlug = slug || slugCache.get(anilistId) || null
@@ -586,6 +670,7 @@ async function puppeteerInit() {
     // Force the next ensureBrowser call to relaunch with a new proxy.
     try { await browser?.close() } catch {}
     ready = false; page = null; browser = null; initPromise = null; _currentProxy = null
+    teardownPool()
         // Small backoff before retry
         await new Promise(r => setTimeout(r, 1000))
       }
@@ -603,7 +688,9 @@ async function puppeteerInit() {
     // between attempts, so each relaunch here picks a FRESH random proxy
     // (previously we passed `false` unconditionally, which meant every
     // retry reused the same direct IP — the rotation was a no-op).
-    const pg = await ensureBrowser(isGogo)
+    // Anidap runs on a checked-out POOL page (root fix: concurrent
+    // extractions); gogo keeps the single-page proxy-rotation path.
+    const pg = options.poolPage && !isGogo ? options.poolPage : await ensureBrowser(isGogo)
     if (options.signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
     console.log(`[cf-harvester] DOM extraction: ${watchUrl.slice(0, 100)}`)
     await safeGoto(pg, watchUrl)
@@ -616,6 +703,7 @@ async function puppeteerInit() {
     if (isCloudflareChallenge(cfCheck.body, cfCheck.title)) {
       console.warn(`[cf-harvester] Cloudflare challenge detected on ${trimUrl(watchUrl)} — recycling session`)
       ready = false
+      teardownPool()
       try { await page?.close() } catch {}
       try { await browser.close() } catch {}
       browser = null; page = null; warmupDone = false; initPromise = null
@@ -878,6 +966,7 @@ async function puppeteerInit() {
       if (isGogo) {
         console.log(`[cf-harvester] Gogoanime extraction failed — recycling browser session`)
         ready = false
+        teardownPool()
         try { await page?.close() } catch {}
         try { await browser.close() } catch {}
         browser = null; page = null; warmupDone = false; initPromise = null
@@ -891,6 +980,7 @@ async function puppeteerInit() {
     if (isGogo) {
       console.log(`[cf-harvester] Recycling browser session after gogoanime extraction…`)
       ready = false
+      teardownPool()
       try { await page?.close() } catch {}
       try { await browser.close() } catch {}
       browser = null; page = null; warmupDone = false; initPromise = null
@@ -935,6 +1025,7 @@ async function puppeteerInit() {
     console.log('[cf-harvester] Shutting down...')
     if (idleTimer) clearTimeout(idleTimer)
     ready = false
+    teardownPool()
     try { await page?.close() } catch {}
     try { await browser.close() } catch {}
     browser = null; page = null

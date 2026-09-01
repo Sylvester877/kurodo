@@ -101,6 +101,26 @@ function clearProviderCooldown(provider) {
   providerFailureCooldown.delete(provider)
 }
 
+// 3-slot semaphore matching the cf-harvester page-pool size: at most this
+// many candidates extract concurrently; the rest queue in FIFO order and
+// start the moment a slot frees. Fast candidates (cache/chad fast path)
+// never queue meaningfully.
+function createSlotLimiter(n) {
+  let active = 0
+  const waiters = []
+  return async function run(fn) {
+    if (active >= n) await new Promise((r) => waiters.push(r))
+    active++
+    try {
+      return await fn()
+    } finally {
+      active--
+      waiters.shift()?.()
+    }
+  }
+}
+const candidateSlot = createSlotLimiter(2)
+
 function bareProviderName(name) {
   return name.replace(/^anidap-/, '')
 }
@@ -399,9 +419,16 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
         // Race all candidates in a loop: fire them all, then
         // repeatedly race the remaining pool, discarding each loser
         // until one succeeds or all are exhausted.
+        // ROOT FIX — candidate concurrency cap: the harvester has a 3-page
+        // extraction pool. Racing 6-7 candidates at once meant 3-4 waited
+        // past every deadline and died as cooldowns even though the servers
+        // work. Firing candidates through a 3-slot semaphore aligns demand
+        // with capacity: everyone gets a full extraction budget in turn.
+        // (Candidates that resolve without a page — cache hits, chad fast
+        // path — release their slot immediately, so nothing is slowed.)
         const pending = allCandidates.map((candidate) => ({
           name: candidate,
-          promise: tryStreamWithTimeout(candidate, type)
+          promise: candidateSlot(() => tryStreamWithTimeout(candidate, type))
             .then(
               (data) =>
                 data
@@ -420,7 +447,7 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
           type === 'sub'
             ? {
                 name: `${normalized}(dub)`,
-                promise: tryStreamWithTimeout(normalized, 'dub')
+                promise: candidateSlot(() => tryStreamWithTimeout(normalized, 'dub'))
                   .then(
                     (data) =>
                       data
