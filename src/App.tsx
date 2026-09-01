@@ -23,6 +23,7 @@ const MangaBrowse = lazyWithRetry(() => import('./pages/MangaBrowse'))
 const MangaDetails = lazyWithRetry(() => import('./pages/MangaDetails'))
 const MangaReader = lazyWithRetry(() => import('./pages/MangaReader'))
 const MangaList = lazyWithRetry(() => import('./pages/MangaList'))
+const Login = lazyWithRetry(() => import('./pages/Login'))
 const Health = lazyWithRetry(() => import('./pages/Health'))
 const NotFound = lazyWithRetry(() => import('./pages/NotFound'))
 
@@ -84,6 +85,8 @@ export default function App() {
         <BrowserRouter>
           <ConnectionDetector />
           <Routes>
+          {/* Standalone full-screen gate — rendered OUTSIDE the app chrome. */}
+          <Route path="login" element={<Page scope="login"><Login /></Page>} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Page scope="home"><Home /></Page>} />
             <Route path="browse" element={<Page scope="browse"><Browse /></Page>} />

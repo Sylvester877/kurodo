@@ -668,13 +668,16 @@ export default function Watch() {
         setProvidersUnavailable(!!unavailable)
         // Prefer the current stream type, prefer user's audio setting.
         // If user has preferDub enabled and dub providers exist, auto-select dub.
-         const hasDub = list.some((p) => p.type === 'dub')
-        const hasSub = list.some((p) => p.type === 'sub')
+        const hasDub = list.some((p) => p.type === 'dub' && p._healthy !== false)
+        const hasSub = list.some((p) => p.type === 'sub' && p._healthy !== false)
         let targetType = streamType
         if (preferDub && hasDub) targetType = 'dub'
         else if (!hasSub && hasDub) targetType = 'dub'
         else if (!hasDub && !hasSub && list.length > 0) targetType = list[0].type as StreamType
         else if (!hasDub && targetType === 'dub') targetType = 'sub' // fallback to sub when no dub available
+        // pickPreferredProvider skips _healthy:false tiles, so the auto-
+        // selection can never land on a server the backend just verified
+        // dead for this title (kiwi 404-loop class of bug).
         const sameType = list.filter((p) => p.type === targetType)
         const pick = pickPreferredProvider(sameType, server)
           ?? pickPreferredProvider(list, server)
@@ -833,11 +836,16 @@ export default function Watch() {
     // the basic title first and the English title in a follow-up response.
   }, [anime?.mal_id, anime?.title_english])
 
-  // Group providers by type for the selector chips
+  // Group providers by type for the selector chips AND the auto-fallback
+  // chain. VERIFIED-DEAD servers (_healthy === false) are excluded from the
+  // fallback pool: the auto-switcher used to cycle into kiwi/yuki-dub —
+  // servers the backend just verified dead — and burn 30s per failure on
+  // every single attempt, producing the "loads 30s then errors" loop.
   const providersByType = useMemo(() => {
     const g: Record<string, AnidapProvider[]> = { sub: [], dub: [], hsub: [] }
     for (const p of providers) {
-      (g[p.type] ||= []).push(p)
+      if (p._healthy === false) continue // verified dead for this title
+      ;(g[p.type] ||= []).push(p)
     }
     return g
   }, [providers])

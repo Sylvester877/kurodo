@@ -26,7 +26,14 @@ async function electronInit() {
   // Bounded mutex: if an operation hangs (e.g. loadURL stalls), don't
   // block the queue forever. Subsequent callers wait up to 20s for the
   // mutex; if it's still held, they reject so the router can fall back.
-  const MUTEX_ACQUIRE_TIMEOUT = 20_000
+  // 20s used to be enough until the caller abort landed BEFORE the mutex
+  // guard fired — each racing provider then held the lock its FULL budget
+  // (18s goto + 8s poll + walk) before releasing, so a 4-candidate race
+  // starved every later request for ~90s (the "sources 404 in 21-24s"
+  // cascade). The caller's abort signal already releases queued work in
+  // ~20s; a 13s cap guarantees the abort wins the race against the mutex
+  // timer so the NEXT request never queues behind a zombie.
+  const MUTEX_ACQUIRE_TIMEOUT = 13_000
   const abortedError = () => new Error('cf-harvester aborted (caller timed out)')
   function withMutex(fn, context = 'anidap', signal) {
     const ctx = _contexts[context] || _contexts.anidap

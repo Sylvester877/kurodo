@@ -85,7 +85,14 @@ export default function AccountMenu() {
     const isElectron = !!(window as any).electronAPI?.isElectron
     if (isElectron) {
       setAuthDropdownOpen(false)
-      ;(window as any).electronAPI.openExternal(url)
+      // Route through our own /login gate in the user's default browser: it
+      // carries the relay state (so /auth/callback hands the token back to
+      // this poller) and the client id (the external browser has no access
+      // to Electron's stored credentials).
+      const cid = getClientId() || ''
+      ;(window as any).electronAPI.openExternal(
+        `${window.location.origin}/login?state=${encodeURIComponent(state)}${cid ? `&cid=${encodeURIComponent(cid)}` : ''}`,
+      )
     } else {
       const popup = window.open(url, '_blank', 'noopener,noreferrer')
       if (!popup || popup.closed || typeof popup.closed === 'undefined') {

@@ -317,9 +317,7 @@ const cached = async (key, ttl, fn, { timeoutMs = 15_000, skipFailCache = false 
 
   inFlight.set(key, p)
   return p
-}
-
-// Periodically prune stale entries from the generic cache and fail cache
+}    // Periodically prune stale entries from the generic cache and fail cache
 // so they don't grow unbounded over the process lifetime.
 setInterval(() => {
   const now = Date.now()
@@ -435,33 +433,51 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
       const entry = cache.get(cacheKey)
       if (entry) entry.at = Date.now() - (TTL - 60_000)
     }
-    // Annotate servers with health status but NEVER hide them.
-    // The background health scheduler can produce false negatives when
-    // anidap is rate-limited or Puppeteer is cold. Filtering dead servers
-    // out entirely leaves users with an empty picker even though the
-    // title is available. We keep every server clickable and just flag
-    // the ones that recently failed probes. We use the fast server-level
-    // health cache (getServerHealth) rather than per-episode probing so
-    // this endpoint stays snappy.
+    // ── LIVE server verification ──
+    // The old annotation used the background server-level health cache,
+    // which probes against a FIXED title (One Piece). It cannot tell whether
+    // a server actually has THIS title: chad lists servers per-episode, and
+    // upstream returns 404 "no sources" for servers that don't cover it
+    // (live case: kiwi returned 404 on every test title, yuki/dub served a
+    // link that died right after extraction). Users then clicked those
+    // tiles and watched a 30s spinner → error screen on EVERY click.
+    //
+    // Now: every listed server is verified against THIS title with a real
+    // source fetch + master-manifest probe (results cached 15 min per
+    // title+server+type; only unknown servers are probed, so warm lists
+    // return instantly). Servers that FAIL are marked _healthy:false —
+    // the picker grays them out, the auto-fallback skips them, and they
+    // can never win the race.
     try {
-      const { getServerHealth } = await import('./anidap.js')
-      data.providers = data.providers.map((p) => {
-        const health = getServerHealth(p.name, p.type)
-        return {
-          ...p,
-          _healthy: health !== false,
-          _healthMs: null,
-          _healthError: health === false ? 'Server unreachable' : null,
-        }
+      const { verifyProviders } = await import('./server-verify.js')
+      data.providers = await verifyProviders(data.providers, {
+        anilistId, slug: String(slug), ep: Number(ep) || 1,
+        titles: title,
       })
-    } catch {
-      // If anidap.js can't be imported, just show all as healthy
-      data.providers = data.providers.map((p) => ({
-        ...p,
-        _healthy: true,
-        _healthMs: null,
-        _healthError: null,
-      }))
+    } catch (e) {
+      // Never let verification break the list — fall back to the old
+      // annotation so the picker still renders.
+      console.warn('[servers] verifyProviders failed, using health cache only:', e?.message || e)
+      try {
+        const { getServerHealth } = await import('./anidap.js')
+        data.providers = data.providers.map((p) => {
+          const health = getServerHealth(p.name, p.type)
+          return {
+            ...p,
+            _healthy: health !== false,
+            _healthMs: null,
+            _healthError: health === false ? 'Server unreachable' : null,
+          }
+        })
+      } catch {
+        // If anidap.js can't be imported, just show all as healthy
+        data.providers = data.providers.map((p) => ({
+          ...p,
+          _healthy: true,
+          _healthMs: null,
+          _healthError: null,
+        }))
+      }
     }
     if (!Array.isArray(data.providers)) data.providers = []
     // ── Rate-limit surfaced to the UI ──
@@ -1081,6 +1097,12 @@ const MANIFEST_TTL = 30 * 1000
 function getCachedManifest(url) { const h = manifestCache.get(url); if (h && Date.now() - h.at < MANIFEST_TTL) return h.data; manifestCache.delete(url); return null }
 function setCachedManifest(url, data) { manifestCache.set(url, { at: Date.now(), data }); if (manifestCache.size > 200) { const n = Date.now(); for (const [k, v] of manifestCache) if (n - v.at > MANIFEST_TTL) manifestCache.delete(k) } }
 
+// Manifest-negative cache: remember upstream FAILURES for manifest URLs so
+// a poisoned/expired entry is not re-served from manifestCache for its full
+// 30s TTL. Cleared automatically when a later fetch succeeds.
+const manifestFailCache = new Map()
+const MANIFEST_FAIL_TTL = 20_000
+
 // ── CDN hosts known to send Access-Control-Allow-Origin: * on their
 // m3u8 manifests AND segment files. For these hosts we can bypass the
 // /proxy entirely — the browser loads streams directly, avoiding 403
@@ -1154,6 +1176,10 @@ function pickReferers(targetUrl) {
     else if (host.includes('cors.otakuu')) { refs.push('https://anidap.lol/', cdnSelf) }
     else if (host.includes('animex'))    { refs.push('https://anidap.lol/', cdnSelf) }
     else if (host.includes('anidb.app')) { refs.push('https://anidb.app/', cdnSelf) }
+    // aniwatchtv family (uwu/yuki/kami + bd/hawk media CDNs): verified live
+    // Aug 2026 — cdnx /uwu/<blob> 403s unless Referer is https://anidap.lol/
+    // (cdnSelf and no-referer both 403; anidap.lol returns 200 + m3u8).
+    else if (host.includes('aniwatchtv')) { refs.push('https://anidap.lol/', cdnSelf) }
     // Miruro CDN hosts (kwik/uwucdn — direct m3u8, CORS * )
     else if (host.includes('uwucdn'))    { refs.push('https://kwik.cx/', cdnSelf) }
     else if (host.includes('kwik'))      { refs.push('https://kwik.cx/', cdnSelf) }
@@ -1363,13 +1389,13 @@ app.get('/proxy', async (req, res) => {
       }
     }
 
-    const contentType = response.headers['content-type'] || ''
+    let contentType = response.headers['content-type'] || ''
     res.set('access-control-allow-origin', '*')
 
     const urlLower = String(targetUrl).toLowerCase()
     const isVttUrl = urlLower.includes('.vtt') || contentType.includes('text/vtt')
     const isSrtUrl = urlLower.includes('.srt')
-    const isM3u8 = urlLower.includes('.m3u8') || contentType.includes('mpegurl')
+    let isM3u8 = urlLower.includes('.m3u8') || contentType.includes('mpegurl')
 
     // Video/audio segments — these are the big files we must stream.
     // Detect by URL extension, Content-Type, OR fallback heuristic:
@@ -1382,7 +1408,7 @@ app.get('/proxy', async (req, res) => {
     // Without this, the proxy buffers the ENTIRE 5MB segment in memory
     // before sending a single byte — causing the "play 5s, lag, play"
     // stutter pattern the user reported.
-    const isVideoSegment =
+    let isVideoSegment =
       /\.(ts|mp4|webm|m4s|m2ts|mp2t|aac|mp3|m4a|mov|mkv|ogv)(\?|$)/i.test(urlLower) ||
       contentType.startsWith('video/') ||
       contentType.startsWith('audio/') ||
@@ -1394,11 +1420,26 @@ app.get('/proxy', async (req, res) => {
       // segment. We detect this because it's not VTT, SRT, M3U8, text,
       // JSON, and it came through our proxy (has h= or is relative path).
       ((contentType.includes('application/octet-stream') || !contentType) && !isVttUrl && !isSrtUrl && !isM3u8)
+
+    // ── image/jpeg-disguised payloads (uwu/aniwatchtv) ──
+    // cdnx /uwu/<blob> returns `image/jpeg` for BOTH its manifests (#EXTM3U
+    // text) AND its MPEG-TS segments (0x47 body). Content-type cannot tell
+    // them apart — only the BODY can. Previously we blanket-flipped every
+    // image/* to `isVideoSegment`, which pushed the uwu MASTER down the raw
+    // segment path and SKIPPED the manifest rewrite entirely: the browser
+    // then resolved the raw root-relative `/uwu/<blob>` variant lines
+    // against localhost → 404 → "variant not m3u8" → dead player.
+    // Now these payloads are marked needsBodySniff: buffered below, then
+    // classified by first bytes (manifest → rewrite path; TS → segment).
+    const needsBodySniff =
+      contentType.startsWith('image/') &&
+      !contentType.startsWith('image/png') &&
+      !isVttUrl && !isSrtUrl && !isM3u8
     const isText = contentType.startsWith('text/') ||
                    contentType.includes('application/json') ||
                    (!contentType && !isVideoSegment)
 
-    if (isVideoSegment && !isVttUrl && !isSrtUrl && !isM3u8) {
+    if (isVideoSegment && !isVttUrl && !isSrtUrl && !isM3u8 && !needsBodySniff) {
       // PNG-disguised segments carry image/png — fix the MIME before
       // streaming (hls.js ignores MIME, but the player UI shows it).
       if (contentType.startsWith('image/')) {
@@ -1507,6 +1548,42 @@ app.get('/proxy', async (req, res) => {
       }
     }
 
+    // ─── Body sniff for image/jpeg-disguised uwu payloads ────────────
+    // image/jpeg here is a disguise: the body is either an #EXTM3U
+    // manifest (must enter the rewrite path below so its relative
+    // /uwu/<blob> lines get proxied) or a raw MPEG-TS segment (0x47 sync
+    // byte, possibly PNG-wrapped). Classify from the buffered bytes.
+    if (needsBodySniff) {
+      const sniffHead = content.subarray(0, 64).toString('utf8').trimStart()
+      if (sniffHead.startsWith('#EXTM3U')) {
+        isM3u8 = true
+        contentType = 'application/vnd.apple.mpegurl; charset=utf-8'
+        res.set('content-type', contentType)
+      } else {
+        // Not a manifest → serve the buffered body as media. Strip a PNG
+        // prefix if present (already done above), guard against HTML junk.
+        const junkHead = content.subarray(0, 16).toString('utf8').trimStart()
+        if (junkHead.startsWith('<') || junkHead.startsWith('{"code"')) {
+          console.error(`[proxy] image-disguised body is HTML junk → ${String(targetUrl).slice(0, 80)} — returning 502`)
+          return res.status(502).send('Upstream returned a non-media response')
+        }
+        res.set('content-type', 'application/octet-stream')
+        res.set('cache-control', 'public, max-age=3600, immutable')
+        res.set('accept-ranges', 'bytes')
+        if (clientRange) {
+          const m = /bytes=(\d+)-(\d*)/.exec(String(clientRange))
+          if (m) {
+            const start = Number(m[1])
+            const end = m[2] ? Math.min(Number(m[2]), content.length - 1) : content.length - 1
+            res.status(206)
+            res.set('content-range', `bytes ${start}-${end}/${content.length}`)
+            return res.send(content.subarray(start, end + 1))
+          }
+        }
+        return res.status(200).send(content)
+      }
+    }
+
     // ─── Subtitle MIME-fixing ────────────────────────────────────────
     // Some upstream hosts serve subtitles as application/octet-stream
     // (or text/plain). Browsers silently REFUSE to render <track> cues
@@ -1559,22 +1636,81 @@ app.get('/proxy', async (req, res) => {
       }
     }
 
+    // ── Global HTML-poison guard ──
+    // The /proxy ONLY ever serves media/playlist/subtitle content. If the
+    // body is HTML (SPA index.html, bot-check page, error page) the player
+    // will choke on it exactly like the 30s-spinner bug. Catch it on EVERY
+    // path — including the raw `res.send(content)` fallthrough that streams
+    // like cdnx /uwu/<blob> hit when upstream 200s with text/html.
+    if (!isVideoSegment && !isVttUrl && !isSrtUrl) {
+      const head = content.toString('utf8', 0, 64).trimStart()
+      const looksHtml = head.startsWith('<') || head.startsWith('<!') ||
+        /^<html/i.test(head) || head.startsWith('{"code":')
+      if (looksHtml && !isM3u8) {
+        console.error(`[proxy] HTML/binary body on non-segment path → ${String(targetUrl).slice(0, 80)} — returning 502`)
+        return res.status(502).send('Upstream returned a non-media response')
+      }
+    }
+
     res.set('content-type', contentType)
 
     // Rewrite m3u8 manifests so segment URLs go through this proxy too.
     // Carry the `h=` upstream-headers param forward to every segment so
     // playback doesn't 403 mid-stream when the host checks Referer.
     if (isM3u8) {
-      // Check manifest cache first
-      const cachedM = getCachedManifest(targetUrl)
+      const baseUrl = new URL(targetUrl)
+      const hSuffix = req.query.h ? `&h=${encodeURIComponent(String(req.query.h))}` : ''
+      // ── Manifest cache is keyed per h-param ──
+      // Same URL with different upstream headers produces DIFFERENT rewrite
+      // output (every nested URI gets that request's h= suffix). A no-h
+      // fetch of the same master used to poison the cache for 30s: later
+      // h-carrying fetches got h-less variant URLs → upstream 403 → the
+      // whole server "died". Keying by url+h keeps each header set's rewrite
+      // separate.
+      const cacheKey = `${targetUrl}|${hSuffix}`
+      // ── Manifest negative-cache: skip serving a KNOWN-dead manifest ──
+      // If the last fetch of this exact url+headers 4xx'd (expired signed
+      // token), don't serve the stale success cache — the player would 502
+      // on every retry for the rest of the manifest TTL. A short failure
+      // stamp (20s) makes the next attempt re-validate against upstream,
+      // which returns the NEW manifest once the token rotates.
+      const mFail = manifestFailCache.get(cacheKey)
+      if (mFail && Date.now() - mFail.at < MANIFEST_FAIL_TTL) {
+        manifestCache.delete(cacheKey)
+        return res.status(502).send('Upstream playlist recently failed — retrying fresh')
+      }
+      const cachedM = getCachedManifest(cacheKey)
       if (cachedM) {
         res.set('content-type', 'application/vnd.apple.mpegurl; charset=utf-8')
         res.set('cache-control', 'public, max-age=10, must-revalidate')
         return res.send(cachedM)
       }
       const text = content.toString('utf8')
-      const baseUrl = new URL(targetUrl)
-      const hSuffix = req.query.h ? `&h=${encodeURIComponent(String(req.query.h))}` : ''
+      // ── Upstream gave us HTML instead of a playlist ──
+      // aniwatchtv (uwu CDN, yuki/kami servers) sometimes 200s with the
+      // anidap SPA page for a playlist URL (signing hiccup / token race).
+      // hls.js then gets HTML as its media playlist → parse error →
+      // playback dies even though a retry returns the REAL playlist.
+      // Detect and: don't cache the poison, return 502 so the player's
+      // retry/fallback chain can recover.
+      if (!text.trimStart().startsWith('#EXTM3U')) {
+        console.error(`[proxy] NOT a playlist (HTML/binary) → ${String(targetUrl).slice(0, 80)} — returning 502 (no cache poison)`)
+        return res.status(502).send('Upstream returned a non-playlist response')
+      }
+      // ── Re-proxy guard ──
+      // If the upstream body is ITSELF a previously-rewritten manifest (its
+      // lines already point at our /proxy), the per-line rewrites below would
+      // resolve those `/proxy?url=…` "relative" lines against the UPSTREAM
+      // base URL → e.g. https://bd.aniwatchtv.site/proxy?url=… → 404 at play
+      // time ("master loads, every segment 404s"). Detect and serve the body
+      // VERBATIM — it's already in player-ready form.
+      if (/\n\/proxy\?url=/.test(text) || text.trimStart().startsWith('/proxy?url=')) {
+        console.warn(`[proxy] upstream already served a rewritten manifest → ${String(targetUrl).slice(0, 80)} — passing through verbatim`)
+        const buf2 = Buffer.from(text, 'utf8')
+        res.set('content-type', 'application/vnd.apple.mpegurl; charset=utf-8')
+        res.set('cache-control', 'public, max-age=10, must-revalidate')
+        return res.send(buf2)
+      }
       const rewritten = text
         .split('\n')
         .map((rawLine) => {
@@ -1586,19 +1722,37 @@ app.get('/proxy', async (req, res) => {
           // the proxy and gets proper CORS headers.
           if (line.startsWith('#')) {
             return rawLine.replace(
-              /\bURI="(https?:\/\/[^"]+)"/gi,
-              (_m, url) => `URI="/proxy?url=${encodeURIComponent(url)}${hSuffix}"`,
+              /\bURI="([^"]+)"/gi,
+              (m, url) => {
+                // Already proxied (e.g. served from the manifest cache after a
+                // proxy hop) — leave as-is instead of double-wrapping.
+                if (url.startsWith('/proxy')) return m
+                const abs = /^https?:/i.test(url)
+                  ? url
+                  : (() => { try { return new URL(url, baseUrl).href } catch { return url } })()
+                return `URI="/proxy?url=${encodeURIComponent(abs)}${hSuffix}"`
+              },
             )
           }
           if (line.startsWith('http')) {
             return `/proxy?url=${encodeURIComponent(line)}${hSuffix}`
           }
-          const absolute = new URL(line, baseUrl).href
+          // ⚠ Hostname-suffix bug guard: `new URL('/uwu/abc', 'https://cdnx.aniwatchtv.site')`
+          // is correct, but a baseUrl WITH A PATH (e.g. 'https://cdnx.aniwatchtv.site/uwu/BLOB')
+          // makes relative resolution KEEP the path prefix: `/uwu/abc` becomes
+          // `https://cdnx.aniwatchtv.site/uwu/BLOB/uwu/abc` — a hostname like
+          // 'cdnx.aniwatchtv.sitec' seen live (ENOTFOUND). Always resolve against
+          // the ORIGIN for root-relative lines, and against baseUrl for
+          // genuinely relative ones.
+          const absolute = line.startsWith('/')
+            ? new URL(line, baseUrl.origin).href
+            : new URL(line, baseUrl).href
           return `/proxy?url=${encodeURIComponent(absolute)}${hSuffix}`
         })
         .join('\n')
       const buf = Buffer.from(rewritten, 'utf8')
-      setCachedManifest(targetUrl, buf)
+      manifestFailCache.delete(cacheKey) // fresh success clears any failure stamp
+      setCachedManifest(cacheKey, buf)
       res.set('content-type', 'application/vnd.apple.mpegurl; charset=utf-8')
       res.set('cache-control', 'public, max-age=10, must-revalidate')
       return res.send(buf)
@@ -1610,6 +1764,17 @@ app.get('/proxy', async (req, res) => {
     const shortUrl = String(targetUrl).slice(0, 120)
     const urlLower = String(targetUrl).toLowerCase()
     const isSubtitle = urlLower.includes('.vtt') || urlLower.includes('.srt') || urlLower.includes('subtitle')
+    // ── Manifest-cache failure stamp ──
+    // A dead upstream manifest (expired token, signed link rotated) used to
+    // keep serving from the 30s manifest cache after the upstream recovered,
+    // so the player 502'd on every retry for up to 30s. Stamp the failure
+    // and drop any cached copy so the NEXT fetch re-validates against
+    // upstream (streamCache re-extraction handles the longer recovery).
+    const cacheKeyForStamp = `${targetUrl}|${req.query.h ? `&h=${encodeURIComponent(String(req.query.h))}` : ''}`
+    if (/\.m3u8(\?|$)/i.test(String(targetUrl)) && status >= 400) {
+      manifestFailCache.set(cacheKeyForStamp, { at: Date.now(), status })
+      manifestCache.delete(cacheKeyForStamp)
+    }
 
     // Subtitle 404s are expected for many episodes — downgrade to debug
     if (status === 404 && isSubtitle) {

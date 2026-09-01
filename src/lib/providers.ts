@@ -53,8 +53,20 @@ function tipQualityRank(tip?: string | null): number {
   return 1
 }
 
-export function sortProviders<T extends { name: string; default?: boolean; tip?: string | null }>(list: T[]): T[] {
+/** Server-health rank: verified-OK servers before unverified, dead last.
+ *  The backend (server-verify.js) marks _healthy:false for servers that
+ *  FAILED a live probe against THIS title (kiwi 404s, yuki/dub dead links) —
+ *  they must sort to the very bottom and never win the default pick, even
+ *  if their tip says "High quality". Unverified (undefined) stays neutral. */
+function healthRank(p: { _healthy?: boolean | null }): number {
+  if (p._healthy === false) return 2
+  if (p._healthy === true) return 0
+  return 1
+}
+
+export function sortProviders<T extends { name: string; default?: boolean; tip?: string | null; _healthy?: boolean | null }>(list: T[]): T[] {
   // Sort keys, in order:
+  //   0. verified health (working servers first, verified-dead last)
   //   1. tip quality ("High quality" servers first — 1080p-capable ones)
   //   2. static PROVIDER_META priority (quality-ranked roster)
   //   3. chad's per-episode `default` flag
@@ -62,6 +74,9 @@ export function sortProviders<T extends { name: string; default?: boolean; tip?:
   //      (V8's sort is not guaranteed stable; without the tie-breaker two
   //      servers sharing all keys would "shuffle" on every page load).
   return [...list].sort((a, b) => {
+    const ha = healthRank(a as T & { _healthy?: boolean | null })
+    const hb = healthRank(b as T & { _healthy?: boolean | null })
+    if (ha !== hb) return ha - hb
     const qa = tipQualityRank((a as { tip?: string | null }).tip)
     const qb = tipQualityRank((b as { tip?: string | null }).tip)
     if (qa !== qb) return qa - qb
@@ -75,26 +90,39 @@ export function sortProviders<T extends { name: string; default?: boolean; tip?:
     return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
   })
 }
-export function pickPreferredProvider<T extends { name: string }>(list: T[], prefer?: string): T | null {
+export function pickPreferredProvider<T extends { name: string; _healthy?: boolean | null }>(list: T[], prefer?: string): T | null {
   if (!list.length) return null
+  // ── Never auto-pick a verified-dead server ──
+  // A user-pinned preference that points at a dead server would re-trigger
+  // the 30s spinner every visit. Prefer a working/unverified match first,
+  // and only fall back to the dead one when NOTHING else exists.
+  const alive = list.filter((p) => p._healthy !== false)
+  const pool = alive.length > 0 ? alive : list
   if (prefer && prefer !== 'auto') {
     const lower = prefer.toLowerCase()
     // 1. Exact match on full name (e.g. 'miruro-megacloud')
-    const exact = list.find(p => p.name.toLowerCase() === lower)
-    if (exact) return exact
+    //    ── but skip verified-dead servers when something else exists ──
+    //    The dead-tile fallthrough (4.) below still honors an explicit
+    //    user choice, so pinning a grayed-out server keeps working.
+    const exactAlive = pool.find(p => p.name.toLowerCase() === lower)
+    if (exactAlive) return exactAlive
     // 2. Starts-with match (e.g. prefer='miruro' matches 'miruro-MegaCloud')
-    const starts = list.find(p => p.name.toLowerCase().startsWith(lower))
+    const starts = pool.find(p => p.name.toLowerCase().startsWith(lower))
     if (starts) return starts
     // 3. Match against the cleaned name (strip provider-family prefix like
     //    anidap-/miruro-/saturn-/pahe- → then case-insensitive compare).
     //    This lets users pick a specific server like 'yuki' and match
     //    'anidap-Yuki' or 'miruro-Yuki'.
-    const cleanMatch = list.find(p => {
+    const cleanMatch = pool.find(p => {
       const clean = p.name.replace(/^anidap-/i, '').toLowerCase()
       return clean === lower || clean.startsWith(lower)
     })
     if (cleanMatch) return cleanMatch
+    // 4. The preferred server is verified-dead for this title — fall back to
+    //    the best ALIVE server instead of looping the 30s spinner forever.
+    const sorted = sortProviders(pool)
+    return sorted[0] || null
   }
-  const sorted = sortProviders(list)
+  const sorted = sortProviders(pool)
   return sorted[0] || null
 }

@@ -115,7 +115,15 @@ async function puppeteerInit() {
   // Bounded mutex: if a page operation hangs, don't block forever.
   // An optional AbortSignal lets the route cancel queued work — without it,
   // 7 racing providers × 18s extraction budget = 126s of mutex occupancy.
-  const PAGE_MUTEX_TIMEOUT = 32_000
+  //
+  // The old 32s cap WAITED OUT the whole 18s DOM budget + 6s goto + queue —
+  // after the caller's 20-25s route cap had already aborted the extraction,
+  // the mutex was still held while the caller returned 404. The NEXT request
+  // then queued behind the zombie for another 20s+ → the observed cascade of
+  // "sources 404 in 21-24s" (each failure making the next one slower until
+  // the mutex freed). 18s lets the route abort land BEFORE the mutex guard
+  // does, so the lock releases as soon as the caller gives up.
+  const PAGE_MUTEX_TIMEOUT = 18_000
   function withPageMutexBounded(fn, signal) {
     if (signal?.aborted) return Promise.reject(new Error('cf-harvester aborted (caller timed out)'))
     let timer
@@ -662,7 +670,9 @@ async function puppeteerInit() {
       const deadline = pollStart + fastTimeout
       while (Date.now() < deadline) {
         if (options.signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
-        const probe = await pg.evaluate((pollStartMs) => {
+        let probe = null
+        try {
+          probe = await pg.evaluate((pollStartMs) => {
           // 1. Stream via Performance API.
           try {
             const resources = performance.getEntriesByType('resource')
@@ -681,6 +691,16 @@ async function puppeteerInit() {
           // 3. No-stream error state (only after a 2s render grace, scoped to
           // the player container so generic strings in the page shell can't
           // false-positive a working provider).
+          // 3a. UPSTREAM-ERROR panel: when the provider simply doesn't have
+          //     this title/type (kiwi/hsub everywhere), the SPA renders
+          //     "HTTP error! status: 400 Try Again …" INSTEAD of a player —
+          //     it lives OUTSIDE the [class*=player] container, so also
+          //     check the page text. This is unambiguous: no provider page
+          //     with a working stream ever shows it.
+          const fullBody = (document.body?.textContent || '').toLowerCase()
+          if (Date.now() - pollStartMs >= 2000 && fullBody.includes('http error!')) {
+            return { kind: 'no-stream', value: 'upstream-http-error' }
+          }
           if (Date.now() - pollStartMs >= 2000) {
             const player = document.querySelector('[class*="player" i], [id*="player" i], [class*="video" i]')
             if (player) {
@@ -693,7 +713,13 @@ async function puppeteerInit() {
             }
           }
           return null
-        }, pollStart).catch(() => null)
+        }, pollStart)
+        } catch (probeErr) {
+          // SPA re-render / mid-navigation destroys the execution context —
+          // this probe is simply lost, not a dead provider. Retry next tick.
+          console.log(`[cf-harvester] probe retry (context lost): ${probeErr?.message?.slice(0, 60)}`)
+          probe = null
+        }
         if (probe) {
           if (probe.kind === 'stream') {
             console.log(`[cf-harvester] ✓ Direct video: ${probe.value.slice(0, 80)}`)
@@ -752,6 +778,35 @@ async function puppeteerInit() {
       // No iframe — try direct video
       streamUrl = await _extractVideo(pg, videoTimeout)
       if (streamUrl) break
+
+      // At depth 0: check whether the anidap SPA rendered an error state.
+      // Live case: unlisted provider+type combos render an "HTTP error!
+      // status: 400 Try Again … If current server doesn't work try other
+      // servers beside" panel INSTEAD of a player — the SPA shell itself
+      // says the provider has nothing. The old pattern list only looked for
+      // "source not found / stream not available"-style strings and never
+      // matched, so kiwi/hsub burned the full 16-20s budget on every cold
+      // request before failing.
+      //
+      // Two checks:
+      //   1. EARLY (before the iframe walk): the body is the FULL page text,
+      //      because the error panel renders OUTSIDE the [class*=player]
+      //      container the later scoped check reads. "http error!" is an
+      //      unambiguous upstream-error render — fail fast immediately and
+      //      the route fails in <2s instead of eating the mutex for 18s.
+      //   2. AFTER the walk (scoped check below) as before.
+      if (depth === 0 && !isGogo) {
+        try {
+          const earlyBody = await pg.evaluate(() => (document.body?.textContent || '').toLowerCase())
+          if (earlyBody.includes('http error!') || earlyBody.includes('try again') && earlyBody.includes('watching')) {
+            console.log(`[cf-harvester] Provider error panel detected early ("${earlyBody.includes('http error!') ? 'upstream-http-error' : 'try-again-panel'}") — failing fast`)
+            throw new Error('Stream not available on this provider')
+          }
+        } catch (e) {
+          if (e.message === 'Stream not available on this provider') throw e
+          // DOM check itself failed — continue the loop
+        }
+      }
 
       // At depth 0: retry once with page refresh for gogoanime only.
       // NOTE: disabled — the refresh retry often just wastes time and

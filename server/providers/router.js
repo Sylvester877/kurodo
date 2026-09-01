@@ -25,6 +25,43 @@ const providerFailureCooldown = new Map()
 const FAILURE_COOLDOWN_BASE_MS = 15_000
 const FAILURE_COOLDOWN_MAX_MS = 120_000
 const FAILURE_COOLDOWN_JITTER_MS = 5_000
+// ── Title-aware dead-link skipping ──────────────────────────────────
+// A provider that returned NOTHING for a specific title used to only be
+// skipped by its GLOBAL failure cooldown (15s→120s exponential). Two
+// problems: (a) the global cooldown blocks that provider for OTHER titles
+// where it works fine, and (b) after the cooldown expires, the SAME dead
+// title+provider combo is re-raced — burning another 20-25s route budget
+// on a server that upstream has already confirmed has nothing. The
+// negative cache is per (title, provider, type) with a 10-min TTL, so
+// "kiwi has no dub for this movie" is remembered per-title instead of
+// poisoning every title.
+const titleNoStreamCache = new Map() // `${slugOrId}:${ep}:${provider}:${type}` -> untilMs
+const TITLE_NO_STREAM_TTL = 10 * 60 * 1000
+
+function isTitleNoStream(anilistId, slug, ep, provider, type) {
+  const key = `${slug || anilistId || ''}:${ep}:${provider}:${type}`
+  const until = titleNoStreamCache.get(key)
+  if (!until) return false
+  if (Date.now() >= until) {
+    titleNoStreamCache.delete(key)
+    return false
+  }
+  return true
+}
+
+function markTitleNoStream(anilistId, slug, ep, provider, type) {
+  if (!provider) return
+  const key = `${slug || anilistId || ''}:${ep}:${provider}:${type}`
+  titleNoStreamCache.set(key, Date.now() + TITLE_NO_STREAM_TTL)
+  if (titleNoStreamCache.size > 500) {
+    const now = Date.now()
+    for (const [k, until] of titleNoStreamCache) if (now >= until) titleNoStreamCache.delete(k)
+    if (titleNoStreamCache.size > 500) {
+      const firstKey = titleNoStreamCache.keys().next().value
+      if (firstKey !== undefined) titleNoStreamCache.delete(firstKey)
+    }
+  }
+}
 
 function isProviderInCooldown(provider) {
   const entry = providerFailureCooldown.get(provider)
@@ -204,6 +241,12 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
       console.log(`[router] Skipping cooled-down provider: ${candidateProvider}`)
       return null
     }
+    // Skip combos upstream already confirmed EMPTY for THIS title.
+    // Without this, every re-visit re-raced the same dead combo for 20s.
+    if (isTitleNoStream(anilistId, effectiveSlug, ep, candidateProvider, candidateType)) {
+      console.log(`[router] Skipping no-stream (this title): ${candidateProvider}/${candidateType}`)
+      return null
+    }
 
     try {
       const data = await anidapProvider.getStream(effectiveSlug, ep, candidateProvider, candidateType, anilistId, { ...opts, titles: title, signal })
@@ -211,10 +254,13 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
         // getStream swallows aborts internally and returns null — don't
         // punish a healthy provider because the route timed out.
         if (signal?.aborted) return null
+        markTitleNoStream(anilistId, effectiveSlug, ep, candidateProvider, candidateType)
         markProviderCooldown(candidateProvider, 'empty stream')
         return null
       }
       clearProviderCooldown(candidateProvider)
+      titleNoStreamCache.delete(`${effectiveSlug}:${ep}:${candidateProvider}:${candidateType}`)
+      titleNoStreamCache.delete(`${anilistId}:${ep}:${candidateProvider}:${candidateType}`)
       return { ...data, source: 'anidap' }
     } catch (e) {
       // Aborts are the caller giving up, not a provider failure — never
@@ -224,7 +270,20 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
       if (is429) {
         const bareName = candidateProvider.replace(/^anidap-/, '')
         markProviderRateLimited(bareName, 15)
+      } else if (e?.transient) {
+        // Transient failure (DOM timeout, expired CDN token, challenge):
+        // cool the provider briefly so the next request retries, but NEVER
+        // record "no stream for this title" — a timeout or a dead CDN token
+        // says nothing about upstream availability. Poisoning here locked
+        // users out of working servers for the full 10-min TTL.
+        markProviderCooldown(candidateProvider, e?.message || 'transient')
       } else {
+        // Definitive 404 ("no stream available") = upstream CONFIRMED this
+        // title+provider+type has nothing — cache per-title so later
+        // requests fail fast instead of re-racing a known-dead combo.
+        if (e?.upstream === 404) {
+          markTitleNoStream(anilistId, effectiveSlug, ep, candidateProvider, candidateType)
+        }
         markProviderCooldown(candidateProvider, e?.message || 'failed')
       }
       return null
@@ -317,6 +376,14 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
         // ── Filter out rate-limited/cooled providers from the race pool ──
         // Only the rate-limited/cooled provider is excluded; all others still race.
         allCandidates = allCandidates.filter((name) => !shouldSkipProvider(name))
+
+        // ── ALWAYS keep the user's pick in the pool ──
+        // The user's chosen server must never be silently dropped: after a
+        // cooldown/429 mark it vanished from the pool and the route returned
+        // 404 — the frontend then auto-fell through to ANOTHER server, so a
+        // transient blip "permanently" switched the user's server. Being in
+        // the pool costs nothing when it fails; being absent is wrong.
+        if (!allCandidates.includes(normalized)) allCandidates.unshift(normalized)
 
         if (allCandidates.length === 0) {
           // All candidates are rate-limited — try cross-type

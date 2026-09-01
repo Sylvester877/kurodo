@@ -365,6 +365,55 @@ export function chadRetryAfterMs(body) {
   return 60_000
 }
 
+// ── chad API pacing (token-bucket + FIFO queue) ──────────────────────
+// chad rate-limits per IP with a SITE-WIDE window (observed: ~86s lockout
+// after a short burst). Bursts used to happen whenever the router raced
+// 3-4 providers while server-verify probed several servers and the UI
+// prefetched the next episode — one cold title could fire ~10 chad calls
+// in 4s and lock EVERY server out at once (the "all servers broken"
+// report). Pacing spreads calls evenly instead: never more than 5 chad
+// calls per 10s, ≈350ms apart. Callers queue briefly rather than trip the
+// global block — a ~1s delay beats an 86s lockout every time.
+const CHAD_PACE_MAX_PER_WINDOW = 5
+const CHAD_PACE_WINDOW_MS = 10_000
+const CHAD_PACE_STAGGER_MS = 350
+const chadPaceQueue = []
+let chadPaceStamps = []
+let chadPaceDraining = false
+let chadPaceLastAt = 0
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function chadPace() {
+  return new Promise((resolve) => {
+    chadPaceQueue.push(resolve)
+    drainChadPaceQueue()
+  })
+}
+
+async function drainChadPaceQueue() {
+  if (chadPaceDraining) return
+  chadPaceDraining = true
+  try {
+    while (chadPaceQueue.length > 0) {
+      const now = Date.now()
+      chadPaceStamps = chadPaceStamps.filter((t) => now - t < CHAD_PACE_WINDOW_MS)
+      if (chadPaceStamps.length >= CHAD_PACE_MAX_PER_WINDOW) {
+        await sleep(Math.max(50, CHAD_PACE_WINDOW_MS - (now - chadPaceStamps[0]))
+        )
+        continue
+      }
+      const gap = now - chadPaceLastAt
+      if (gap < CHAD_PACE_STAGGER_MS) await sleep(CHAD_PACE_STAGGER_MS - gap)
+      const resolve = chadPaceQueue.shift()
+      chadPaceStamps.push(Date.now())
+      chadPaceLastAt = Date.now()
+      resolve()
+    }
+  } finally {
+    chadPaceDraining = false
+  }
+}
+
 const CHAD_API = 'https://chad.anidap.lol/rest/api'
 const CHAD_HEADERS = {
   'Referer': 'https://anidap.lol/',
@@ -481,9 +530,88 @@ async function isRealVideoStream(streamUrl, headers = null) {
     const body = (await res.text()).trim()
     if (!body) return false // empty manifest is not a real stream
     if (body.startsWith('<') || body.startsWith('Request failed')) return false // HTML/bot error page
+    if (!body.startsWith('#EXTM3U')) return false // binary/JSON junk — not a manifest
+    // ── Variant sanity check ──
+    // The uwu/aniwatchtv masters USUALLY load (#EXTM3U) while their video
+    // variants are dead (403 SPA blob). hls.js then fatal-errors on the
+    // variant. One extra ~300ms probe of the FIRST variant turns "dead link
+    // at play time" into "fallback at pick time" — the router falls through
+    // to a provider that actually plays. Masters that ARE media playlists
+    // (no STREAM-INF) have no variants to check.
+    if (body.includes('#EXT-X-STREAM-INF')) {
+      const variantLine = body
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l && !l.startsWith('#'))
+      if (variantLine && variantLine.includes('/proxy?url=')) {
+        // ⚠ DOUBLED-PROXY BUG GUARD: the /proxy rewrites RELATIVE variant
+        // paths against the UPSTREAM base, but if this master text was
+        // already rewritten once (served from the /proxy's own manifest
+        // cache after a proxy hop), the "relative" lines are actually
+        // '/proxy?url=…' URLs. Resolving those against the upstream base
+        // produced bd.aniwatchtv.site/proxy?url=… → 404 at play time — the
+        // "master loads, every segment 404s" bug. Detect and treat the
+        // already-proxied line as the variant URL directly.
+        try {
+          const inner = decodeURIComponent(variantLine.split('url=')[1]?.split('&')[0] || '')
+          if (/^https?:/i.test(inner)) {
+            const vRes = await fetch(`${origin}/proxy?url=${encodeURIComponent(inner)}&h=${h}`, {
+              signal: AbortSignal.timeout(4_000),
+            })
+            if (vRes.status >= 400 && vRes.status < 500) return false
+            if (vRes.ok) {
+              const vBody = (await vRes.text()).trim()
+              if (!vBody.startsWith('#EXTM3U')) return false // SPA HTML, dead variant
+            }
+          }
+        } catch { /* variant probe hiccup — trust the master */ }
+      } else if (variantLine) {
+        try {
+          const vAbs = /^https?:/i.test(variantLine)
+            ? variantLine
+            : new URL(variantLine, new URL(streamUrl)).href
+          const vRes = await fetch(`${origin}/proxy?url=${encodeURIComponent(vAbs)}&h=${h}`, {
+            signal: AbortSignal.timeout(4_000),
+          })
+          if (vRes.status >= 400 && vRes.status < 500) return false
+          if (vRes.ok) {
+            const vBody = (await vRes.text()).trim()
+            if (!vBody.startsWith('#EXTM3U')) return false // SPA HTML, dead variant
+          }
+        } catch { /* variant probe hiccup — trust the master */ }
+      }
+    }
     return true // anything m3u8-shaped is playable
   } catch {
     return true // validation failure — let the player try
+  }
+}
+
+/** Is a CACHED stream still playable? Probes its master manifest through
+ *  /proxy exactly like the player does. Returns false only on a definitive
+ *  client error (4xx other than 429) — transient 5xx/timeouts count as
+ *  alive so a brief CDN hiccup doesn't nuke a good cache entry.
+ *  Probe budget: 4s. The manifest cache (30s) makes this ~free when the
+ *  same master was fetched moments ago. */
+async function isCachedStreamAlive(data) {
+  if (!data?.url) return false
+  const origin = `http://127.0.0.1:${Number(process.env.PORT) || 5173}`
+  const referer = data.headers?.Referer || data.headers?.referer || playerRefererFor(data.url)
+  const h = encodeURIComponent(
+    Buffer.from(JSON.stringify({ Referer: referer })).toString('base64'),
+  )
+  try {
+    const res = await fetch(`${origin}/proxy?url=${encodeURIComponent(data.url)}&h=${h}`, {
+      signal: AbortSignal.timeout(4_000),
+    })
+    // 429 = upstream rate window, not a dead link — keep serving the cache
+    // (the player's own requests would hit the same window anyway).
+    if (res.status === 429) return true
+    if (res.status >= 400) return false
+    const head = (await res.text()).trimStart().slice(0, 8)
+    return head.startsWith('#EXTM3U')
+  } catch {
+    return true // probe failed (network hiccup) — assume alive
   }
 }
 
@@ -514,6 +642,7 @@ function playerRefererFor(streamUrl) {
 async function chadGet(path, params = {}, timeoutMs = 8_000) {
   const qs = new URLSearchParams(params).toString()
   const url = `${CHAD_API}/${path}${qs ? `?${qs}` : ''}`
+  await chadPace() // smooth the burst — see pacing block above
   try {
     const res = await fetch(url, { headers: CHAD_HEADERS, signal: AbortSignal.timeout(timeoutMs) })
     if (res.status === 429) {
@@ -742,10 +871,41 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
 
   // Positive-result cache: return a previously working stream without
   // touching the upstream chad API again.
+  // ── BUT: verify the cached URL is still alive before serving it ──
+  // The old behavior served the cached URL blindly for 10 min. When the
+  // upstream link dies minutes after extraction (yuki/dub case: the uwu
+  // host 404s the path right after signing), every later request got the
+  // dead URL → 404 through /proxy → the player's error screen — and the
+  // failure was CACHED too, so switching servers back to yuki kept
+  // "working" and dying. A cheap master-probe through /proxy (same path
+  // the player uses, ~1-2s, no browser work) catches this: on a definitive
+  // 4xx we drop the cache entry and re-extract below.
   const cachedStream = streamCache.get(noStreamKey)
   if (cachedStream && Date.now() - cachedStream.at < STREAM_TTL) {
-    console.log(`[anidap] Returning cached stream: ${id}:${epNum}/${bareProvider}/${type}`)
-    return cachedStream.data
+    const alive = await isCachedStreamAlive(cachedStream.data)
+    if (alive) {
+      console.log(`[anidap] Returning cached stream: ${id}:${epNum}/${bareProvider}/${type}`)
+      return cachedStream.data
+    }
+    // ── Dead-cached-link decay ──
+    // The cached link 4xx'd through /proxy (the same path the player uses).
+    // SOME hosts do this every ~3rd request (otakuhg Cloudflare flapping:
+    // live-verified 403-with-<html> vs 200 with #EXTM3U alternating within
+    // seconds), so ONE probe failure shouldn't throw away a stream that has
+    // been serving all day. Decay rule: 1st dead probe → keep the entry but
+    // shrink its remaining TTL to 60s; a 2nd probe failure inside that
+    // window → drop it for real and re-extract below.
+    cachedStream.deadProbes = (cachedStream.deadProbes || 0) + 1
+    if (cachedStream.deadProbes < 2) {
+      cachedStream.at = Math.max(
+        cachedStream.at,
+        Date.now() - (STREAM_TTL - 60_000),
+      )
+      console.log(`[anidap] Cached stream flapped DEAD (probe ${cachedStream.deadProbes}) — keeping 60s grace: ${id}:${epNum}/${bareProvider}/${type}`)
+      return cachedStream.data
+    }
+    console.log(`[anidap] Cached stream is DEAD (manifest 4xx ×${cachedStream.deadProbes}) — re-extracting: ${id}:${epNum}/${bareProvider}/${type}`)
+    streamCache.delete(noStreamKey)
   }
 
   if (getNoStream(noStreamKey)) {
@@ -812,13 +972,16 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
       if (data && Array.isArray(data.sources) && data.sources.length > 0) {
         const streamUrl = data.sources[0]?.url
         if (streamUrl) {
-          // Skip streams whose manifest is an HTML error page — the
-          // router then auto-falls through to the next provider. Short
-          // TTL so a transient CDN hiccup recovers quickly.
+          // Skip streams whose manifest is an HTML error page — THROW a
+          // transient error (NOT return null): a dead/expired CDN token is
+          // not evidence the title lacks a stream. Returning null made the
+          // router remember "no stream for this title" for 10 minutes and
+          // every later request skipped instantly instead of re-extracting
+          // a fresh token. The router cools the provider ~17s and falls
+          // through; the NEXT request mints a fresh upstream token.
           if (!(await isRealVideoStream(streamUrl, data.headers))) {
-            setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
             console.log(`[anidap] Skipping unusable stream (HTML error page): ${streamUrl.slice(0, 70)}`)
-            return null
+            throw Object.assign(new Error('unusable stream (HTML error page)'), { transient: true })
           }
           const tracks = (data.tracks || []).map((t) => ({
             file: t.url || t.file || '',
@@ -886,6 +1049,36 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
   }
   }
 
+  // ── Stream-URL normalization ──
+  // Upstream hands us bare manifests with no playlist filename (live case:
+  // `morning-credit-3bcc.vibevibe.workers.dev/ag5aaeb…` → 404; the real
+  // master lives at `<same>/master.m3u8`). A 404 then flows straight to
+  // the player → 30s spinner → error screen on EVERY server. Try the
+  // documented suffixes and keep the first one that actually returns a
+  // manifest. Cached per raw URL so each click doesn't re-probe.
+  //
+  // Probes go DIRECT to the CDN (with chad's Referer when provided) — a
+  // bare-URL check only needs a 200, and the /proxy hop would double the
+  // latency on the hot path.
+  const urlNormalizeCache = new Map()
+  const normalizeStreamUrl = async (rawUrl, headers) => {
+    if (!rawUrl || /\.m3u8(\?|$)/i.test(rawUrl)) return rawUrl
+    if (urlNormalizeCache.has(rawUrl)) return urlNormalizeCache.get(rawUrl)
+    let resolved = rawUrl
+    for (const suffix of ['/master.m3u8', '/index.m3u8', '/playlist.m3u8']) {
+      try {
+        const res = await fetch(`${rawUrl}${suffix}`, {
+          headers: headers && Object.keys(headers).length ? headers : undefined,
+          signal: AbortSignal.timeout(6_000),
+        })
+        if (res.ok) { resolved = `${rawUrl}${suffix}`; break }
+      } catch { /* try next */ }
+    }
+    urlNormalizeCache.set(rawUrl, resolved)
+    if (urlNormalizeCache.size > 500) urlNormalizeCache.clear()
+    return resolved
+  }
+
   // ── BROWSER CHAD PATH (cookies) ──
   // Plain Node fetch gets bot_detected (403) once the API fingerprints it;
   // the browser context with real anidap.lol cookies still returns real
@@ -897,12 +1090,16 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
       const tBrowser = Date.now()
       const browserData = await fetchChadSources(id, chadSlug, epNum, bareProvider, type)
       if (browserData && Array.isArray(browserData.sources) && browserData.sources.length > 0) {
-        const streamUrl = browserData.sources[0]?.url
-        if (streamUrl) {
-          if (!(await isRealVideoStream(streamUrl, browserData.headers))) {
+        // Normalize FIRST: bare CDNs (vibevibe workers) hand back a path
+        // with no playlist filename — probe the documented suffixes before
+        // validating, or the manifest check 404s and the server is skipped.
+        const normalizedUrl = await normalizeStreamUrl(browserData.sources[0]?.url, browserData.headers)
+        if (normalizedUrl) {
+          if (!(await isRealVideoStream(normalizedUrl, browserData.headers))) {
             setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
-            console.log(`[anidap] Skipping unusable browser stream (HTML error page): ${streamUrl.slice(0, 70)}`)
-            return null
+            console.log(`[anidap] Skipping unusable browser stream (HTML error page): ${normalizedUrl.slice(0, 70)}`)
+            // Transient (expired CDN token) — see the fast-path comment.
+            throw Object.assign(new Error('unusable browser stream'), { transient: true })
           }
           const tracks = (browserData.tracks || []).map((t) => ({
             file: t.url || t.file || '',
@@ -912,15 +1109,15 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
             lang: t.lang || undefined,
           }))
           const result = {
-            url: streamUrl,
-            raw: streamUrl,
+            url: normalizedUrl,
+            raw: normalizedUrl,
             headers: browserData.headers && Object.keys(browserData.headers).length > 0
               ? browserData.headers
-              : { Referer: playerRefererFor(streamUrl) },
+              : { Referer: playerRefererFor(normalizedUrl) },
             tracks: tracks.length > 0 ? tracks : null,
           }
           setStreamCache(noStreamKey, result)
-          console.log(`[anidap] ✓ browser chad stream: ${streamUrl.slice(0, 80)} (${Date.now() - tBrowser}ms)`)
+          console.log(`[anidap] ✓ browser chad stream: ${normalizedUrl.slice(0, 80)} (${Date.now() - tBrowser}ms)`)
           return result
         }
       }
@@ -936,22 +1133,57 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
   }
 
   // ── DOM extraction — browser fallback (chad API down / slug unknown) ──
+  // ── SHORT-CIRCUIT: skip the DOM hop for combos upstream confirmed empty ──
+  // getProviders is per-episode ground truth: if chad's server list doesn't
+  // include this provider for this title/ep, the DOM page is a hard-404 SPA
+  // ("HTTP error! status: 400 … If current server doesn't work try other
+  // servers"). The old flow still burned a 16-20s browser extraction on it
+  // (the 20s route cap → "sources 404 in 21s" loop). With the skip, the
+  // route fails in <1s and the frontend falls through to the next server.
+  // The chadSlug guard keeps gogoanime-style providers (no chad slug) on
+  // the DOM path.
+  //
+  // ⚠ The provider list is cached under `${id}:${epNum}` where id is the
+  // AniList id, BUT getProviders stores it under the key built from ITS
+  // OWN resolved id which (for chad-backed lookups) equals the anilist id
+  // too. However the FALLBACK roster path (chad unreachable) stores under
+  // the same key — both share the shape. If neither key exists, we SKIP
+  // the short-circuit rather than guess: an unknown list must not block a
+  // provider that might be listed ("unknown" ≠ "dead").
+  const providerListKey = providerListCache.has(`${id}:${epNum}`)
+    ? `${id}:${epNum}`
+    : (providerListCache.has(`${chadSlug}:${epNum}`) ? `${chadSlug}:${epNum}` : null)
+  if (chadSlug && providerListKey) {
+    const listed = providerListCache.get(providerListKey).data
+    const hasThis = (Array.isArray(listed) ? listed : []).some(
+      (p) => String(p.type) === String(type) &&
+        String(p.name).toLowerCase() === String(bareProvider).toLowerCase(),
+    )
+    if (!hasThis) {
+      console.log(`[anidap] Not listed for this title (per chad) — skipping DOM: ${id}:${epNum}/${bareProvider}/${type}`)
+      setNoStream(noStreamKey, NO_STREAM_TTL_CONFIRMED)
+      return null
+    }
+  }
   try {
     const tStart = Date.now()
     const watchUrl = `${BASE}/watch?id=${id}&ep=${epNum}&type=${type}&provider=${bareProvider}`
     console.log(`[anidap] DOM extraction: ${watchUrl.slice(0, 120)}`)
     const domData = await extractStreamFromWatchPage(watchUrl, { maxDurationMs: 18_000, signal: opts.signal })
     if (domData && Array.isArray(domData.sources) && domData.sources.length > 0) {
-      const streamUrl = domData.sources[0]?.url
-      if (!streamUrl) {
+      // Same bare-URL normalization as the browser path (DOM extractions
+      // also hand back filename-less vibevibe paths).
+      const normalizedUrl = await normalizeStreamUrl(domData.sources[0]?.url, domData.headers)
+      if (!normalizedUrl) {
         setNoStream(noStreamKey, NO_STREAM_TTL_CONFIRMED)
         return null
       }
       // Same fake-stream guard as the fast path (slideshow segments).
-      if (!(await isRealVideoStream(streamUrl, domData.headers))) {
+      if (!(await isRealVideoStream(normalizedUrl, domData.headers))) {
         setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
-        console.log(`[anidap] Skipping unusable DOM stream (HTML error page): ${streamUrl.slice(0, 70)}`)
-        return null
+        console.log(`[anidap] Skipping unusable DOM stream (HTML error page): ${normalizedUrl.slice(0, 70)}`)
+        // Transient (expired CDN token) — see the fast-path comment.
+        throw Object.assign(new Error('unusable DOM stream'), { transient: true })
       }
       const tracks = (domData.tracks || []).map((t) => ({
         file: t.url || t.file || '',
@@ -960,15 +1192,15 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
         default: t.default || false,
       }))
       const result = {
-        url: streamUrl,
-        raw: streamUrl,
+        url: normalizedUrl,
+        raw: normalizedUrl,
         headers: domData.headers && Object.keys(domData.headers).length > 0
           ? domData.headers
           : { Referer: watchUrl },
         tracks: tracks.length > 0 ? tracks : null,
       }
       setStreamCache(noStreamKey, result)
-      console.log(`[anidap] ✓ DOM stream: ${streamUrl.slice(0, 80)} (${Date.now() - tStart}ms)`)
+      console.log(`[anidap] ✓ DOM stream: ${normalizedUrl.slice(0, 80)} (${Date.now() - tStart}ms)`)
       return result
     }
     console.log(`[anidap] DOM returned no sources for ${id}:${epNum}/${bareProvider}/${type} (${Date.now() - tStart}ms)`)
@@ -985,15 +1217,34 @@ export async function getStream(slug, ep, provider, type, anilistId, opts = {}) 
     // already won. Hard-blocking on an abort is the "fix one thing, break
     // everything" bug: one successful stream would fast-fail all of anidap
     // for 10 minutes. Aborts never confirm the block.
+    // A mutex/Page TIMEOUT is NOT block evidence — under contention or a slow
+    // Cloudflare challenge it happens constantly, and hard-blocking ALL of
+    // anidap on it was the "every server says loading stream" bug. Only a
+    // real render failure (navigation destroyed, challenge, HTTP error
+    // panel) confirms the block reached our browser too. Both timeout
+    // spellings are matched: 'Page operation timed out' (mutex) and
+    // 'loadURL timeout' (navigation).
     const domWasAborted = domErr?.message?.includes('aborted') || domErr?.name === 'AbortError'
-    if (isChadBlocked() && browserPathThrew && !domWasAborted) markChadHardBlocked()
+    const domIsTimeout = /timed out|timeout/i.test(domErr?.message || '')
+    if (isChadBlocked() && browserPathThrew && !domWasAborted && !domIsTimeout) markChadHardBlocked()
     // Only mark rate-limited for actual 429s — not for timeouts or other errors
     if (domErr.upstream === 429 || domErr.message?.includes('too_many_requests')) {
       markProviderRateLimited(bareProvider, RATE_LIMIT_COOLDOWN)
     }
     // Transient errors: don't poison the cache (retry next time)
-    if (!domErr.message?.includes('timeout') && !domErr.message?.includes('challenge') && !domErr.message?.includes('aborted')) {
+    if (!domIsTimeout && !domErr.message?.includes('challenge') && !domErr.message?.includes('aborted')) {
       setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
+    }
+    // Abort / timeout / challenge are TRANSIENT — surface them as thrown
+    // errors (marker: transient) so the router cools the provider briefly
+    // but never records "this title has no stream". A mutex timeout says
+    // nothing about upstream availability; poisoning on it locked users
+    // out of working servers for the full 10-min TTL.
+    if (domWasAborted || domIsTimeout || domErr.message?.includes('challenge')) {
+      throw Object.assign(
+        domErr instanceof Error ? domErr : new Error(String(domErr?.message || 'DOM extraction failed')),
+        { transient: true },
+      )
     }
   }
 
