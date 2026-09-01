@@ -92,6 +92,15 @@ Users with an older version get the update automatically on startup via `electro
 
 ---
 
+## 🤝 Project standards
+
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Security Policy](./SECURITY.md)
+- [License (MIT)](./LICENSE)
+
+---
+
 ## 🧰 Tech stack
 
 | Layer | Technology |
