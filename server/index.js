@@ -480,6 +480,35 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
       }
     }
     if (!Array.isArray(data.providers)) data.providers = []
+    // ── ROOT FIX: confirmed-absent servers are grayed instantly ──
+    // Upstream sometimes LISTS a server whose sources endpoint has nothing
+    // (kiwi on most titles). Instead of advertising a chip that can only
+    // 404, any server with a CONFIRMED no-stream verdict (10-min TTL: chad
+    // confirmed empty / not listed / DOM verified absence) is marked
+    // _healthy:false right here — no probe round-trip needed. Transient
+    // verdicts (timeouts, 2-min failures) deliberately don't gray anything.
+    if (anilistId) {
+      try {
+        const { hasConfirmedNoStream } = await import('./anidap.js')
+        data.providers = data.providers.map((p) => {
+          if (p._healthy === false) return p
+          const bare = String(p.name).replace(/^anidap-/, '')
+          if (hasConfirmedNoStream(anilistId, Number(ep) || 1, bare, p.type)) {
+            return { ...p, _healthy: false, _healthMs: null, _healthError: 'No stream for this title' }
+          }
+          return p
+        })
+      } catch { /* annotation is best-effort */ }
+    }
+    // ── Roster guesses are cached briefly ──
+    // When the list came from the fallback roster (chad never answered),
+    // every item is a guess. Cache it 60s, not the full TTL, so the REAL
+    // per-episode list replaces it as soon as chad responds again.
+    if (data.providers.some((p) => p._roster)) {
+      const entry = cache.get(cacheKey)
+      if (entry) entry.at = Date.now() - (TTL - 60_000)
+      data.fromRoster = true
+    }
     // ── Rate-limit surfaced to the UI ──
     // When anidap is site-wide rate-limited (chad 429 on this IP), the
     // server picker must show the countdown instead of an endless spinner.

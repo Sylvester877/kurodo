@@ -64,6 +64,17 @@ function getNoStream(key) {
 function setNoStream(key, ttl) {
   noStreamCache.set(key, { at: Date.now(), ttl })
 }
+
+/** ROOT helper for the /servers route: true when upstream CONFIRMED this
+ *  title/ep/provider has no stream (the 10-min verdict — chad confirmed
+ *  empty, provider not listed, or DOM verified absence). The 2-min
+ *  transient failure TTL deliberately does NOT count: a timeout says
+ *  nothing about availability. The picker grays confirmed-dead servers
+ *  instead of advertising chips that can only 404. */
+export function hasConfirmedNoStream(id, ep, provider, type) {
+  const entry = getNoStream(`${id}:${Number(ep) || 1}:${provider}:${type}`)
+  return !!entry && entry.ttl >= NO_STREAM_TTL_CONFIRMED
+}
 function pruneNoStreamCache() {
   const now = Date.now()
   for (const [key, entry] of noStreamCache) {
@@ -839,10 +850,13 @@ export async function getProviders(slug, ep, anilistId, titles = {}) {
     // legacy multi-CDN fleet. Returning the old dead names (nuri/kami/
     // koto/mochi/vee) made the picker full of "High Quality" tiles that
     // all failed, which is exactly the "servers are different" complaint.
+    // NOTE: this roster is a GUESS, not upstream truth — each item is
+    // flagged `_roster: true` so the /servers route caches it briefly and
+    // the real list appears the moment chad answers again.
     return [
-      ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub', tip: PROVIDER_TIPS[name] || null })),
-      ...ALL_DUB_SERVERS.map(name => ({ name, type: 'dub', tip: PROVIDER_TIPS[name] || null })),
-      ...ALL_HSUB_SERVERS.map(name => ({ name, type: 'hsub', tip: PROVIDER_TIPS[name] || null })),
+      ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
+      ...ALL_DUB_SERVERS.map(name => ({ name, type: 'dub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
+      ...ALL_HSUB_SERVERS.map(name => ({ name, type: 'hsub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
     ]
   })()
 
