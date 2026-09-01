@@ -29,6 +29,9 @@ const MAX_PROBES_PER_TICK = 3         // cap per request so one cold title
                                       // doesn't drain the chad API budget
                                       // (probes are also paced by chadGet)
 const PROBE_CONCURRENCY = 1           // serial — smoothest possible probing
+const FAST_WAIT_MS = 4_000            // route blocks at most this long for
+                                      // probes; the rest finish in background
+const probeInFlight = new Map()        // `${slug}:${ep}` -> batch promise
 
 const verdicts = new Map() // `${slugOrId}:${ep}:${name}:${type}` -> { ok, at }
 
@@ -188,9 +191,34 @@ export async function verifyProviders(providers, { anilistId, slug, ep, titles =
         p._healthError = verdict.ok ? null : (verdict.why || 'Verified dead for this title')
       }
     }
-    await Promise.all(
-      Array.from({ length: Math.min(PROBE_CONCURRENCY, batch.length) }, runNext),
-    )
+
+    // ── Non-blocking probing (ROOT speed fix) ──
+    // The old code AWAITED the whole batch (3 × 12s worst case = 36s) before
+    // the picker could paint anything. Now the batch runs in the BACKGROUND
+    // (deduped per title+ep so overlapping requests share it) and the route
+    // only waits FAST_WAIT_MS — usually the fast-path probes (0.5-3s) finish
+    // inside the window; slower ones land in the verdict map for the next
+    // fetch. The picker paints in ~1-4s on a cold title instead of 36s.
+    const batchKey = `${slug}:${ep}`
+    let work = probeInFlight.get(batchKey)
+    if (!work) {
+      work = Promise.all(
+        Array.from({ length: Math.min(PROBE_CONCURRENCY, batch.length) }, runNext),
+      ).finally(() => probeInFlight.delete(batchKey))
+      probeInFlight.set(batchKey, work)
+    }
+    await Promise.race([work, new Promise((r) => setTimeout(r, FAST_WAIT_MS))])
+
+    // Re-annotate from the verdict map — probes that finished inside the
+    // window are included; the rest stay optimistic for this response.
+    for (const p of needsProbe) {
+      const v = verdicts.get(`${slug}:${ep}:${p.name}:${p.type}`)
+      if (v) {
+        p._healthy = v.ok
+        p._healthMs = v.ms ?? null
+        p._healthError = v.ok ? null : (v.why || 'Verified dead for this title')
+      }
+    }
     const probed = batch.filter((p) => p._healthy === true).length
     console.log(
       `[server-verify] ${slug}:ep${ep} — probed ${batch.length}/${needsProbe.length}, ` +

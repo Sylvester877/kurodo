@@ -682,16 +682,16 @@ html.reduce-motion .page-enter,
    The `anikage` preset (pink→purple) is the brand default; the rest are
    user-selectable alternates in Settings → Appearance. */
 html.theme-anikage {
-  --theme-primary: hsl(330 81% 60%);   /* anikage pink #ff4d9d */
-  --theme-h: 330; --theme-s: 81%; --theme-l: 60%;
+  --theme-primary: hsl(330 81% 54%);   /* anikage pink #ff4d9d */
+  --theme-h: 330; --theme-s: 81%; --theme-l: 54%;
 }
 html.theme-violet {
-  --theme-primary: hsl(280 85% 62%);   /* anikage purple */
-  --theme-h: 280; --theme-s: 85%; --theme-l: 62%;
+  --theme-primary: hsl(280 85% 55%);   /* anikage purple */
+  --theme-h: 280; --theme-s: 85%; --theme-l: 55%;
 }
 html.theme-indigo {
-  --theme-primary: hsl(245 75% 60%);
-  --theme-h: 245; --theme-s: 75%; --theme-l: 60%;
+  --theme-primary: hsl(245 75% 54%);
+  --theme-h: 245; --theme-s: 75%; --theme-l: 54%;
 }
 html.theme-anidap {
   --theme-primary: hsl(357 75% 49%);   /* anidap red #e01b24 */

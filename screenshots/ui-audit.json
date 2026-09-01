@@ -1,0 +1,64 @@
+{
+ "home": {
+  "overflowX": null,
+  "brokenImgs": [],
+  "lowContrast": [],
+  "radii": [
+   "3.35544e+07px",
+   "16px",
+   "4px",
+   "12px",
+   "0px 3.35544e+07px 3.35544e+07px 0px",
+   "14px",
+   "24px"
+  ],
+  "spill": []
+ },
+ "browse": {
+  "overflowX": null,
+  "brokenImgs": [],
+  "lowContrast": [],
+  "radii": [
+   "3.35544e+07px",
+   "16px",
+   "12px",
+   "14px"
+  ],
+  "spill": []
+ },
+ "watch-reze": {
+  "overflowX": null,
+  "brokenImgs": [],
+  "lowContrast": [],
+  "radii": [
+   "3.35544e+07px",
+   "16px",
+   "12px",
+   "4px"
+  ],
+  "spill": []
+ },
+ "schedule": {
+  "overflowX": null,
+  "brokenImgs": [],
+  "lowContrast": [],
+  "radii": [
+   "3.35544e+07px",
+   "16px",
+   "12px",
+   "4px"
+  ],
+  "spill": []
+ },
+ "seasonal": {
+  "overflowX": null,
+  "brokenImgs": [],
+  "lowContrast": [],
+  "radii": [
+   "3.35544e+07px",
+   "16px",
+   "12px"
+  ],
+  "spill": []
+ }
+}

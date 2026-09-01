@@ -77,6 +77,8 @@ export default function RecentEpisodes() {
           pill="LIVE"
           pillTone="hot"
           subtitle="Latest drops from currently airing shows"
+          to="/browse"
+          linkLabel="View All"
         />
 
         {/* Filter tabs — Anikoto-style grouped pill group */}

@@ -60,7 +60,7 @@ export default function SegmentedControl<V extends string>({
                 ? 'opacity-30 cursor-not-allowed text-white/30'
                 : active
                   ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/20'
-                  : 'text-white/50 hover:bg-white/5 hover:text-white/80',
+                  : 'text-white/70 hover:bg-white/5 hover:text-white',
             )}
           >
             <span>{opt.label}</span>
@@ -68,7 +68,7 @@ export default function SegmentedControl<V extends string>({
               <span
                 className={cn(
                   'text-[9px] font-mono px-1 rounded-md',
-                  active ? 'bg-black/30 text-white' : 'bg-white/[0.06] text-white/50',
+                  active ? 'bg-black/30 text-white' : 'bg-white/[0.06] text-white/65',
                 )}
               >
                 {opt.count}

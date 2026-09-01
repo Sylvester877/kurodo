@@ -247,12 +247,12 @@ export default function Seasonal() {
                               </span>
                             )}
                             {m.format && (
-                              <span className="text-[10px] text-white/50">
+                              <span className="text-[10px] text-white/65">
                                 {m.format === 'TV' ? 'TV' : m.format}
                               </span>
                             )}
                             {m.episodes && (
-                              <span className="text-[10px] text-white/50">
+                              <span className="text-[10px] text-white/65">
                                 {m.episodes} ep
                               </span>
                             )}

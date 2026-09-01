@@ -124,6 +124,11 @@ export default function Login() {
   const [showAdvanced, setShowAdvanced] = useState(!passedCid && !getClientId())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // ROOT UX FIX: with a client id available (passed from the desktop app or
+  // baked into the build), /login AUTO-REDIRECTS to AniList — the user never
+  // types anything. A short delay + visible cancel link keeps it escapable
+  // (no redirect loops for users who want a different account).
+  const [autoCancelled, setAutoCancelled] = useState(false)
 
   // The card should animate in once on mount.
   const [entered, setEntered] = useState(false)
@@ -132,17 +137,10 @@ export default function Login() {
     return () => cancelAnimationFrame(id)
   }, [])
 
-  const startLogin = (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    setError(null)
-    const cleaned = clientId.trim()
-    if (!cleaned || !/^\d+$/.test(cleaned)) {
-      setError('Enter your AniList Client ID — a number, e.g. 42167.')
-      setShowAdvanced(true)
-      return
-    }
+  const beginLogin = (idValue: string) => {
     setBusy(true)
-    setClientId(cleaned)
+    setClientId(idValue)
+    setClientIdState(idValue)
     if (clientSecret.trim()) setClientSecret(clientSecret.trim())
     else setClientSecret(null)
     // A fresh state ties the browser session to the desktop app's poller.
@@ -158,6 +156,27 @@ export default function Login() {
       return
     }
     window.location.href = url
+  }
+
+  // Auto-start when an id is known and the user hasn't cancelled.
+  const autoId = passedCid || getClientId() || ''
+  useEffect(() => {
+    if (autoCancelled || !autoId) return
+    const t = setTimeout(() => beginLogin(autoId), 1400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCancelled, autoId])
+
+  const startLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setError(null)
+    const cleaned = clientId.trim()
+    if (!cleaned || !/^\d+$/.test(cleaned)) {
+      setError('Enter your AniList Client ID — a number, e.g. 42167.')
+      setShowAdvanced(true)
+      return
+    }
+    beginLogin(cleaned)
   }
 
   const openDiscord = () => {
@@ -247,6 +266,20 @@ export default function Login() {
               </p>
             )}
           </form>
+
+          {/* Auto-redirect escape hatch — no redirect loops, no trapped users */}
+          {busy && !error && (
+            <button
+              type="button"
+              onClick={() => {
+                setAutoCancelled(true)
+                setBusy(false)
+              }}
+              className="mx-auto mt-3 block text-[11px] uppercase tracking-[0.18em] text-zinc-500 transition hover:text-zinc-300"
+            >
+              Cancel — use a different account
+            </button>
+          )}
 
           {/* ── Advanced: client secret ── */}
           <div className="mt-5">

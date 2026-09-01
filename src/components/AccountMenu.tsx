@@ -57,17 +57,10 @@ export default function AccountMenu() {
     if (safetyRef.current) { clearTimeout(safetyRef.current); safetyRef.current = null }
   }
 
-  const saveAndLogin = (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    const cleaned = clientIdInput.trim()
-    if (!cleaned || !/^\d+$/.test(cleaned)) {
-      toast.error('Client ID should be a number like 42167')
-      return
-    }
-    setClientId(cleaned)
-    // Persist the secret if the user supplied one.
-    if (clientSecretInput.trim()) setClientSecret(clientSecretInput.trim())
-    else setClientSecret(null)
+  // ROOT UX: one click → browser opens → signs in → token relays back.
+  // No forms inside the desktop app when a client id already exists
+  // (stored in Electron's disk file or baked into the build).
+  const startRelayLogin = () => {
     const state = genState()
     const url = getLoginUrl({ flow: 'auto', state })
     if (!url) {
@@ -131,6 +124,21 @@ export default function AccountMenu() {
     }, 180000)
   }
 
+  // Form submit: validate the pasted id, persist, then run the same flow.
+  const saveAndLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const cleaned = clientIdInput.trim()
+    if (!cleaned || !/^\d+$/.test(cleaned)) {
+      toast.error('Client ID should be a number like 42167')
+      return
+    }
+    setClientId(cleaned)
+    // Persist the secret if the user supplied one.
+    if (clientSecretInput.trim()) setClientSecret(clientSecretInput.trim())
+    else setClientSecret(null)
+    startRelayLogin()
+  }
+
   // Clean up polling on unmount
   useEffect(() => () => { cancelPolling() }, [])
 
@@ -160,6 +168,9 @@ export default function AccountMenu() {
                 if (authDropdownOpen) { setAuthDropdownOpen(false); return }
                 // If already waiting for external browser auth, allow re-opening
                 if (pollingState) { cancelPolling(); setPollingState(null); return }
+                // One click → browser → signed in. The form only appears when
+                // no client id exists anywhere (first-ever setup).
+                if (getClientId()) { startRelayLogin(); return }
                 setClientIdInput(storedId ?? '')
                 setClientSecretInput(storedSecret ?? '')
                 setDirectAuthUrl(null) // reset stale fallback link from previous attempt
@@ -169,7 +180,7 @@ export default function AccountMenu() {
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
                 pollingState
-                  ? 'bg-white/10 text-white/60 cursor-pointer hover:bg-white/15'
+                  ? 'bg-white/10 text-white/70 cursor-pointer hover:bg-white/15'
                   : 'bg-primary text-white hover:bg-primary/90 shadow-[0_4px_16px_-6px_hsl(245,75%,60%,0.55)]',
               )}
               title={pollingState ? 'Waiting for browser sign-in… (click to cancel)' : 'Sign in with AniList'}
