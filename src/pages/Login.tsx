@@ -58,10 +58,10 @@ function GrainBackdrop() {
   )
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden bg-black" aria-hidden>
-      {/* Bleach AMV background video, heavily dimmed to stay monochrome-dark */}
+      {/* Bleach AMV background video — grayscale-dimmed action climax loop */}
       <video
         className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'grayscale(1) brightness(0.42) contrast(1.15)' }}
+        style={{ filter: 'grayscale(1) brightness(0.48) contrast(1.18)' }}
         src="/login-bg.mp4"
         poster="/login-bg.jpg"
         autoPlay
@@ -69,14 +69,16 @@ function GrainBackdrop() {
         muted
         playsInline
       />
-      {/* dark scrim so text stays legible */}
+      {/* Radial scrim: darkest behind the card, AMV motion visible at the edges */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.75) 100%)',
+            'radial-gradient(ellipse 72% 64% at 50% 46%, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.42) 58%, rgba(0,0,0,0.22) 100%)',
         }}
       />
+      {/* Mobile: object-cover zooms the video crop — extra dimming keeps the gate dark */}
+      <div className="absolute inset-0 bg-black/40 sm:hidden" />
       {/* soft radial light behind the card */}
       <div
         className="absolute inset-0"
@@ -94,12 +96,12 @@ function GrainBackdrop() {
       </div>
       {/* film grain */}
       <div className="absolute inset-0 opacity-[0.05] mix-blend-screen" style={{ backgroundImage: grain }} />
-      {/* vignette */}
+      {/* vignette — softened so edge motion still reads */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse 90% 90% at 50% 50%, transparent 40%, rgba(0,0,0,0.85) 100%)',
+            'radial-gradient(ellipse 95% 95% at 50% 50%, transparent 45%, rgba(0,0,0,0.7) 100%)',
         }}
       />
     </div>
