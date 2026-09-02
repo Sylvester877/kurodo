@@ -317,7 +317,7 @@ export default function Hero(_props: Props = {}) {
                 type="button"
                 onClick={() => setActiveTab(t.key)}
                 className={cn(
-                  'px-3 py-1 rounded-full text-[11px] font-semibold transition-all',
+                  'px-3.5 min-h-[32px] inline-flex items-center rounded-full text-xs font-semibold transition-all',
                   activeTab === t.key
                     ? 'bg-white text-black'
                     : 'text-white/50 hover:text-white/80 hover:bg-white/10',

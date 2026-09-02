@@ -24,7 +24,7 @@ export default function Footer() {
                 { to: '/browse?filter=upcoming', label: 'Upcoming' },
               ].map(({ to, label }) => (
                 <li key={to}>
-                  <Link to={to} className="text-[13px] text-white/40 hover:text-white transition-colors duration-200">
+                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white transition-colors duration-200">
                     {label}
                   </Link>
                 </li>
@@ -43,7 +43,7 @@ export default function Footer() {
                 { to: '/music', label: 'Music' },
               ].map(({ to, label }) => (
                 <li key={to}>
-                  <Link to={to} className="text-[13px] text-white/40 hover:text-white transition-colors duration-200">
+                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white transition-colors duration-200">
                     {label}
                   </Link>
                 </li>
@@ -68,7 +68,7 @@ export default function Footer() {
                 { to: '/manga-list', label: 'Manga List' },
               ].map(({ to, label }) => (
                 <li key={to}>
-                  <Link to={to} className="text-[13px] text-white/40 hover:text-white transition-colors duration-200">
+                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white transition-colors duration-200">
                     {label}
                   </Link>
                 </li>

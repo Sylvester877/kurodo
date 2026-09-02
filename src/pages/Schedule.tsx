@@ -241,7 +241,7 @@ export default function Schedule() {
                           : 'bg-white/5 text-muted-foreground group-hover:bg-white/10 group-hover:text-white',
                       )}
                     >
-                      <span className="text-[9px] opacity-80 leading-none">
+                      <span className="text-[10px] opacity-80 leading-none">
                         {isToday ? 'Today' : DAY_NAMES[d.date.getDay()]}
                       </span>
                       <span className="text-base font-bold leading-none mt-0.5">

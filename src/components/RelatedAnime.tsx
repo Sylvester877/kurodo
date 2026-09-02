@@ -165,7 +165,7 @@ export default function RelatedAnime({ anilistId, className }: Props) {
                 {/* Relation badge */}
                 <span
                   className={cn(
-                    'absolute top-1.5 left-1.5 text-[9px] font-bold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md border backdrop-blur-sm',
+                    'absolute top-1.5 left-1.5 text-[10px] font-bold uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md border backdrop-blur-sm',
                     tone,
                   )}
                 >

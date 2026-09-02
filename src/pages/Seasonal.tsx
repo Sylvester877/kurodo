@@ -111,7 +111,7 @@ export default function Seasonal() {
             <button
               onClick={() => setYear((y) => Math.max(YEAR_RANGE[0], y - 1))}
               disabled={year <= YEAR_RANGE[0]}
-              className="p-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-2.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -121,7 +121,7 @@ export default function Seasonal() {
             <button
               onClick={() => setYear((y) => Math.min(YEAR_RANGE[2], y + 1))}
               disabled={year >= YEAR_RANGE[2]}
-              className="p-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-2.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

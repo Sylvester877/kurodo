@@ -89,7 +89,7 @@ export default function Logo({
             {showDotMe && (
               <span
                 className="font-extrabold tracking-tight"
-                style={{ fontSize: size * 0.32, color: RED, marginLeft: 2 }}
+                style={{ fontSize: Math.max(10, size * 0.32), color: RED, marginLeft: 2 }}
               >
                 .me
               </span>
@@ -98,7 +98,7 @@ export default function Logo({
           {showTagline && (
             <div
               className="flex items-center gap-1.5 text-white/55"
-              style={{ fontSize: size * 0.18 }}
+              style={{ fontSize: Math.max(8, size * 0.18) }}
             >
               <span style={{ background: RED, height: 1, width: 14 }} />
               <span className="tracking-[0.35em] font-semibold uppercase">

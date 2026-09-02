@@ -86,7 +86,7 @@ export default function SeasonalCountdown() {
             >
               {season.daysUntil > 0 ? season.daysUntil : '🎉'}
             </div>
-            <div className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               {season.daysUntil > 0 ? 'days' : 'now'}
             </div>
           </div>

@@ -454,7 +454,7 @@ export default function SetupWizard() {
                           onChange={(e) => setClientIdState(e.target.value.replace(/\D/g, ''))}
                           placeholder="e.g. 42167"
                           autoFocus
-                          className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-3.5 py-3 text-sm font-mono tracking-wide text-white placeholder:text-white/20 outline-none focus:border-primary/50 focus:bg-white/[0.05] focus:shadow-[0_0_24px_-8px_hsl(245,75%,60%,0.35)] transition-all duration-300"
+                          className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-3.5 py-3 text-sm font-mono tracking-wide text-white placeholder:text-white/20 outline-none focus:border-primary/50 focus:bg-white/[0.05] focus:ring-2 focus:ring-primary/25 focus:shadow-[0_0_24px_-8px_hsl(245,75%,60%,0.35)] transition-all duration-300"
                         />
                         {clientId && /^\d+$/.test(clientId) && (
                           <motion.div
@@ -476,7 +476,7 @@ export default function SetupWizard() {
                         value={clientSecret}
                         onChange={(e) => setClientSecretState(e.target.value)}
                         placeholder="Only for Confidential clients"
-                        className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-3.5 py-3 text-sm font-mono text-white placeholder:text-white/20 outline-none focus:border-amber-500/30 focus:bg-white/[0.05] transition-all duration-300"
+                        className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-3.5 py-3 text-sm font-mono text-white placeholder:text-white/20 outline-none focus:border-amber-500/30 focus:bg-white/[0.05] focus:ring-2 focus:ring-amber-500/15 transition-all duration-300"
                       />
                     </div>
                   </div>

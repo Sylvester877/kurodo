@@ -143,7 +143,7 @@ export default function ServerPicker({
               <span>{meta.label}</span>
               {count > 0 && (
                 <span className={cn(
-                  'text-[9px] font-mono px-1 rounded-md bg-black/30',
+                  'text-[10px] font-mono px-1 rounded-md bg-black/30',
                   isActive ? 'text-white' : 'text-white/50',
                 )}>
                   {count}
@@ -204,13 +204,13 @@ export default function ServerPicker({
                       <div className="flex items-center gap-1.5 mt-auto relative z-10">
                         {quality && (
                           <span className={cn(
-                            'text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1',
+                            'text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1',
                             isActive ? 'bg-primary/20 text-white' : 'bg-white/10 text-white/60'
                           )}>
                             {quality}
                           </span>
                         )}
-                        <span className="text-[9px] text-white/40">{p.type.toUpperCase()}</span>
+                        <span className="text-[10px] text-white/40">{p.type.toUpperCase()}</span>
                       </div>
                     </button>
                   )
