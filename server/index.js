@@ -567,6 +567,11 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
   // (The chad fast path normally resolves in ~1-3s; the DOM fallback needs
   // the headroom for a cold watch-page load.)
   const extractionAbort = new AbortController()
+  // 40s covers the full chain when chad is blocked and gogoanime failover
+  // runs (slug search ~15s + stream extraction ~25s). Fast-fail paths (429
+  // countdown, negative cache) return in ms regardless, so a flat budget
+  // costs nothing on the healthy path.
+  const budget = 40_000
   try {
     const data = await Promise.race([
       routedGetStream(anilistId, slug, Number(ep), provider, type, req.query, title, extractionAbort.signal),
@@ -574,7 +579,7 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
         setTimeout(() => {
           extractionAbort.abort(new Error('Stream extraction timed out'))
           reject(new Error('Stream extraction timed out'))
-        }, 25_000),
+        }, budget),
       ),
     ])
     // The request settled (success or definitive failure) — abort the
@@ -647,12 +652,15 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
     // Kill any leftover candidates (timeout already aborts; this covers
     // early errors like a 404 while cross-type fallbacks are still queued).
     extractionAbort.abort()
-    // Record failure in stream negative cache so the router doesn't retry
+    // Record failure in stream negative cache so the router doesn't retry.
+    // NEVER cache timeouts/aborts — the next attempt deserves a fresh run
+    // (the failover chain may simply have needed longer this once).
+    const isTimeout = e?.message === 'Stream extraction timed out' || e?.name === 'AbortError'
     const upstream = e?.response?.status || e?.upstream || 502
     // 429 is site-wide (chad rate-limit on this IP) and self-clears via the
     // isChad429Blocked window — never cache it here or retries would be
     // blocked up to 60s AFTER the cooldown already expired.
-    if (upstream !== 429 && !streamFailCache.has(streamKey)) {
+    if (upstream !== 429 && !isTimeout && !streamFailCache.has(streamKey)) {
       streamFailCache.set(streamKey, {
         at: Date.now(),
         message: e?.message || 'upstream failure',

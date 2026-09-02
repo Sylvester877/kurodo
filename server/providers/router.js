@@ -191,6 +191,14 @@ export async function routedGetEpisodes(anilistId, slug, title) {
 export async function routedGetProviders(anilistId, slug, ep, title) {
   const allProviders = []
 
+  // While chad is site-wide blocked, gogoanime is the only live door.
+  // Its AniList→slug search takes ~12s cold — do it NOW in the background
+  // (when the watch page loads) so the user's first play click finds the
+  // slug warm in cache instead of timing out mid-failover.
+  if (isChad429Blocked() && anilistId) {
+    gogoanimeProvider.getInfoByAniListId(anilistId).catch(() => {})
+  }
+
   // Always return all anidap servers — no rate-limit gate here.
   // Individual servers may be rate-limited, but the LIST should always
   // show so the user can see what's available and try different servers.
@@ -230,15 +238,41 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
 
   // Site-wide chad 429 (IP rate-limit): every anidap provider will 429
   // together, and each would otherwise burn seconds in the race pool before
-  // failing. Fail fast with the upstream 429 so the client shows the
-  // countdown it already renders instead of a 25s spinner. Gogoanime does
-  // NOT use chad, so an explicit gogoanime server pick still goes through.
-  if (isChad429Blocked() && !providerName?.startsWith('gogoanime-')) {
-    const remainingSec = getChad429Remaining()
-    console.warn(`[router] chad site-wide rate-limit — failing fast (~${remainingSec}s remaining)`)
-    const err = new Error(`Anidap is temporarily rate-limited. Retry in ~${remainingSec}s.`)
+  // failing. Gogoanime does NOT use chad, so we FAIL OVER to it instead of
+  // dead-ending: the user asked for a stream, chad is temporarily blocked,
+  // give them gogoanime (a separate scraper) so playback still works. Only
+  // surface the 429 countdown if gogoanime ALSO fails. An explicit
+  // gogoanime- server pick is already gogoanime — let it through.
+  const chad429Sec = isChad429Blocked() ? getChad429Remaining() : 0
+  if (chad429Sec > 0 && !providerName?.startsWith('gogoanime-')) {
+    console.warn(`[router] chad site-wide rate-limit — trying gogoanime fallback (~${chad429Sec}s remaining)`)
+    try {
+      const gogoInfo = await Promise.race([
+        gogoanimeProvider.getInfoByAniListId(anilistId),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('gogoanime info timeout')), 15_000),
+        ),
+      ])
+      if (gogoInfo?.slug) {
+        const gogoProvider = type === 'dub' ? 'gogoanime-dub' : 'gogoanime-sub'
+        const gogoData = await Promise.race([
+          gogoanimeProvider.getStream(gogoInfo.slug, ep, gogoProvider, type, anilistId, { signal }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('gogoanime stream timeout')), 25_000),
+          ),
+        ])
+        if (gogoData) {
+          console.log(`[router] Gogoanime fallback succeeded for #${anilistId} (chad was rate-limited)`)
+          return { ...gogoData, source: 'gogoanime' }
+        }
+      }
+    } catch (e) {
+      console.warn(`[router] gogoanime fallback (chad 429) failed: ${e?.message || e}`)
+    }
+    // Both chad (blocked) and gogoanime (failed) — now surface the countdown.
+    const err = new Error(`Anidap is temporarily rate-limited. Retry in ~${chad429Sec}s.`)
     err.upstream = 429
-    err.retryAfterSec = remainingSec
+    err.retryAfterSec = chad429Sec
     throw err
   }
 
@@ -508,27 +542,17 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
     console.warn(`[router] anidap stream failed: ${e?.message || e}`)
   }
 
-  // ── Site-wide 429 after the race: fail fast instead of burning the
-  // 25s gogoanime fallback (which the client would see as another
-  // endless spinner). The block auto-clears via retry_after and the
-  // client auto-retries when the health countdown hits zero. ──
-  if (isChad429Blocked() && !providerName?.startsWith('gogoanime-')) {
-    const remainingSec = getChad429Remaining()
-    console.warn(`[router] race exhausted while chad blocked — failing fast 429 (~${remainingSec}s)`)
-    const err = new Error(`Anidap is temporarily rate-limited. Retry in ~${remainingSec}s.`)
-    err.upstream = 429
-    err.retryAfterSec = remainingSec
-    throw err
-  }
-
-  // ── Fallback to gogoanime when anidap has no stream ──
-  if (IS_ELECTRON && !providerName?.startsWith('gogoanime-')) {
+  // ── Fallback to gogoanime when anidap has no stream OR chad got
+  // blocked mid-race. (Was gated on IS_ELECTRON — the Puppeteer/standalone
+  // backend ships gogoanime too, and falling back keeps playback alive
+  // when anidap confirms empty or is rate-limited.) ──
+  if (!providerName?.startsWith('gogoanime-')) {
     try {
       console.log(`[router] anidap empty - trying gogoanime fallback for #${anilistId}`)
       const gogoInfo = await Promise.race([
         gogoanimeProvider.getInfoByAniListId(anilistId),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('gogoanime info timeout')), 8_000),
+          setTimeout(() => reject(new Error('gogoanime info timeout')), 15_000),
         ),
       ])
       if (gogoInfo?.slug) {
@@ -547,6 +571,16 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
     } catch (e) {
       console.warn(`[router] gogoanime fallback failed: ${e?.message || e}`)
     }
+  }
+
+  // ── Both providers failed. If chad is site-wide blocked, surface the
+  // real countdown so the client knows when to auto-retry. ──
+  if (isChad429Blocked() && !providerName?.startsWith('gogoanime-')) {
+    const remainingSec = getChad429Remaining()
+    const err = new Error(`Anidap is temporarily rate-limited. Retry in ~${remainingSec}s.`)
+    err.upstream = 429
+    err.retryAfterSec = remainingSec
+    throw err
   }
 
   const err = new Error(`No stream available for ${normalized || providerName}/${type}`)

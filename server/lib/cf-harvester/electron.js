@@ -9,6 +9,38 @@ import { getRandomGogoProxy, markProxyDead } from '../../proxy-config.js'
 
 let _electronImpl = null  // lazily initialized
 
+// Frame-tree probe source (runs inside every frame): returns a stream URL
+// if this frame has performance entries or DOM video sources for one.
+const FRAME_PROBE_SRC = `() => {
+  try {
+    const resources = performance.getEntriesByType('resource')
+    for (const r of resources) {
+      if (r.initiatorType === 'img' || r.initiatorType === 'beacon' || r.initiatorType === 'css') continue
+      const name = r.name || ''
+      if (name.includes('.m3u8') || name.endsWith('.m3u8')) return name
+      if (/\\.(mp4|webm|mkv|mov)(\\?|$)/i.test(name)) return name
+    }
+  } catch {}
+  try {
+    const video = document.querySelector('video')
+    if (video && video.src && !video.src.startsWith('blob:')) return video.src
+    const source = document.querySelector('video source[src]')
+    if (source) return source.getAttribute('src')
+  } catch {}
+  return null
+}`
+
+// Nudge source (runs inside child frames): clicks play buttons / starts
+// muted playback so lazy embed players actually begin loading the stream.
+const FRAME_NUDGE_SRC = `() => {
+  try {
+    const btn = document.querySelector('[class*="play" i]:not([class*="playing" i]), button[aria-label*="play" i]')
+    if (btn) { try { btn.click() } catch {} return }
+    const v = document.querySelector('video')
+    if (v) { try { v.muted = true; v.play().catch(() => {}) } catch {} }
+  } catch {}
+}`
+
 async function electronInit() {
   if (_electronImpl) return _electronImpl
   const { BrowserWindow } = await import('electron')
@@ -524,6 +556,51 @@ async function electronInit() {
     })
   }
 
+  // ── In-place frame-tree stream probe (gogoanime root fix) ──
+  // The gogoanime chain is: episode page -> /player/ iframe -> megavid
+  // "Embed Only" page. The player chain ONLY works when each hop stays
+  // INSIDE its parent iframe: megavid 403s top-level navigation ("Embed
+  // Only") and /player/ redirects to the homepage without a Referer. The
+  // old walk navigated the hidden window to each iframe URL, breaking
+  // both. Instead, probe every frame of the loaded window tree in place —
+  // the iframes are already loading with the right referer chain.
+  async function _probeFramesForStream(win, timeoutMs = 20_000, signal) {
+    const deadline = Date.now() + timeoutMs
+    let poll = 0
+    const listFrames = (w) => {
+      try {
+        const frames = [w.webContents.mainFrame]
+        const walk = (f) => { for (const c of f.frames) { frames.push(c); walk(c) } }
+        walk(frames[0])
+        return frames
+      } catch { return [] }
+    }
+    const probeFrame = async (f) => {
+      try { return await f.executeJavaScript(`(${FRAME_PROBE_SRC})()`, false) } catch { return null }
+    }
+    while (Date.now() < deadline) {
+      if (signal?.aborted) throw abortedError()
+      const frames = listFrames(win)
+      for (const f of frames) {
+        const url = await probeFrame(f)
+        if (url) {
+          console.log(`[cf-harvester] ✓ Frame stream probe hit: ${url.slice(0, 80)}`)
+          return url
+        }
+      }
+      // Nudge (every 3s): click play buttons / start muted playback in
+      // child frames so lazy embed players actually begin loading.
+      if (poll % 3 === 2 && frames.length > 1) {
+        for (const f of frames.slice(1)) {
+          try { await f.executeJavaScript(`(${FRAME_NUDGE_SRC})()`, false) } catch { }
+        }
+      }
+      poll++
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+    return null
+  }
+
   async function extractStreamImpl(watchUrl, options = {}) {
     const isGogo = watchUrl.includes('gogoanime')
     const context = isGogo ? 'gogoanime' : 'anidap'
@@ -625,6 +702,16 @@ async function electronInit() {
         }
 
         if (iframeSrc) {            console.log(`[cf-harvester] Depth ${depth} iframe -> ${trimUrl(iframeSrc)}`)
+          if (isGogo) {
+            // Root fix: gogoanime's player chain (/player/ -> megavid) is
+            // embed-only. Navigating the hidden window to those URLs 403s
+            // ("Embed Only") or redirects home (no Referer). Probe the
+            // frame tree IN PLACE — every hop already loads inside the
+            // episode page with the referer chain intact.
+            streamUrl = await _probeFramesForStream(win, Math.min(22_000, remainingBudget()), signal)
+            if (streamUrl) break
+            break
+          }
           await safeLoadURL(win, iframeSrc, { loadTimeoutMs: loadTimeout(), context })
           streamUrl = await _extractVideo(win, Math.min(10_000, remainingBudget()), signal)
           if (streamUrl) break

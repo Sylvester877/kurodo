@@ -347,7 +347,13 @@ function markChadHardBlocked() {
 // fail fast with a clean 429 instead of retrying every provider through
 // the slow DOM path — the UI already shows a countdown + auto-retry.
 let chad429Until = 0
-const CHAD_429_MAX_TTL = 3 * 60 * 1000 // never block longer than 3 min
+// Honest backoff: chad reports retry_after in SECONDS (multi-hour after
+// bursts). Capping at 3 min made the UI say "~166s" when the IP is really
+// blocked for 23h — the user retried straight into the wall. Never shorten
+// a live window, and respect the upstream value up to 1h so the countdown
+// is truthful. (We STILL fail over to gogoanime meanwhile, so a long chad
+// window never means "you can't watch anything".)
+const CHAD_429_MAX_TTL = 60 * 60 * 1000
 
 function markChad429(retryAfterMs) {
   const capped = Math.min(

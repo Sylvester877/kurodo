@@ -688,6 +688,67 @@ async function puppeteerInit() {
 
   }
 
+  // ── In-place frame-tree stream probe (gogoanime root fix) ──
+  // The gogoanime chain is: episode page -> /player/ iframe -> megavid
+  // "Embed Only" page. The player chain ONLY works when each hop stays
+  // INSIDE its parent iframe: megavid 403s top-level navigation ("Embed
+  // Only") and /player/ redirects to the homepage without a Referer. The
+  // old walk navigated the tab to each iframe URL, breaking both. Instead,
+  // probe every frame of the existing page tree in place — the iframes are
+  // already loading inside the episode page with the right referer chain.
+  async function _probeFramesForStream(pg, timeoutMs = 20_000, signal) {
+    const deadline = Date.now() + timeoutMs
+    let poll = 0
+    const probeFrame = (fr) => fr.evaluate(() => {
+      try {
+        const resources = performance.getEntriesByType('resource')
+        for (const r of resources) {
+          if (r.initiatorType === 'img' || r.initiatorType === 'beacon' || r.initiatorType === 'css') continue
+          const name = r.name || ''
+          if (name.includes('.m3u8') || name.endsWith('.m3u8')) return name
+          if (/\.(mp4|webm|mkv|mov)(\?|$)/i.test(name)) return name
+        }
+      } catch {}
+      try {
+        const video = document.querySelector('video')
+        if (video && video.src && !video.src.startsWith('blob:')) return video.src
+        const source = document.querySelector('video source[src]')
+        if (source) return source.getAttribute('src')
+      } catch {}
+      return null
+    })
+    while (Date.now() < deadline) {
+      if (signal?.aborted) throw new Error('cf-harvester aborted (caller timed out)')
+      let frames = []
+      try { frames = pg.frames() } catch { }
+      for (const fr of frames) {
+        let url = null
+        try { url = await probeFrame(fr) } catch { continue }
+        if (url) {
+          console.log(`[cf-harvester] ✓ Frame stream (${(fr.url() || '').slice(0, 70)}): ${url.slice(0, 80)}`)
+          return url
+        }
+      }
+      // Nudge (every 3s): click play buttons / start muted playback in
+      // embed frames so lazy players actually begin loading the stream.
+      if (poll % 3 === 2 && frames.length > 1) {
+        for (const fr of frames.slice(1)) {
+          try {
+            await fr.evaluate(() => {
+              const btn = document.querySelector('[class*="play" i]:not([class*="playing" i]), button[aria-label*="play" i]')
+              if (btn) { try { btn.click() } catch { } return }
+              const v = document.querySelector('video')
+              if (v) { try { v.muted = true; v.play().catch(() => { }) } catch { } }
+            })
+          } catch { }
+        }
+      }
+      poll++
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+    return null
+  }
+
   async function __doExtract(watchUrl, options = {}) {
     const totalBudgetMs = options.maxDurationMs ?? 30_000
     const remainingBudget = makeRemainingBudget(Date.now(), totalBudgetMs)
@@ -866,6 +927,18 @@ async function puppeteerInit() {
 
       if (iframeSrc) {
         console.log(`[cf-harvester] Depth ${depth} iframe -> ${trimUrl(iframeSrc)}`)
+        if (isGogo) {
+          // Root fix: gogoanime's player chain (/player/ -> megavid) is
+          // embed-only. Navigating the tab to those URLs 403s ("Embed
+          // Only") or redirects home (no Referer). Probe the frame tree
+          // IN PLACE — every hop already loads inside the episode page
+          // with the referer chain intact.
+          streamUrl = await _probeFramesForStream(pg, Math.min(22_000, remainingBudget()), options.signal)
+          if (streamUrl) break
+          // Navigating to the embed URL would only 403 — nothing deeper
+          // to find, bail out of the walk.
+          break
+        }
         await safeGoto(pg, iframeSrc)
         streamUrl = await _extractVideo(pg, videoTimeout, options.signal)
         if (streamUrl) break
