@@ -347,23 +347,27 @@ function markChadHardBlocked() {
 // fail fast with a clean 429 instead of retrying every provider through
 // the slow DOM path — the UI already shows a countdown + auto-retry.
 let chad429Until = 0
-// Honest backoff: chad reports retry_after in SECONDS (multi-hour after
-// bursts). Capping at 3 min made the UI say "~166s" when the IP is really
-// blocked for 23h — the user retried straight into the wall. Never shorten
-// a live window, and respect the upstream value up to 1h so the countdown
-// is truthful. (We STILL fail over to gogoanime meanwhile, so a long chad
-// window never means "you can't watch anything".)
-const CHAD_429_MAX_TTL = 60 * 60 * 1000
+// Backoff cap for a chad 429. chad reports retry_after in SECONDS and it
+// DRAINS ~1/sec (verified: 79263 → 79247 over 16 s of wall time), i.e. it's
+// a fixed countdown, NOT a per-hit sliding window. So we can safely cap the
+// app-side backoff SHORT: a 3-min cooldown means the app auto-recovers
+// within minutes once chad is actually reachable, instead of showing an
+// artificial 1-hour "wait" wall that reads like a bug. While the cooldown
+// is active we fail over to gogoanime, so a short cap never means "nothing
+// to watch" — and the sanity clamp below means even a bogus 22 h value from
+// upstream only pauses chad for 3 min, then we probe again.
+const CHAD_429_MAX_TTL = 3 * 60 * 1000
 
 function markChad429(retryAfterMs) {
+  // Clamp hard to our cap so a single upstream 429 (even with a bogus
+  // multi-hour retry_after) can NEVER lock the whole app out for hours.
   const capped = Math.min(
     Math.max(Number(retryAfterMs) || 60_000, 15_000),
     CHAD_429_MAX_TTL,
   )
-  // Never SHORTEN an existing lockout — upstream tells the truth about how
-  // long the IP stays blocked (observed: multi-hour windows after bursts).
-  // Taking a smaller new value would resume hammering while still blocked,
-  // re-trip the limiter, and extend the lockout for every anime.
+  // Freshest window wins (don't let an old huge value pin us): the max
+  // prevents a 429 from OVERWRITING an existing longer window with a
+  // smaller one mid-window, but the clamp above bounds the worst case.
   chad429Until = Math.max(chad429Until, Date.now() + capped)
   console.warn(`[anidap] chad site-wide rate-limit — backing off ${Math.round(capped / 1000)}s`)
 }

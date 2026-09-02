@@ -565,6 +565,20 @@ async function puppeteerInit() {
       throw new Error('Could not resolve anidap slug for chad API')
     }
 
+    // If chad is site-wide 429-blocked (tracked in anidap.js), do NOT hit
+    // it from the browser either — every call during the window just keeps
+    // the IP hot and re-tripping the limiter (the "backing off" loop that
+    // extends the lockout for every anime). Fail fast to the DOM/gogo path
+    // instead. Checked fresh from the server module so both Client paths
+    // share one source of truth, not a stale cached boolean.
+    try {
+      const a = await import('../../anidap.js')
+      if (a.isChad429Blocked && a.isChad429Blocked()) {
+        console.warn(`[cf-harvester] chad site-wide 429 — skipping browser chad fetch (~${a.getChad429Remaining()}s)`)
+        throw Object.assign(new Error('Chad is rate-limited, use fallback'), { upstream: 429 })
+      }
+    } catch (e) { if (e?.upstream === 429) throw e }
+
     const tApiStart = Date.now()
     const sourcesUrl = `https://chad.anidap.lol/rest/api/sources?id=${encodeURIComponent(resolvedSlug)}&epNum=${ep}&type=${type}&providerId=${provider}`
     console.log(`[cf-harvester] Fetching chad sources: ${sourcesUrl.slice(0, 120)}`)

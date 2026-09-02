@@ -467,6 +467,17 @@ async function electronInit() {
       throw new Error('Could not resolve anidap slug for chad API')
     }
 
+    // If chad is site-wide 429-blocked (tracked in anidap.js), do NOT hit
+    // it from the browser either — every call during the window keeps the
+    // IP hot and re-tripping the limiter. Fail fast to the DOM/gogo path.
+    try {
+      const a = await import('../../anidap.js')
+      if (a.isChad429Blocked && a.isChad429Blocked()) {
+        console.warn(`[cf-harvester] chad site-wide 429 — skipping browser chad fetch (~${a.getChad429Remaining()}s)`)
+        throw Object.assign(new Error('Chad is rate-limited, use fallback'), { upstream: 429 })
+      }
+    } catch (e) { if (e?.upstream === 429) throw e }
+
     const tApiStart = Date.now()
       const sourcesUrl = `https://chad.anidap.lol/rest/api/sources?id=${encodeURIComponent(resolvedSlug)}&epNum=${ep}&type=${type}&providerId=${provider}`
       console.log(`[cf-harvester] Fetching chad sources: ${sourcesUrl.slice(0, 120)}`)
