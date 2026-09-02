@@ -648,6 +648,13 @@ export default function Watch() {
   // default (which snapped the user's server back to yuki mid-playback).
   const userPickedRef = useRef<{ ep: number; slug: string; name: string } | null>(null)
   const [providersLoading, setProvidersLoading] = useState(true)
+  // Identity of the last loaded stream (slug:ep:server:type) — see the
+  // identity-flip guard in the stream effect below.
+  const identityRef = useRef<string | null>(null)
+  // Mirror of `stream` for use inside the health-poll interval closure
+  // (whose deps deliberately don't include stream).
+  const streamRef = useRef<AnidapStream | null>(null)
+  streamRef.current = stream
   useEffect(() => {
     userPickedRef.current = null
   }, [currentEp, anidapSlug])
@@ -658,6 +665,11 @@ export default function Watch() {
   // Bumped when a rate-limit cooldown expires so the stream effect re-runs
   // even if the picked provider is unchanged (auto-retry after 429).
   const [streamRetryKey, setStreamRetryKey] = useState(0)
+  // An explicit retry (health-poll auto-retry bumping streamRetryKey, or the
+  // Retry button) must always refetch, even if the identity is unchanged.
+  useEffect(() => {
+    identityRef.current = null
+  }, [streamRetryKey])
   const retryTimerRef = useRef<number | null>(null)
   // Clean up the Retry button's setTimeout on unmount to prevent
   // setState-on-unmounted-component warnings and stale provider flips.
@@ -739,13 +751,21 @@ export default function Watch() {
         setRateLimitSec(remaining > 0 ? remaining : null)
         if (remaining <= 0 && providersUnavailable) {
           setProvidersUnavailable(false)
-          setServerReloadKey((k) => k + 1)
-          // Force the stream effect to re-run even if the picked provider
-          // didn't change — otherwise the player stays on the error screen
-          // after the cooldown clears and the "auto-retry" promise is half-
-          // delivered (reviewer catch).
-          setStreamRetryKey((k) => k + 1)
           setStreamError(null)
+          // ── Only reload when there's nothing playing ──
+          // The old code bumped both reload keys on EVERY tick once the
+          // unavailable flag was set — even mid-playback — so a stream that
+          // was already playing got torn down and re-fetched every 10s
+          // ("plays → refresh → loading stream" loop). If a stream IS
+          // loaded, just clear the stale flags and let playback continue.
+          if (!streamRef.current) {
+            setServerReloadKey((k) => k + 1)
+            // Force the stream effect to re-run even if the picked provider
+            // didn't change — otherwise the player stays on the error screen
+            // after the cooldown clears and the "auto-retry" promise is half-
+            // delivered (reviewer catch).
+            setStreamRetryKey((k) => k + 1)
+          }
         }
       } catch { /* health endpoint may be busy */ }
     }, 10000)
@@ -764,6 +784,20 @@ export default function Watch() {
       return
     }
     let cancelled = false
+
+    // ── Identity-flip guard: don't tear down a playing stream ──
+    // The stream effect depends on anilistId, which resolves ASYNC and can
+    // flip null→number (and number→null when the fallback query refires).
+    // Each flip re-ran this effect, which did setStream(null) → "Loading
+    // stream" → refetch — i.e. the video restarted every few seconds while
+    // watching ("plays, then refreshes, then loading stream, every 3s").
+    // If the source identity (slug/ep/server/type) is unchanged and a
+    // stream is already loaded, this re-run is a no-op.
+    const identity = `${anidapSlug}:${currentEp}:${activeProvider}:${streamType}`
+    if (identityRef.current === identity && stream && !streamError) {
+      return
+    }
+    identityRef.current = identity
 
     // Check the prefetch cache first.
     const prefetched = takePrefetchedStream(malId, currentEp, streamType, activeProvider)
