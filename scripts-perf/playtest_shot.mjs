@@ -29,9 +29,13 @@ await page.evaluate(() => {
   if (b) b.click()
 }).catch(() => {})
 
-// Wait up to 75s for a real playing video (fallback chain can take ~40s)
-const deadline = Date.now() + 75_000
+// Wait up to 90s for a real playing video. On 'loaded-paused', keep polling
+// (autoplay can lag ~5s) and nudge play() once after 6s in case autoplay
+// policy still blocks it.
+const deadline = Date.now() + 90_000
 let state = 'no-video'
+let loadedPausedSince = 0
+let nudged = false
 while (Date.now() < deadline) {
   state = await page.evaluate(() => {
     const v = document.querySelector('video')
@@ -40,7 +44,17 @@ while (Date.now() < deadline) {
     if (v.readyState >= 2) return 'loaded-paused'
     return 'loading'
   }).catch(() => 'probe-error')
-  if (state === 'playing' || state === 'loaded-paused') break
+  if (state === 'playing') break
+  if (state === 'loaded-paused') {
+    if (!loadedPausedSince) loadedPausedSince = Date.now()
+    if (Date.now() - loadedPausedSince > 6_000 && !nudged) {
+      nudged = true
+      await page.evaluate(() => document.querySelector('video')?.play()?.catch(() => {})).catch(() => {})
+    }
+    if (Date.now() - loadedPausedSince > 25_000) break // give up honestly
+  } else {
+    loadedPausedSince = 0
+  }
   await new Promise((r) => setTimeout(r, 1500))
 }
 console.log('video state:', state)
