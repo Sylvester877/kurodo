@@ -6,6 +6,7 @@
 
 import { anidapProvider } from './anidap.js'
 import { gogoanimeProvider } from './gogoanime.js'
+import { megavidProvider } from './megavid.js'
 import {
   isProviderRateLimited, markProviderRateLimited,
   isChadBlocked, isChad429Blocked, getChad429Remaining,
@@ -243,6 +244,29 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
   // give them gogoanime (a separate scraper) so playback still works. Only
   // surface the 429 countdown if gogoanime ALSO fails. An explicit
   // gogoanime- server pick is already gogoanime — let it through.
+  // ── megavid first-resort fast path (root fix for chad rate-limiting) ──
+  // megavid.buzz is MAL-keyed, plain HTTP (~2s), browser-free, and 100%
+  // chad-independent — verified working even while chad 429s our IP. Racing
+  // it FIRST means most requests resolve before touching chad at all:
+  // fewer chad calls → less rate-limit pressure → fewer 429 windows.
+  // An explicit gogoanime- pick keeps its dedicated path below.
+  if (!providerName?.startsWith('gogoanime-') && !providerName?.startsWith('megavid')) {
+    try {
+      const megavidData = await Promise.race([
+        megavidProvider.getStream(anilistId, ep, type, title, { signal }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('megavid timeout')), 20_000),
+        ),
+      ])
+      if (megavidData) {
+        console.log(`[router] megavid fast path won for #${anilistId} ep${ep} ${type}`)
+        return { ...megavidData, source: 'megavid' }
+      }
+    } catch (e) {
+      console.warn(`[router] megavid fast path failed: ${e?.message || e}`)
+    }
+  }
+
   const chad429Sec = isChad429Blocked() ? getChad429Remaining() : 0
   if (chad429Sec > 0 && !providerName?.startsWith('gogoanime-')) {
     console.warn(`[router] chad site-wide rate-limit — trying gogoanime fallback (~${chad429Sec}s remaining)`)
