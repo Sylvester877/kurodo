@@ -258,7 +258,7 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
         const gogoData = await Promise.race([
           gogoanimeProvider.getStream(gogoInfo.slug, ep, gogoProvider, type, anilistId, { signal }),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('gogoanime stream timeout')), 25_000),
+            setTimeout(() => reject(new Error('gogoanime stream timeout')), 30_000),
           ),
         ])
         if (gogoData) {
@@ -560,7 +560,7 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
         const gogoData = await Promise.race([
           gogoanimeProvider.getStream(gogoInfo.slug, ep, gogoProvider, type, anilistId, { signal }),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('gogoanime stream timeout')), 25_000),
+            setTimeout(() => reject(new Error('gogoanime stream timeout')), 30_000),
           ),
         ])
         if (gogoData) {

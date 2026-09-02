@@ -212,7 +212,10 @@ async function puppeteerInit() {
   // for a page is bounded only by the caller's abort signal plus a generous
   // outer queue cap — racing providers queue, then each gets a fair full
   // work budget once checked out.
-  const PAGE_MUTEX_TIMEOUT = 20_000   // work budget once a page is granted
+  const PAGE_MUTEX_TIMEOUT = 35_000   // work budget once a page is granted
+  // (35s: gogoanime failover chain = goto + server click + embed iframe
+  // render + in-place frame probe needs ~30s; the route's 40s outer
+  // budget is the real ceiling — this just stops premature aborts.)
   const PAGE_QUEUE_TIMEOUT = 32_000   // hard cap on waiting for a page
   async function withPageMutexBounded(fn, signal) {
     if (signal?.aborted) return Promise.reject(new Error('cf-harvester aborted (caller timed out)'))
