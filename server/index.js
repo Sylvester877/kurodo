@@ -3407,7 +3407,7 @@ app.get('/img', async (req, res) => {
 // Register additional API modules
 await registerAnikageEpisodes(app)
 
-const distPath = path.resolve(__dirname, '..', 'dist')
+const distPath = path.resolve(process.env.DIST_DIR || path.join(__dirname, '..', 'dist'))
 const isProduction = fs.existsSync(distPath)
 
 if (isProduction) {
