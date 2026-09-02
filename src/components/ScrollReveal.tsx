@@ -13,7 +13,9 @@ interface Props {
   delay?: number
   /** When true, only animate once (default true) */
   once?: boolean
-  /** Root margin for IntersectionObserver. Default '0px' */
+  /** Root margin for IntersectionObserver. Default pre-triggers the reveal
+   *  250px before the element enters the viewport so cards are already
+   *  settled when the user actually sees them (no on-screen swarm). */
   margin?: string
   /** Use a simpler fade-only animation (no slide). Default false */
   fadeOnly?: boolean
@@ -45,11 +47,12 @@ export default function ScrollReveal({
   direction = 'up',
   delay = 0,
   once = true,
-  margin = '0px',
+  // Pre-trigger 250px early: cards are settled before the user sees them.
+  margin = '0px 0px 250px 0px',
   fadeOnly = false,
 }: Props) {
-  const { reduceMotion, reduceQuality } = useSettings(
-    useShallow((s) => ({ reduceMotion: s.reduceMotion, reduceQuality: s.reduceQuality })),
+  const { reduceMotion } = useSettings(
+    useShallow((s) => ({ reduceMotion: s.reduceMotion })),
   )
 
   // Skip scroll animations only when user explicitly prefers reduced motion.
@@ -57,22 +60,26 @@ export default function ScrollReveal({
     return <div className={cn(className)}>{children}</div>
   }
 
-  const offset = fadeOnly ? { x: 0, y: 0 } : directionMap[direction]
+  // ~50% of the old offset: cards no longer visibly "chase" the scroll,
+  // which read as jitter when many revealed at once during fast scrolling.
+  // (New object — directionMap is module-level and must not be mutated.)
+  const base = fadeOnly ? { x: 0, y: 0 } : directionMap[direction]
+  const offset = { x: Math.round(base.x * 0.5), y: Math.round(base.y * 0.5) }
 
   // Use variants to isolate from parent AnimatePresence opacity animation.
-  // Add a subtle blur-to-sharp reveal on high-quality devices for a premium
-  // 21st.dev feel; skip the blur on integrated GPUs / reduced quality.
+  // NOTE: no filter/blur animation here — animating blur re-rasterizes the
+  // element every frame during scroll and is the #1 cause of reveal jank,
+  // especially with 20+ cards entering at once. opacity+transform only:
+  // both composite on the GPU with no repaint.
   const variants = {
     hidden: {
       opacity: 0,
       ...offset,
-      filter: reduceQuality ? 'none' : 'blur(4px)',
     },
     visible: {
       opacity: 1,
       x: 0,
       y: 0,
-      filter: 'blur(0px)',
     },
   }
 
@@ -84,7 +91,7 @@ export default function ScrollReveal({
       whileInView="visible"
       viewport={{ once, margin, amount: 0.05 }}
       transition={{
-        duration: 0.25,
+        duration: 0.45,
         delay,
         ease: [0.22, 1, 0.36, 1],
       }}
@@ -111,7 +118,8 @@ export function ScrollRevealGrid({
   className,
   staggerMs = 12,
   direction = 'up',
-  margin = '0px',
+  // Same 250px pre-trigger as ScrollReveal.
+  margin = '0px 0px 250px 0px',
 }: {
   children: ReactNode | ReactNode[]
   className?: string

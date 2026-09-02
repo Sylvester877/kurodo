@@ -112,15 +112,18 @@ export default function Layout() {
 
 
   // Memoize lenis options so ReactLenis doesn't re-initialize on every render.
-  // Tuned for a premium, grounded feel: tighter lerp for physical friction,
-  // slightly heavier wheel multiplier, and syncTouch so mobile devices get
-  // the same smoothness as desktop wheel scrolling.
+  // Tuned for buttery smoothness: duration+easing mode gives a deterministic
+  // glide with a long ease-out tail after the last wheel event — the stop
+  // feels "expensive" instead of abrupt. (lerp is the alternative mode; the
+  // two are mutually exclusive, so we set duration+easing only.)
+  // syncTouch gives mobile the same smoothness as desktop wheel scrolling.
   const lenisOptions = useMemo(() => ({
-    lerp: 0.08,
+    duration: 1.15,
+    easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // easeOutExpo
     smoothWheel: !reduceMotion,
     syncTouch: !reduceMotion,
-    touchMultiplier: 1.5,
-    wheelMultiplier: 0.9,
+    touchMultiplier: 1.6,
+    wheelMultiplier: 1.0,
   }), [reduceMotion])
 
   return (

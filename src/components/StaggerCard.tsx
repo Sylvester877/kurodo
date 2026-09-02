@@ -52,22 +52,25 @@ export default function StaggerCard({
   // Spring bounce disabled on iGPUs — spring physics are compositor-heavy
   // and can jitter at lower framerates.
   const useSpringBounce = !reduceQuality
-
+  // NOTE: no filter/blur animation — animating blur re-rasterizes the card
+  // every frame while it enters during scroll (compositor jank with grids of
+  // cards). opacity+transform+scale only: all GPU-composited, zero repaint.
   return (
     <motion.div
       initial={{
         opacity: 0,
-        y: 20,
-        scale: 0.96,
-        filter: reduceQuality ? 'none' : 'blur(4px)',
+        y: 10,
+        scale: 0.98,
       }}
       whileInView={{
         opacity: 1,
         y: 0,
         scale: 1,
-        filter: 'blur(0px)',
       }}
-      viewport={{ once: true, margin: '0px', amount: 0.05 }}
+      // Pre-trigger 250px early — matches ScrollReveal. Cards animate just
+      // before they enter the viewport so fast scrolling never shows a swarm
+      // of mid-animation cards on screen.
+      viewport={{ once: true, margin: '0px 0px 250px 0px', amount: 0.05 }}
       transition={{
         duration,
         delay: (index % 20) * (staggerMs / 1000),
