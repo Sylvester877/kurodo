@@ -30,6 +30,19 @@ export async function fetchChadSources(anilistId, slug, ep, provider, type) {
   return impl.fetchChadSources(anilistId, slug, ep, provider, type)
 }
 
+// Light browser pass: load the anidap watch page and read the slug SSR prop.
+// Used when the Node-fetch slug resolver fails (the page 500s for plain
+// Node requests). Deduped per id inside the impls; returns null on failure.
+export async function extractSlugInBrowser(anilistId) {
+  try {
+    const impl = await getImpl()
+    if (!impl.extractSlugInBrowser) return null
+    return await impl.extractSlugInBrowser(anilistId)
+  } catch {
+    return null
+  }
+}
+
 export async function extractStreamFromWatchPage(watchUrl, options = {}) {
   const impl = await getImpl()
   return impl.extractStreamFromWatchPage(watchUrl, options)

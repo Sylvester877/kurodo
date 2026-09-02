@@ -140,11 +140,21 @@ function formatCookieHeader(cookies) {
 }
 
 async function directFetchChadSources(sourcesUrl, cookieHeader = '') {
+  // Full Chrome header set — same root fix as CHAD_HEADERS in anidap.js.
+  // Minimal headers fingerprint as a bot (403) and force the slow browser
+  // path; the complete client-hint set passes chad's header check.
   const headers = {
-    'Accept': 'application/json',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
     'Referer': 'https://anidap.lol/',
     'Origin': 'https://anidap.lol',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Sec-Ch-Ua': '"Chromium";v="126", "Google Chrome";v="126", "Not?J_Brand";v="8"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Windows"',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-site',
   }
   if (cookieHeader) headers['Cookie'] = cookieHeader
 

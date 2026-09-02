@@ -422,6 +422,15 @@ async function electronInit() {
       resolvedSlug = await resolveSlugFromAniList(anilistId)
     }
 
+    // ROOT FIX: the watch page (slug source) currently 500s even in real
+    // browsers — but chad's API accepts the NUMERIC AniList ID directly
+    // (verified live). Proceed with the numeric id instead of throwing:
+    // throwing forced every uncached stream down the doomed DOM path.
+    if (!resolvedSlug && anilistId) {
+      resolvedSlug = String(anilistId)
+      console.log(`[cf-harvester] No text slug — using numeric AniList id for chad API: ${resolvedSlug}`)
+    }
+
     if (!resolvedSlug) {
       throw new Error('Could not resolve anidap slug for chad API')
     }
@@ -756,9 +765,41 @@ async function electronInit() {
     console.log('[cf-harvester] Shutdown complete')
   }
 
+  // ── Slug-only browser resolution (mirror of the puppeteer impl) ──
+  // The watch page 500s for plain Node fetches; resolve via the Electron
+  // session in the background instead. Deduped per id.
+  const slugBrowserInFlight = new Map()
+  async function extractSlugInBrowserImpl(anilistId) {
+    if (!anilistId) return null
+    const existing = slugBrowserInFlight.get(anilistId)
+    if (existing) return existing
+    const p = (async () => {
+      try {
+        return await withMutexBounded(async () => {
+          const win = await ensureWindow(false, false, 'anidap')
+          const watchUrl = `${ANIDAP_BASE}/watch?id=${anilistId}&ep=1`
+          await safeLoadURL(win, watchUrl, { context: 'anidap', loadTimeoutMs: 12_000 })
+          let slug = null
+          try { slug = await safeExecuteJS(win, EXTRACT_SLUG_JS) } catch {}
+          for (let poll = 0; poll < 3 && !slug; poll++) {
+            await new Promise((r) => setTimeout(r, 1000))
+            try { slug = await safeExecuteJS(win, EXTRACT_SLUG_JS) } catch {}
+          }
+          if (slug) slugCache.set(anilistId, slug)
+          return slug
+        })
+      } finally {
+        slugBrowserInFlight.delete(anilistId)
+      }
+    })()
+    slugBrowserInFlight.set(anilistId, p)
+    return p
+  }
+
   _electronImpl = {
     fetchChadApi: fetchChadApiImpl,
     fetchChadSources: fetchChadSourcesImpl,
+    extractSlugInBrowser: extractSlugInBrowserImpl,
     extractStreamFromWatchPage: extractStreamImpl,
     exportCookies: exportCookiesImpl,
     isReady: isReadyImpl,

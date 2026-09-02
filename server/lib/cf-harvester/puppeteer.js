@@ -549,6 +549,15 @@ async function puppeteerInit() {
       resolvedSlug = await resolveSlugFromAniList(anilistId)
     }
 
+    // ROOT FIX: the watch page (slug source) currently 500s even in real
+    // browsers — but chad's API accepts the NUMERIC AniList ID directly
+    // (verified live). Proceed with the numeric id instead of throwing:
+    // throwing forced every uncached stream down the doomed DOM path.
+    if (!resolvedSlug && anilistId) {
+      resolvedSlug = String(anilistId)
+      console.log(`[cf-harvester] No text slug — using numeric AniList id for chad API: ${resolvedSlug}`)
+    }
+
     if (!resolvedSlug) {
       throw new Error('Could not resolve anidap slug for chad API')
     }
@@ -1032,10 +1041,42 @@ async function puppeteerInit() {
     console.log('[cf-harvester] Shutdown complete')
   }
 
+  // ── Slug-only browser resolution ────────────────────────────────
+  // The anidap watch page 500s for plain Node fetches (bot fingerprinting
+  // at the HTML level), so resolveAnidapSlug's fast path fails. This light
+  // pass loads the page in the real browser (which renders fine), reads the
+  // slug SSR prop, and returns — no extraction, ~2-4s. Deduped per id.
+  const slugBrowserInFlight = new Map()
+  async function extractSlugInBrowserImpl(anilistId) {
+    if (!anilistId) return null
+    const existing = slugBrowserInFlight.get(anilistId)
+    if (existing) return existing
+    const p = (async () => {
+      try {          return await withPageMutexBounded(async (pg) => {
+            const watchUrl = `${ANIDAP_BASE}/watch?id=${anilistId}&ep=1`
+            await safeGoto(pg, watchUrl)
+            let slug = null
+            try { slug = await pg.evaluate(EXTRACT_SLUG_JS) } catch {}
+            for (let poll = 0; poll < 3 && !slug; poll++) {
+              await new Promise((r) => setTimeout(r, 1000))
+              try { slug = await pg.evaluate(EXTRACT_SLUG_JS) } catch {}
+            }
+            if (slug) slugCache.set(anilistId, slug)
+            return slug
+          }, null)
+      } finally {
+        slugBrowserInFlight.delete(anilistId)
+      }
+    })()
+    slugBrowserInFlight.set(anilistId, p)
+    return p
+  }
+
   _puppeteerImpl = {
     fetchChadApi: fetchChadApiImpl,
     fetchChadSources: fetchChadSourcesImpl,
     extractStreamFromWatchPage: extractStreamImpl,
+    extractSlugInBrowser: extractSlugInBrowserImpl,
     exportCookies: exportCookiesImpl,
     isReady: isReadyImpl,
     warmUp: warmUpImpl,

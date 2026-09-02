@@ -354,7 +354,11 @@ function markChad429(retryAfterMs) {
     Math.max(Number(retryAfterMs) || 60_000, 15_000),
     CHAD_429_MAX_TTL,
   )
-  chad429Until = Date.now() + capped
+  // Never SHORTEN an existing lockout — upstream tells the truth about how
+  // long the IP stays blocked (observed: multi-hour windows after bursts).
+  // Taking a smaller new value would resume hammering while still blocked,
+  // re-trip the limiter, and extend the lockout for every anime.
+  chad429Until = Math.max(chad429Until, Date.now() + capped)
   console.warn(`[anidap] chad site-wide rate-limit — backing off ${Math.round(capped / 1000)}s`)
 }
 
@@ -366,12 +370,19 @@ export function getChad429Remaining() {
   return isChad429Blocked() ? Math.ceil((chad429Until - Date.now()) / 1000) : 0
 }
 
-/** Parse `retry_after` (ms) out of a chad 429 response body. */
+/** Parse `retry_after` out of a chad 429 response body.
+ *  ROOT FIX (unit bug): chad returns retry_after in SECONDS (verified live:
+ *  the value drains ~1/sec: 4553 → 4148 over ~6 min of wall time). We used
+ *  to read it as MILLISECONDS, so a 4553 s (76 min) real lockout was stored
+ *  as 4553 ms (4.5 s, min-clamped to 15 s). The app then resumed hammering
+ *  chad while still blocked, re-tripped the limiter on every uncached
+ *  request, and everything cascaded into the 10-25 s DOM-extraction path —
+ *  the "fetching takes forever on anime that aren't cached" bug. */
 export function chadRetryAfterMs(body) {
   try {
     const parsed = typeof body === 'string' ? JSON.parse(body) : body
-    const ms = Number(parsed?.retry_after)
-    if (Number.isFinite(ms) && ms > 0) return ms
+    const sec = Number(parsed?.retry_after)
+    if (Number.isFinite(sec) && sec > 0) return sec * 1000
   } catch { /* not JSON */ }
   return 60_000
 }
@@ -426,10 +437,26 @@ async function drainChadPaceQueue() {
 }
 
 const CHAD_API = 'https://chad.anidap.lol/rest/api'
+// ── Chrome-mirroring header set (ROOT FIX for slow uncached fetches) ──
+// chad's bot check fingerprints the REQUEST HEADERS: with only Referer/
+// Origin/UA, every Node fetch got 403 bot_detected, which forced every
+// stream request down the 10-25s DOM-extraction path. Verified live:
+// the exact same request with the full Chrome client-hint header set
+// passes the bot check (responds 200/429-rate-limit, never 403). These
+// headers must look exactly like what Chrome sends for a cross-site
+// XHR from anidap.lol.
 const CHAD_HEADERS = {
   'Referer': 'https://anidap.lol/',
   'Origin': 'https://anidap.lol',
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Sec-Ch-Ua': '"Chromium";v="126", "Google Chrome";v="126", "Not?J_Brand";v="8"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'same-site',
 }
 const slugResolveCache = new Map() // anilistId -> { at, slug }
 const SLUG_RESOLVE_TTL = 12 * 60 * 60 * 1000 // 12h — slugs rarely change
@@ -459,34 +486,94 @@ function extractSlugFromWatchHtml(html) {
 }
 
 /** Resolve AniList ID -> real anidap text slug (cached 12h).
- *  One cheap HTTP fetch of the watch page HTML — no browser needed. */
+ *
+ *  ROOT FIX — anidap migrated to a GraphQL backend (graphql.anidap.lol).
+ *  The old slug source (watch-page SSR HTML) now 500s for EVERYONE — real
+ *  browsers included — so the old Node scraper returns null and every
+ *  uncached anime cascaded into 10-25s DOM extractions (the "fetching
+ *  forever" bug). The new GraphQL `anime(anilistId:)` query returns the
+ *  text slug directly, works from plain Node fetch, and is unmetered by
+ *  chad's per-IP limiter (verified live).
+ *
+ *  Order: GraphQL → watch-page HTML (legacy) → background browser pass.
+ *  Callers get null only if ALL of them fail; a null triggers the
+ *  numeric-id fallback (harmless: chad answers 404 and the caller uses
+ *  its roster/stub fallback) while the browser pass keeps trying. */
+async function resolveSlugViaGraphQL(anilistId) {
+  const q = 'query($anilistId: Int) { anime(anilistId: $anilistId) { id anilistId } }'
+  const res = await fetch('https://graphql.anidap.lol/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Origin': 'https://anidap.lol',
+      'Referer': 'https://anidap.lol/',
+      'User-Agent': CHAD_HEADERS['User-Agent'],
+      'Accept': 'application/json, text/plain, */*',
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'same-site',
+    },
+    body: JSON.stringify({ query: q, variables: { anilistId: Number(anilistId) } }),
+    signal: AbortSignal.timeout(8_000),
+  })
+  if (!res.ok) return null
+  const j = await res.json().catch(() => null)
+  const id = j?.data?.anime?.id
+  return typeof id === 'string' && /^[a-z0-9][a-z0-9-]{1,60}$/.test(id) ? id : null
+}
+
 async function resolveAnidapSlug(anilistId) {
   if (!anilistId) return null
   const cached = slugResolveCache.get(anilistId)
   if (cached && Date.now() - cached.at < SLUG_RESOLVE_TTL) return cached.slug
 
-  // Single-flight: concurrent callers share one watch-page fetch.
+  // Single-flight: concurrent callers share one resolve.
   const inFlight = slugResolveInFlight.get(anilistId)
   if (inFlight) return inFlight
 
   const p = (async () => {
+    // 1. PRIMARY: the new GraphQL backend — fast, Node-friendly, reliable.
+    try {
+      const slug = await resolveSlugViaGraphQL(anilistId)
+      if (slug) {
+        slugResolveCache.set(anilistId, { at: Date.now(), slug })
+        console.log(`[anidap] Resolved slug (graphql): #${anilistId} -> ${slug}`)
+        return slug
+      }
+    } catch (e) {
+      console.warn(`[anidap] GraphQL slug resolve failed for #${anilistId}:`, e.message)
+    }
+    // 2. LEGACY: watch-page SSR prop (currently 500s upstream, kept in case
+    //    they restore it — one cheap request).
     try {
       const watchUrl = `${BASE}/watch?id=${anilistId}&ep=1`
       const res = await fetch(watchUrl, {
         headers: { 'User-Agent': CHAD_HEADERS['User-Agent'] },
         signal: AbortSignal.timeout(9_000),
       })
-      if (!res.ok) return null
-      const html = await res.text()
-      const slug = extractSlugFromWatchHtml(html)
-      if (slug) {
-        slugResolveCache.set(anilistId, { at: Date.now(), slug })
-        console.log(`[anidap] Resolved slug: #${anilistId} -> ${slug}`)
-        return slug
+      if (res.ok) {
+        const html = await res.text()
+        const slug = extractSlugFromWatchHtml(html)
+        if (slug) {
+          slugResolveCache.set(anilistId, { at: Date.now(), slug })
+          console.log(`[anidap] Resolved slug (node): #${anilistId} -> ${slug}`)
+          return slug
+        }
       }
     } catch (e) {
       console.warn(`[anidap] Slug resolve failed for #${anilistId}:`, e.message)
     }
+    // 3. Background browser pass — resolves eventually, cached 12h.
+    import('./cf-harvester.js')
+      .then((mod) => mod.extractSlugInBrowser(anilistId))
+      .then((slug) => {
+        if (slug) {
+          slugResolveCache.set(anilistId, { at: Date.now(), slug })
+          console.log(`[anidap] Resolved slug (browser, bg): #${anilistId} -> ${slug}`)
+        }
+      })
+      .catch((e) =>
+        console.warn(`[anidap] Browser slug resolve failed for #${anilistId}:`, e?.message || e))
     return null
   })().finally(() => slugResolveInFlight.delete(anilistId))
 
@@ -653,16 +740,28 @@ function playerRefererFor(streamUrl) {
 async function chadGet(path, params = {}, timeoutMs = 8_000) {
   const qs = new URLSearchParams(params).toString()
   const url = `${CHAD_API}/${path}${qs ? `?${qs}` : ''}`
+  // ROOT FIX — enforce the site-wide 429 lockout HERE, at the API client.
+  // The gate used to live only in getStream/router, but getEpisodes and
+  // getProviders still called through while blocked: every blocked-window
+  // request re-tripped the limiter and EXTENDED the lockout (observed:
+  // "backing off 180s" repeating indefinitely), so one cold anime kept the
+  // whole API — all anime — locked out. Failing fast here lets the window
+  // actually expire; callers treat _error:429 like any other miss and use
+  // their existing fallbacks (roster/stub) in the meantime.
+  if (isChad429Blocked()) {
+    return { _error: 429, retryAfterMs: Math.max(1_000, chad429Until - Date.now()) }
+  }
   await chadPace() // smooth the burst — see pacing block above
   try {
     const res = await fetch(url, { headers: CHAD_HEADERS, signal: AbortSignal.timeout(timeoutMs) })
     if (res.status === 429) {
       // chad rate-limits by IP — read the cooldown it tells us to respect
       // and set the site-wide window so every provider backs off together.
+      // retry_after is in SECONDS (see chadRetryAfterMs — unit bug fix).
       let retryAfterMs = 60_000
       try {
         const body = await res.json()
-        if (body && body.retry_after) retryAfterMs = Number(body.retry_after) || 60_000
+        if (body && body.retry_after) retryAfterMs = chadRetryAfterMs(body)
       } catch { /* keep default */ }
       markChad429(retryAfterMs)
       return { _error: 429, retryAfterMs }
@@ -718,10 +817,12 @@ export async function getEpisodes(slug, anilistId, titles = {}) {
   if (cached && Date.now() - cached.at < EPISODES_CACHE_TTL) return cached.episodes
 
   try {
-    const resolved = await resolveAnidapSlug(id)
-    if (resolved) {
+    // Numeric-ID fallback: chad accepts the AniList id directly — when the
+    // slug resolver fails (watch page 500s for Node), still hit the API.
+    const resolved = (await resolveAnidapSlug(id)) || String(id)
+    {
       const list = await chadGet('episodes', { id: resolved }, 20_000)
-      if (list?._error === 404) invalidateSlug(id)
+      if (list?._error === 404 && resolved !== String(id)) invalidateSlug(id)
       if (Array.isArray(list) && list.length > 0) {
         const eps = list.map((ep) => ({
           number: Number(ep.number) || 0,
@@ -822,27 +923,29 @@ export async function getProviders(slug, ep, anilistId, titles = {}) {
   if (inFlight) return inFlight
 
   const attempt = (async () => {
-    // Fast path: REAL per-episode provider lists from the chad API.
-    // The site only lists servers that actually have this episode, so the
-    // picker stops showing dead servers for episodes they don't cover.
-    try {
-      const resolved = await resolveAnidapSlug(id)
-      if (resolved) {
-        const data = await chadGet('servers', { id: resolved, epNum: Number(ep) || 1 })
-        if (data?._error === 404) invalidateSlug(id)
-        if (data && !data._error) {
-          const out = []
-          for (const [key, type] of [['subProviders', 'sub'], ['dubProviders', 'dub'], ['hsubProviders', 'hsub']]) {
-            for (const p of data[key] || []) {
-              out.push({ name: p.id, type, default: !!p.default, tip: p.tip || null })
+      // Fast path: REAL per-episode provider lists from the chad API.
+      // The site only lists servers that actually have this episode, so the
+      // picker stops showing dead servers for episodes they don't cover.
+      // Numeric-ID fallback: same as getEpisodes — don't skip the API when
+      // the text slug can't be resolved.
+      try {
+        const resolved = (await resolveAnidapSlug(id)) || String(id)
+        {
+          const data = await chadGet('servers', { id: resolved, epNum: Number(ep) || 1 })
+          if (data?._error === 404 && resolved !== String(id)) invalidateSlug(id)
+          if (data && !data._error) {
+            const out = []
+            for (const [key, type] of [['subProviders', 'sub'], ['dubProviders', 'dub'], ['hsubProviders', 'hsub']]) {
+              for (const p of data[key] || []) {
+                out.push({ name: p.id, type, default: !!p.default, tip: p.tip || null })
+              }
+            }
+            if (out.length > 0) {
+              providerListCache.set(cacheKey, { at: Date.now(), data: out })
+              return out
             }
           }
-          if (out.length > 0) {
-            providerListCache.set(cacheKey, { at: Date.now(), data: out })
-            return out
-          }
         }
-      }
     } catch (e) { console.warn(`[anidap] chad servers failed for #${id}:`, e.message) }
 
     // Chad is unreachable/bot-blocked. Fall back to the CURRENT Aug-2026
@@ -995,9 +1098,17 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
   try {
     const tFast = Date.now()
     chadSlug = await resolveAnidapSlug(id)
-    if (chadSlug) {
+    // ROOT FIX: chad's API accepts the numeric AniList ID directly
+    // (verified: numeric ids get real 200/429 responses, never 404). When
+    // slug resolution fails (the watch page 500s for Node fetches), fall
+    // back to the numeric id instead of skipping the fast path entirely —
+    // skipping is what forced every uncached anime down the 10-25s DOM
+    // extraction cascade. A background browser resolve (started inside
+    // resolveAnidapSlug) upgrades to the real slug for later calls.
+    const fastId = chadSlug || String(id)
+    {
       const data = await chadGet('sources', {
-        id: chadSlug, epNum, type, providerId: bareProvider,
+        id: fastId, epNum, type, providerId: bareProvider,
       })
       if (data?._error === 429) {
         // Throw (not return null) so the router labels this provider
@@ -1052,9 +1163,12 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
         // The slug is stale/gone (anidap regenerates random-suffix slugs) —
         // invalidate so the next request re-resolves instead of 404-looping
         // against the 12h cache. Short failure TTL too.
-        invalidateSlug(id)
+        // NOTE: a 404 with the NUMERIC id means upstream genuinely has no
+        // such stream (the id shape is valid for chad) — confirmed absence,
+        // cached below via the normal no-stream path.
+        if (chadSlug) invalidateSlug(id)
         setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
-        console.log(`[anidap] chad 404 for slug (invalidating): ${id}:${epNum}/${bareProvider}/${type}`)
+        console.log(`[anidap] chad 404 for ${chadSlug ? 'slug (invalidating)' : 'numeric id'}: ${id}:${epNum}/${bareProvider}/${type}`)
         return null
       } else if (data._error === 403) {
         // bot_detected — the chad API is temporarily blocking our Node
@@ -1122,7 +1236,13 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
   // sources (verified live). Runs when the Node fast path failed in a way
   // the browser might recover from (403 / network failure / 5xx).
   // Cost: ~2-6s (the browser is pre-warmed at startup).
-  if (chadSlug && chadFallbackNeeded) {
+  // Numeric-ID aware: the harvester resolves the slug itself when needed
+  // (browser EXTRACT_SLUG_JS pass); passing the numeric id is fine — chad
+  // accepts both shapes.
+  // 429-aware: during a site-wide rate-limit window the browser path hits
+  // the SAME blocked IP — firing it re-trips the limiter and extends the
+  // lockout for every anime. Skip while blocked; the window auto-clears.
+  if (!isChad429Blocked() && (chadSlug || !isChadBlocked()) && chadFallbackNeeded) {
     try {
       const tBrowser = Date.now()
       const browserData = await fetchChadSources(id, chadSlug, epNum, bareProvider, type)

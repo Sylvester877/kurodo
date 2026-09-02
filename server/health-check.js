@@ -503,6 +503,20 @@ export function startHealthCheckScheduler({ intervalMs = 15 * 60 * 1000 } = {}) 
   let nextInterval = jitteredInterval()
 
 const tick = async () => {
+    // ── Skip the whole tick while chad is blocked (ROOT FIX) ──
+    // The per-title loop below fires routedGetProviders + stream probes;
+    // during a chad 429 window those calls re-trip the IP limiter and
+    // EXTEND the lockout indefinitely ("backing off 180s" on a loop),
+    // which is how one cold anime kept the whole API locked out. The
+    // gates inside probeAllServersHealth aren't enough — check once here.
+    try {
+      const { isChadBlocked, isChad429Blocked } = await import('./anidap.js')
+      if (isChadBlocked() || isChad429Blocked()) {
+        console.log(`${DIM}[health-check]${RESET} chad is blocked — skipping this tick entirely`)
+        return
+      }
+    } catch { /* fall through and probe as usual */ }
+
     // ── Server-level health: probe ALL known anidap servers against
     // One Piece ep 1 so getProviders() can dynamically enable servers
     // that come back online (and disable ones that go down). ──
