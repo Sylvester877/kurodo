@@ -253,7 +253,7 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
   if (!providerName?.startsWith('gogoanime-') && !providerName?.startsWith('megavid')) {
     try {
       const megavidData = await Promise.race([
-        megavidProvider.getStream(anilistId, ep, type, title, { signal }),
+        megavidProvider.getStream(anilistId, ep, type, title, { signal, malId: _query?.malId }),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('megavid timeout')), 20_000),
         ),

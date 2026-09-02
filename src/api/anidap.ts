@@ -174,10 +174,13 @@ export const fetchAnidapStream = (
   ep: number,
   provider: string,
   type: string,
-  opts: { anilistId?: number | null; forceSource?: string | null; signal?: AbortSignal; titles?: { english?: string | null; romaji?: string | null } } = {},
+  opts: { anilistId?: number | null; malId?: number | null; forceSource?: string | null; signal?: AbortSignal; titles?: { english?: string | null; romaji?: string | null } } = {},
 ) => {
   const params = new URLSearchParams()
   if (opts.anilistId) params.set('anilistId', String(opts.anilistId))
+  // The watch route param IS the MAL id — lets the megavid fast path skip
+  // its server-side AniList lookup (seconds saved on cold titles).
+  if (opts.malId) params.set('malId', String(opts.malId))
   if (opts.forceSource) params.set('source', opts.forceSource)
   if (opts.titles?.english) params.set('title_english', opts.titles.english)
   if (opts.titles?.romaji) params.set('title_romaji', opts.titles.romaji)

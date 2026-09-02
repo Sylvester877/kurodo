@@ -641,6 +641,17 @@ export default function Watch() {
     lastStreamErrorProvider.current = null
   }, [currentEp, streamType, anidapSlug])
 
+  // ── User's explicit server choice for THIS episode ──
+  // Recorded by the picker's onChangeProvider; cleared when the episode or
+  // slug changes so a new episode auto-picks the best default again. The
+  // providers-list effect consults this instead of blindly re-picking a
+  // default (which snapped the user's server back to yuki mid-playback).
+  const userPickedRef = useRef<{ ep: number; slug: string; name: string } | null>(null)
+  const [providersLoading, setProvidersLoading] = useState(true)
+  useEffect(() => {
+    userPickedRef.current = null
+  }, [currentEp, anidapSlug])
+
   // ---- When episode or slug changes, load providers ----
   // Bumping `serverReloadKey` re-runs this effect — used by the Retry button.
   const [serverReloadKey, setServerReloadKey] = useState(0)
@@ -658,12 +669,21 @@ export default function Watch() {
     }
     let cancelled = false
     setStreamError(null)
+    setProvidersLoading(true)
     fetchAnidapServers(anidapSlug, currentEp, anilistId, undefined, {
       english: anime?.title_english,
       romaji: anime?.title,
     })
       .then(({ providers: list, unavailable }) => {
         if (cancelled) return
+        setProvidersLoading(false)
+        // ── Keep the user's picked server across list re-resolutions ──
+        // This effect re-runs when the late-resolving anilistId flips
+        // null→number and when the health-poll reloads the list. Re-picking
+        // a DEFAULT here reset activeProvider mid-playback: the "server
+        // snaps back to yuki after 2s" bug and the "player randomly
+        // refreshes ~2s into playback" remount — both fixed by re-picking
+        // ONLY when the user hasn't chosen a server for THIS episode.
         setProviders(list)
         setProvidersUnavailable(!!unavailable)
         // Prefer the current stream type, prefer user's audio setting.
@@ -679,16 +699,27 @@ export default function Watch() {
         // selection can never land on a server the backend just verified
         // dead for this title (kiwi 404-loop class of bug).
         const sameType = list.filter((p) => p.type === targetType)
-        const pick = pickPreferredProvider(sameType, server)
-          ?? pickPreferredProvider(list, server)
-        if (pick) {
-          setActiveProvider(pick.name)
-          setStreamType(pick.type as StreamType)
+        const pickedName = userPickedRef.current?.ep === currentEp ? userPickedRef.current?.name : null
+        if (pickedName) {
+          // User already chose a server for this episode — keep it.
+          setActiveProvider(pickedName)
         } else {
-          setActiveProvider(null)
+          const pick = pickPreferredProvider(sameType, server)
+            ?? pickPreferredProvider(list, server)
+          if (pick) {
+            setActiveProvider(pick.name)
+            setStreamType(pick.type as StreamType)
+          } else {
+            setActiveProvider(null)
+          }
         }
       })
-      .catch((e) => !cancelled && setStreamError(friendlyError(e)))
+      .catch((e) => {
+        if (!cancelled) {
+          setProvidersLoading(false)
+          setStreamError(friendlyError(e))
+        }
+      })
     // Server reload key + identity params are the only true triggers.
     // Adding streamType, server as deps would re-fetch on
     // every server-preference change during page load.
@@ -761,6 +792,7 @@ export default function Watch() {
         const curPObj = providers.find((p) => p.name === providerName && p.type === streamType)
         const data = await fetchAnidapStream(anidapSlug, currentEp, providerName, streamType, {
           anilistId,
+          malId,
           forceSource: curPObj?._provider,
           titles: { english: anime?.title_english, romaji: anime?.title },
         })
@@ -1176,8 +1208,11 @@ export default function Watch() {
               >
                 ← Back to details
               </Link>
-              {/* No servers available — slug resolved but 0 providers */}
-              {!streamError && !streamLoading && providers.length === 0 && anidapSlug ? (
+              {/* No servers available — slug resolved but 0 providers.
+                  While the list is still loading, show a skeleton instead:
+                  the empty state here made every cold first-open flash
+                  "No servers available" before the real list arrived. */}
+              {!streamError && !streamLoading && providers.length === 0 && anidapSlug && !providersLoading ? (
                 <div className="relative text-center p-6 max-w-sm">
                   <AlertCircle className="h-10 w-10 text-yellow-400 mx-auto mb-3" />
                   <p className="text-sm text-white/80 font-semibold mb-1">
@@ -1640,8 +1675,10 @@ export default function Watch() {
               streamType={streamType}
               activeProvider={activeProvider}
               unavailable={providersUnavailable}
+              loading={providersLoading}
               onChangeProvider={(name) => {
                 setStreamError(null)
+                userPickedRef.current = { ep: currentEp, slug: anidapSlug || '', name }
                 setActiveProvider(name)
               }}
               onChangeType={(t) => setStreamType(t as StreamType)}

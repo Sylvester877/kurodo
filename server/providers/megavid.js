@@ -66,7 +66,12 @@ function prune(map, max = 300) {
   for (const [k, v] of map) if (now - v.at > 60 * 60 * 1000) map.delete(k)
 }
 
-async function resolveMalId(anilistId, title) {
+async function resolveMalId(anilistId, title, opts = {}) {
+  // ── Fast path: the client already knows the MAL id (it's the watch route
+  // param!) — pass it through and skip the AniList round-trip (~0.7-3s cold).
+  if (Number.isFinite(Number(opts.malId)) && Number(opts.malId) > 0) {
+    return Number(opts.malId)
+  }
   if (!anilistId && !title) return null
   const key = String(anilistId || title?.english || title?.romaji || '')
   const hit = cacheGet(titleCache, key, TITLE_TTL)
@@ -120,7 +125,7 @@ export const megavidProvider = {
   async getStream(anilistId, ep, type = 'sub', title = null, opts = {}) {
     const epNum = Number(ep) || 1
     const t0 = Date.now()
-    const malId = await resolveMalId(anilistId, title)
+    const malId = await resolveMalId(anilistId, title, opts)
     console.log(`[megavid] resolveMalId(${anilistId}) -> ${malId} in ${Date.now() - t0}ms`)
     if (!malId) return null
 

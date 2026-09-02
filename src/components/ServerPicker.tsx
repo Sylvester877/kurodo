@@ -12,6 +12,10 @@ interface Props {
   onChangeType: (type: string) => void
   /** True when the source confirmed this anime isn't available at all. */
   unavailable?: boolean
+  /** True while the provider list is still being fetched — show a
+   *  skeleton instead of the "no servers" empty state, which otherwise
+   *  flashes on every cold first-open before the real list lands. */
+  loading?: boolean
 }
 
 const TYPE_META: Record<string, { label: string; icon: typeof Mic }> = {
@@ -49,7 +53,7 @@ function cleanServerName(name: string): string {
  */
 export default function ServerPicker({
   providers, streamType, activeProvider,
-  onChangeProvider, onChangeType, unavailable,
+  onChangeProvider, onChangeType, unavailable, loading,
 }: Props) {
   // Group by type, then sort within each type via sortProviders.
   // sortProviders ranks chad's live `tip` ("High quality" = 1080p-capable
@@ -83,6 +87,29 @@ export default function ServerPicker({
   }, [currentList])
 
   if (providers.length === 0) {
+    // ── Loading skeleton ──
+    // The provider list can take a few seconds on a cold title (roster +
+    // verification). Rendering the empty state during that window made
+    // every first-open flash "No servers available" before the list came.
+    if (loading && !unavailable) {
+      return (
+        <div className="glass-card rounded-2xl p-6 border border-white/5 bg-black/20">
+          <div className="flex items-center gap-2 mb-4">
+            <Server className="h-4 w-4 text-white/40 animate-pulse" />
+            <span className="text-xs font-semibold text-white/50">Finding servers…</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[64, 52, 58, 46, 60].map((w, i) => (
+              <div
+                key={i}
+                className="h-8 rounded-lg bg-white/[0.05] animate-pulse"
+                style={{ width: `${w}px` }}
+              />
+            ))}
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="glass-card flex flex-col items-center justify-center rounded-2xl p-8 text-center border border-white/5 bg-black/20">
         <div className="h-12 w-12 rounded-full bg-white/5 flex items-center justify-center mb-4">

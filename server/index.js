@@ -543,6 +543,9 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
   const { slug, ep, provider, type } = req.params
   const anilistId = req.query.anilistId ? Number(req.query.anilistId) : null
   const title = { english: req.query.title_english, romaji: req.query.title_romaji }
+  // The watch route IS the MAL id — pass it so the megavid fast path can
+  // skip its AniList id lookup entirely (~0.7-3s saved on cold titles).
+  const malId = req.query.malId ? Number(req.query.malId) : null
 
   // Check stream-level negative cache first — fast-fail known-dead combos
   const streamKey = `${slug || anilistId || ''}:${ep}:${provider}:${type}`
@@ -574,7 +577,7 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
   const budget = 40_000
   try {
     const data = await Promise.race([
-      routedGetStream(anilistId, slug, Number(ep), provider, type, req.query, title, extractionAbort.signal),
+      routedGetStream(anilistId, slug, Number(ep), provider, type, { ...req.query, malId }, title, extractionAbort.signal),
       new Promise((_, reject) =>
         setTimeout(() => {
           extractionAbort.abort(new Error('Stream extraction timed out'))
