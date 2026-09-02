@@ -68,6 +68,37 @@ async function throttledGet(url, opts = {}, retries = 2) {
 }
 
 const slugCache = new Map()
+
+// Cheap pre-flight cache: slugs confirmed NOT on this mirror (their episode
+// URL redirects to the homepage). One HTTP GET is enough; don't re-probe the
+// same slug for an hour — repeated provider attempts would otherwise each
+// launch a ~30s browser extraction only to fail.
+const mirrorMissCache = new Map() // slug -> expiry (ms)
+const MIRROR_MISS_TTL = 60 * 60 * 1000
+
+// Fast existence check (~1-2s via throttledGet): gogoanime.by redirects
+// unknown/new slugs to the homepage (`final URL == BASE`). Detect that
+// BEFORE the ~30s browser extraction so titles that aren't on this mirror
+// fail fast instead of grinding every provider in the fallback chain.
+async function episodeOnMirror(watchUrl, slug) {
+  if (!slug) return true
+  const cached = mirrorMissCache.get(slug)
+  if (cached && Date.now() < cached) return false
+  try {
+    const r = await throttledGet(watchUrl, { maxRedirects: 5, validateStatus: () => true })
+    const finalUrl = (r?.request?.res?.responseUrl || r?.request?.responseURL || watchUrl)
+    const landedHome = /^https?:\/\/gogoanime\.by\/?$/.test(finalUrl)
+    if (landedHome) {
+      mirrorMissCache.set(slug, Date.now() + MIRROR_MISS_TTL)
+      return false
+    }
+    return true
+  } catch {
+    // Network/proxy error here — let the real extraction decide (it may
+    // have a working proxy). Don't negative-cache on a transport failure.
+    return true
+  }
+}
 const titleCache = new Map()
 const SLUG_TTL = 24 * 60 * 60 * 1000
 const TITLE_TTL = 7 * 24 * 60 * 60 * 1000
@@ -83,6 +114,27 @@ async function slugExists(slug) {
   return null
 }
 
+// Score a mirror slug against the query title by shared-word overlap.
+// Handles the season aliasing that defeats the old exact-substring match:
+// "Mushoku Tensei Season 3" -> "mushoku-tensei-ii-isekai-ittara-honki-dasu-
+// part-2" (shares mushoku/tensei) and "Reincarnated as a Slime Season 4"
+// -> "tensei-shitara-slime-datta-ken-4th-season" (shares tensei/slime/season).
+function tokenOverlapScore(slug, title) {
+  const slugTok = new Set((slug || '').toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1))
+  const titleTok = (title || '').toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2)
+  const norm = (t) => (t === 'ii' ? '2' : t === 'iii' ? '3' : t === 'iv' ? '4' : t === 'v' ? '5' : t)
+  const STOP = new Set(['season', 'part', 'the', 'of', 'and', 'movie', 'anime'])
+  let matched = 0
+  for (const tok of titleTok) {
+    const n = norm(tok)
+    if (slugTok.has(tok) || slugTok.has(n)) matched++
+  }
+  const coverage = titleTok.length ? matched / titleTok.length : 0
+  const meaningful = titleTok.filter((t) => !STOP.has(t) && !/^[ivx]+$/i.test(t)).length
+  const meaningfulMatched = titleTok.filter((t) => !STOP.has(t) && !/^[ivx]+$/i.test(t) && (slugTok.has(t) || slugTok.has(norm(t)))).length
+  return { score: coverage + (meaningful ? 0.3 * (meaningfulMatched / meaningful) : 0), coverage, meaningful, meaningfulMatched }
+}
+
 async function searchByTitle(title) {
   if (!title) return null
   const q = encodeURIComponent(title.replace(/[^a-zA-Z0-9 ]/g, '').trim())
@@ -91,17 +143,29 @@ async function searchByTitle(title) {
     const { data: body } = await throttledGet(`${BASE}/?s=${q}`)
     const matches = [...body.matchAll(/href="https?:\/\/gogoanime\.by\/(series|category)\/([^"]+)"/gi)]
     const slugs = [...new Set(matches.map(m => m[2].replace(/\/$/, '')))]
+    if (slugs.length === 0) return null
     const titleSlug = titleToSlug(title)
-    const match = slugs.find(s => s.includes(titleSlug) || titleSlug.includes(s))
-    if (match) return match
-    if (slugs.length > 0) {
-      const verified = await slugExists(titleToSlug(title))
-      if (verified) return verified
+    // Exact match wins immediately.
+    const exact = slugs.find((s) => s === titleSlug || s.includes(titleSlug) || titleSlug.includes(s))
+    if (exact) return exact
+    // Otherwise pick the best token-overlap candidate above a floor. Guard
+    // against cross-title false positives (e.g. "Mushoku Tensei III" must
+    // not resolve to Slime S3 just because they share "tensei") by requiring
+    // the title's LEADING distinctive token to also appear in the slug.
+    const STOP = new Set(['season', 'part', 'the', 'of', 'and', 'movie', 'anime'])
+    const titleTok = (title || '').toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2)
+    const lead = titleTok.find((t) => !STOP.has(t) && !/^[ivx]+$/i.test(t))
+    const candidates = slugs.map((s) => ({ s, ...tokenOverlapScore(s, title) }))
+    let best = null
+    let bestScore = 0
+    for (const c of candidates) {
+      if (lead && !c.s.includes(lead)) continue
+      if (c.score > bestScore) { bestScore = c.score; best = c.s }
     }
+    if (best && bestScore >= 0.45) return best
     return null
   } catch {}
-  const verified = await slugExists(titleToSlug(title))
-  return verified
+  return null
 }
 
 async function getAniListMedia(anilistId) {
@@ -263,6 +327,14 @@ export const gogoanimeProvider = {
     ]
 
     for (const watchUrl of urls) {
+      // Cheap pre-flight first: if this slug isn't on the mirror, its URL
+      // redirects to the homepage — skip the expensive browser extraction
+      // so a provider attempt fails in ~2s instead of ~30s.
+      const onMirror = await episodeOnMirror(watchUrl, slug)
+      if (!onMirror) {
+        console.log(`[gogoanime] ${slug} not on mirror (pre-flight miss) — skipping ${watchUrl}`)
+        continue
+      }
       console.log(`[gogoanime] Trying: ${watchUrl}${preferDub ? ' (preferDub)' : ''}`)
       try {
         const data = await extractStreamFromWatchPage(watchUrl, { preferDub, signal: opts.signal })
