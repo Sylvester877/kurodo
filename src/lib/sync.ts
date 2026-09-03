@@ -28,6 +28,21 @@ export function initSyncBridge(): void {
     onRemove:   (id)       => { void syncRemove(id) },
     onProgress: (id, ep)   => { void syncProgress(id, ep) },
   })
+
+  // Flush episodes watched while signed out as soon as a token appears
+  // (covers: sign-in from another tab, token relay from the external
+  // browser, and the /auth/callback round-trip).
+  if (typeof window !== 'undefined') {
+    useAuthStore.subscribe((state, prev) => {
+      const token = state.auth?.token
+      if (token && token !== prev.auth?.token) void flushPendingProgress()
+    })
+    // Also flush on startup if already signed in (crashed/queued offline)
+    if (useAuthStore.getState().auth?.token) {
+      window.addEventListener('online', () => { void flushPendingProgress() })
+      window.requestIdleCallback?.(() => { void flushPendingProgress() }, { timeout: 5000 })
+    }
+  }
 }
 
 // Map MAL id → AniList list entry id (so we can DELETE later).
@@ -46,6 +61,67 @@ const malToAniId = new Map<number, number>()
 // Lets syncProgress avoid downgrading COMPLETED back to CURRENT when
 // the user re-watches an episode they've already finished.
 const malToStatus = new Map<number, ListStatus>()
+
+// ── Pending progress queue ───────────────────────────────────────
+// Episodes finished while signed OUT (or while the network/AniList was
+// down) used to be silently dropped — they never reached AniList. Now
+// they persist here (localStorage) and flush automatically on sign-in.
+const PENDING_SYNC_KEY = 'kurodo-pending-anilist-progress'
+type PendingProgress = Record<number, number> // malId → highest episode
+
+function loadPendingProgress(): PendingProgress {
+  try { return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY) || '{}') }
+  catch { return {} }
+}
+
+function savePendingProgress(p: PendingProgress): void {
+  try { localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(p)) }
+  catch { /* storage full — non-fatal */ }
+}
+
+function queuePendingProgress(malId: number, episode: number): void {
+  const pending = loadPendingProgress()
+  // Keep the HIGHEST episode — AniList progress is a single number, and
+  // watching ep 5 implies 1–4.
+  if ((pending[malId] ?? 0) >= episode) return
+  pending[malId] = episode
+  savePendingProgress(pending)
+  console.log(`[sync] queued pending AniList progress: MAL ${malId} → ep ${episode}`)
+}
+
+/**
+ * Push every queued episode to AniList. Called automatically on sign-in
+ * (see initSyncBridge); safe to call any time — it's a no-op when signed
+ * out or when the queue is empty. Returns how many entries synced.
+ */
+export async function flushPendingProgress(): Promise<number> {
+  const pending = loadPendingProgress()
+  const malIds = Object.keys(pending).map(Number)
+  if (malIds.length === 0) return 0
+  if (!getToken()) return 0
+
+  let synced = 0
+  for (const malId of malIds) {
+    const episode = pending[malId]
+    try {
+      // Run the real sync path (it clears nothing itself — we clear per
+      // success below). Temporarily remove the entry so a concurrent
+      // markEpisodeWatched during the await re-queues it if newer.
+      delete pending[malId]
+      savePendingProgress(pending)
+      await syncProgress(malId, episode)
+      synced++
+    } catch {
+      // Re-queue for the next flush
+      queuePendingProgress(malId, episode)
+    }
+  }
+  if (synced > 0) {
+    console.log(`[sync] flushed ${synced} pending progress update(s) to AniList`)
+    toast.success(`Synced ${synced} watched episode${synced > 1 ? 's' : ''} to AniList`, 3000)
+  }
+  return synced
+}
 
 function getToken(): string | null {
   return useAuthStore.getState().auth?.token ?? null
@@ -116,7 +192,11 @@ async function getTotalEpisodesCached(malId: number, aniId: number): Promise<num
 
 export async function syncProgress(malId: number, episode: number) {
   const token = getToken()
-  if (!token) return
+  if (!token) {
+    // Signed out — remember it and sync automatically once they sign in.
+    queuePendingProgress(malId, episode)
+    return
+  }
   if (getSettings().autoSyncAniList === false) {
     console.log('[sync] AniList auto-sync disabled; skipping progress update')
     return
@@ -166,7 +246,8 @@ export async function syncProgress(malId: number, episode: number) {
       }
     }
   } catch (e) {
-    console.warn('AniList sync (progress) failed', e)
+    console.warn('AniList sync (progress) failed — queued for retry on next sign-in', e)
+    queuePendingProgress(malId, episode)
   }
 
   // Schedule a batched activity post (silent for solo episodes, one
