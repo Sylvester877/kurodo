@@ -258,6 +258,20 @@ function createMainWindow() {
   win.removeMenu()
   mainWinCreatedAt = Date.now()
 
+  // Purge any service-worker registration/caches left over from previous
+  // versions (they preload a stale SPA shell → blank window after update).
+  // Idempotent and cheap once clean.
+  win.webContents.on('did-finish-load', () => {
+    win.webContents
+      .executeJavaScript(`(async () => { try {
+        const regs = await navigator.serviceWorker?.getRegistrations?.() || []
+        for (const r of regs) await r.unregister()
+        for (const n of await caches.keys()) await caches.delete(n)
+        return regs.length
+      } catch { return -1 } })()`)
+      .catch(() => {})
+  })
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http')) {
       shell.openExternal(url)
@@ -1623,6 +1637,23 @@ ipcMain.handle('torrent:extractSubtitle', async (_event, { infoHash, fileIndex, 
 
 app.whenReady().then(async () => {
   console.log('[electron] Starting Kurōdo...')
+
+  // ── Block the web-PWA service worker (desktop app must not use it) ──
+  // The SW precaches the SPA shell + hashed chunks. After an app update the
+  // precached shell references chunk filenames that no longer exist on disk,
+  // and the renderer dies with a PERMANENTLY BLANK window (root cause of the
+  // "blank Kurōdo after update" bug). In-browser PWA installs still get the
+  // SW — this only affects the Electron session, where we control updates
+  // and the SW is pure downside.
+  try {
+    session.defaultSession.webRequest.onBeforeRequest(
+      { urls: ['*://*/sw.js', '*://*/registerSW.js', '*://*/workbox-*'] },
+      (_details, callback) => callback({ cancel: true }),
+    )
+    console.log('[electron] Web-PWA service worker blocked for this session')
+  } catch (err) {
+    console.warn('[electron] Could not install SW blocker:', err.message)
+  }
 
   // Start the torrent streaming server
   torrentStreamServer.listen(TORRENT_STREAM_PORT, '127.0.0.1', () => {

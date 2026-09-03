@@ -3439,6 +3439,12 @@ if (isProduction) {
         // Service worker MUST have short cache (browser checks for updates)
         res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
         res.setHeader('Service-Worker-Allowed', '/')
+      } else if (basename === 'index.html' || basename === 'manifest.webmanifest') {
+        // NEVER cache the SPA shell — it references hashed chunks that are
+        // deleted on rebuild. A cached stale shell 404s its own entry chunk
+        // and renders a permanently blank app (root cause of the "blank
+        // window after update" bug). max-age=0 forces revalidation.
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
       } else {
         res.setHeader('Cache-Control', 'public, max-age=3600')
       }
@@ -3462,6 +3468,7 @@ if (isProduction) {
       return res.status(404).type('text/plain').send('Not found')
     }
     const indexPath = path.join(distPath, 'index.html')
+    // (SPA shell is served with max-age=0; see static block above)
     if (fs.existsSync(indexPath)) {
       // Prevent browser caching of index.html so new deploys take effect
       res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
