@@ -150,8 +150,17 @@ export async function searchManga(query, { limit = 24, offset = 0 } = {}) {
     }
     const { data } = await api.get('/collections/manga/documents/search', { params })
     const hits = data.hits || []
+    // Adult-content guard: Typesense has no content-rating filter, so drop
+    // hentai-labeled titles after the fact (belt-and-braces — the app never
+    // surfaces them from any provider).
+    const HENTAI_RE = /\bhentai\b|\bh-?\s?anime\b|pornograph/i
+    const filtered = hits.filter((h) => {
+      const doc = h.document || h
+      const t = `${doc.title || ''} ${doc.englishTitle || ''} ${doc.synopsis || ''}`
+      return !HENTAI_RE.test(t)
+    })
     return {
-      results: hits.map((h) => normalizeSearchResult(h.document || h)),
+      results: filtered.map((h) => normalizeSearchResult(h.document || h)),
       total: data.found || 0,
       offset,
       limit,

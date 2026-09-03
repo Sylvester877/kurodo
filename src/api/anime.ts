@@ -279,6 +279,16 @@ export interface SearchFilters {
   sfw?: boolean
 }
 
+// Adult-content guard: strip entries tagged Hentai/Erotica no matter which
+// source returned them (Jikan SFW and AniList isAdult aren't always complete).
+const NSFW_GENRES = new Set(['Hentai', 'Erotica'])
+function stripNsfw(res: AnimeSearchResponse): AnimeSearchResponse {
+  res.data = (res.data || []).filter(
+    (m) => !(m.genres || []).some((g) => NSFW_GENRES.has(g.name || '')),
+  )
+  return res
+}
+
 export async function searchAnime(
   query: string, page = 1, limit = 24,
   filters: SearchFilters = {},
@@ -299,7 +309,9 @@ export async function searchAnime(
   if (filters.minScore != null) params.min_score = filters.minScore
   if (filters.yearFrom != null) params.start_date = `${filters.yearFrom}-01-01`
   if (filters.yearTo != null) params.end_date = `${filters.yearTo}-12-31`
-  if (filters.sfw) params.sfw = true
+  // Adult content is never welcome in search results — SFW is always on
+  // regardless of user filters.
+  params.sfw = true
 
   // Race Jikan vs AniList — return whichever responds first so the user
   // never waits 20s for a slow/504 upstream. Jikan provides richer data
@@ -309,12 +321,12 @@ export async function searchAnime(
   if (hasActiveFilters) {
     // Filters only work with Jikan — AniList fallback is title-only.
     try {
-      const res = await cachedGet<AnimeSearchResponse>('/anime', params)
+      const res = stripNsfw(await cachedGet<AnimeSearchResponse>('/anime', params))
       if (res.data && res.data.length > 0) return res
       throw new Error('Jikan returned empty results')
     } catch (err) {
       console.warn('[searchAnime] Jikan filtered search failed, falling back to AniList', err)
-      return searchAnimeAniList(query, page, limit)
+      return stripNsfw(await searchAnimeAniList(query, page, limit))
     }
   }
 
@@ -322,10 +334,10 @@ export async function searchAnime(
   return new Promise((resolve) => {
     let settled = false
     const jikanPromise = cachedGet<AnimeSearchResponse>('/anime', params)
-      .then((r) => { if (!settled && r.data?.length > 0) { settled = true; resolve(r) } })
+      .then((r) => { const f = stripNsfw(r); if (!settled && f.data?.length > 0) { settled = true; resolve(f) } })
       .catch(() => {})
     const anilistPromise = searchAnimeAniList(query, page, limit)
-      .then((r) => { if (!settled) { settled = true; resolve(r) } })
+      .then((r) => { if (!settled) { settled = true; resolve(stripNsfw(r)) } })
       .catch(() => {})
     // 8s hard cap — neither source should take longer than this.
     setTimeout(() => {

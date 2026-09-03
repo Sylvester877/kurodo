@@ -427,7 +427,7 @@ export async function searchAnimeAniList(
     `query ($q: String, $page: Int, $perPage: Int) {
       Page(page: $page, perPage: $perPage) {
         pageInfo { hasNextPage currentPage lastPage }
-        media(search: $q, type: ANIME, sort: SEARCH_MATCH) {
+        media(search: $q, type: ANIME, sort: SEARCH_MATCH, isAdult: false) {
           id idMal
           title { romaji english native }
           description(asHtml: false)

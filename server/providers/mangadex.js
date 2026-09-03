@@ -111,7 +111,8 @@ export async function searchManga(query, { limit = 24, offset = 0 } = {}) {
       limit,
       offset,
       'includes[]': 'cover_art',
-      'contentRating[]': ['safe', 'suggestive', 'erotica'],
+      // Erotica/pornographic excluded — hentai must never surface in search.
+      'contentRating[]': ['safe', 'suggestive'],
       'order[relevance]': 'desc',
     }
     const { data } = await api.get('/manga', { params })
@@ -324,7 +325,8 @@ export async function browseManga({
       limit,
       offset,
       'includes[]': 'cover_art',
-      'contentRating[]': ['safe', 'suggestive', 'erotica'],
+      // Same policy as search — no erotica, no pornographic.
+      'contentRating[]': ['safe', 'suggestive'],
     }
 
     // Genre → tag UUIDs

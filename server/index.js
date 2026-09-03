@@ -1892,6 +1892,25 @@ function getJikanCacheKey(path, query) {
   return `jikan:${path}:${JSON.stringify(query || {})}`
 }
 
+// ── Adult-content guard (server-side, applies to every Jikan consumer) ──
+// Jikan's sfw=true still returns Hentai/Erotica-tagged entries for hentai
+// queries. This strips them from any response shape that carries an anime
+// list (search, top, seasons, genres…). Applied AFTER caching so poisoned
+// upstream responses can't linger in the cache either.
+const JIKAN_NSWF_GENRES = new Set(['Hentai', 'Erotica'])
+function filterNsfwJikanResponse(data) {
+  if (!data || typeof data !== 'object') return data
+  if (Array.isArray(data.data)) {
+    data.data = data.data.filter((m) => {
+      if (!m || typeof m !== 'object') return true
+      const genres = Array.isArray(m.genres) ? m.genres : []
+      const explicit = Array.isArray(m.explicit_genres) ? m.explicit_genres : []
+      return ![...genres, ...explicit].some((g) => JIKAN_NSWF_GENRES.has(g?.name))
+    })
+  }
+  return data
+}
+
 function pruneJikanCache() {
   const now = Date.now()
   for (const [key, value] of jikanCache) {
@@ -2090,7 +2109,7 @@ app.get('/api/jikan/*', async (req, res) => {
     if (winner) {
       jikanCache.set(cacheKey, { at: Date.now(), data: winner })
       if (jikanCache.size % 50 === 0) pruneJikanCache()
-      return res.status(200).json(winner)
+      return res.status(200).json(filterNsfwJikanResponse(winner))
     }
 
     // ── Both sources failed or timed out — graceful degradation ──

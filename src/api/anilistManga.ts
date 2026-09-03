@@ -111,7 +111,7 @@ export async function searchMangaAniList(query_: string, perPage = 24): Promise<
   const data = await query<{ Page: { media: MangaFeedMedia[] } }>(
     `query ($q: String, $perPage: Int) {
       Page(page: 1, perPage: $perPage) {
-        media(search: $q, type: MANGA, sort: SEARCH_MATCH) {
+        media(search: $q, type: MANGA, sort: SEARCH_MATCH, isAdult: false) {
           ${MANGA_FIELDS}
         }
       }
@@ -136,7 +136,7 @@ export async function searchMangaAniListPaginated(
   }>(
     `query ($q: String, $page: Int, $perPage: Int) {
       Page(page: $page, perPage: $perPage) {
-        media(search: $q, type: MANGA, sort: SEARCH_MATCH) {
+        media(search: $q, type: MANGA, sort: SEARCH_MATCH, isAdult: false) {
           ${MANGA_FIELDS}
         }
         pageInfo { total perPage currentPage lastPage hasNextPage }
