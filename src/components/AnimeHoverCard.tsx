@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Clock, Tv } from 'lucide-react'
+import { Star, Play } from 'lucide-react'
 import { getImageUrl, formatScore, pickTitle } from '../lib/utils'
 import { useSettings } from '../store/useSettings'
 import type { Anime } from '../types'
@@ -13,7 +13,7 @@ interface Props {
 
 const HOVER_DELAY = 400
 const LEAVE_DELAY = 200
-const CARD_WIDTH = 280
+const CARD_WIDTH = 320
 const CARD_MARGIN = 12
 
 /**
@@ -63,8 +63,9 @@ export default function AnimeHoverCard({ anime, children }: Props) {
     }
 
     // Clamp top so card stays in viewport with 12px breathing room
-    const cardTop = rect.top > 0 ? rect.top : 0
-    const top = Math.max(12, Math.min(cardTop, viewH - 420))
+    // (card ≈ 330px tall: banner 110 + title + meta + genres + synopsis + footer)
+    const cardTop = rect.top > 0 ? rect.top - 20 : 0
+    const top = Math.max(12, Math.min(cardTop, viewH - 360))
 
     return {
       position: 'fixed',
@@ -108,9 +109,18 @@ export default function AnimeHoverCard({ anime, children }: Props) {
   useEffect(() => clearTimers, [clearTimers])
 
   const synopsis = anime.synopsis
-  const genres = anime.genres?.slice(0, 6) ?? []
-  const studios = anime.studios?.slice(0, 2) ?? []
+  const genres = anime.genres?.slice(0, 3) ?? []
 
+  // Landscape banner for the header — trailer thumbnail (1280x720) when
+  // available, else the poster stretched behind a gradient (still looks
+  // intentional under the blur overlay).
+  const bannerSrc =
+    anime.trailer?.images?.maximum_image_url ||
+    anime.trailer?.images?.large_image_url ||
+    getImageUrl(anime)
+
+  // Aniclover-style hover card: banner header with overlapping poster,
+  // score • type • year meta row, genre pills, synopsis, details footer.
   const hoverCard = (
     <AnimatePresence>
       {visible && (
@@ -125,80 +135,91 @@ export default function AnimeHoverCard({ anime, children }: Props) {
           }}
           onMouseLeave={onMouseLeave}
         >
-          <div className="rounded-2xl bg-zinc-900/98 border border-white/10 shadow-lg shadow-black/50 overflow-hidden relative">
-            {/* Cover image strip */}
-            <div className="relative h-32 overflow-hidden">
+          <div className="rounded-2xl bg-zinc-900/[0.97] border border-white/10 shadow-2xl shadow-black/60 overflow-hidden relative backdrop-blur-xl">
+            {/* ── Banner header with overlapping poster ── */}
+            <div className="relative h-[110px]">
               <img
-                src={getImageUrl(anime)}
+                src={bannerSrc}
                 alt=""
-                className="w-full h-full object-cover opacity-80"
+                className="w-full h-full object-cover"
                 loading="lazy"
+                onError={(e) => { e.currentTarget.style.opacity = '0' }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/35 to-transparent" />
+
+              {/* Poster — overlaps the banner's bottom edge, aniclover-style */}
+              <div className="absolute left-4 bottom-[-26px] h-[96px] w-[68px] rounded-xl overflow-hidden border-2 border-white/15 shadow-lg shadow-black/50 bg-zinc-800">
+                <img
+                  src={getImageUrl(anime)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
             </div>
 
-            {/* Score badge */}
-            {anime.score && (
-              <div className="absolute top-3 right-3 glass-pill py-0.5 px-2 bg-black/70 border-white/10 text-xs font-bold text-white tabular-nums shadow-lg">
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                <span>{formatScore(anime.score)}</span>
-              </div>
-            )}
-
-            {/* Content */}
-            <div className="p-4 pt-3 space-y-2.5">
+            {/* ── Title sits right of the overlapping poster ── */}
+            <div className="pl-[92px] pr-4 pt-2 min-h-[64px]">
               <h4 className="text-sm font-bold text-white leading-snug line-clamp-2">
                 {displayTitle}
               </h4>
+            </div>
 
-              {/* Meta row */}
-              <div className="flex items-center gap-2 text-[10px] text-white/45 font-medium flex-wrap">
-                {anime.type && (
-                  <span className="flex items-center gap-1">
-                    <Tv className="h-3 w-3" />{anime.type}
+            {/* ── Meta row: ★ score • type • year ── */}
+            <div className="px-4 pt-1 flex items-center gap-1.5 text-xs text-white/60 font-medium">
+              {anime.score && (
+                <span className="flex items-center gap-1 text-white font-semibold">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                  {formatScore(anime.score)}
+                </span>
+              )}
+              {anime.type && (
+                <>
+                  <span className="text-white/25">•</span>
+                  <span>{anime.type}</span>
+                </>
+              )}
+              {anime.year && (
+                <>
+                  <span className="text-white/25">•</span>
+                  <span>{anime.year}</span>
+                </>
+              )}
+              {anime.episodes && (
+                <>
+                  <span className="text-white/25">•</span>
+                  <span>{anime.episodes} EP</span>
+                </>
+              )}
+            </div>
+
+            {/* ── Genre pills ── */}
+            {genres.length > 0 && (
+              <div className="px-4 pt-2.5 flex items-center gap-1.5 flex-wrap">
+                {genres.map((g) => (
+                  <span
+                    key={g.mal_id}
+                    className="text-[10px] font-medium text-white/75 border border-white/15 rounded-full px-2.5 py-0.5 bg-white/[0.03]"
+                  >
+                    {g.name}
                   </span>
-                )}
-                {anime.episodes && <span>{anime.episodes} eps</span>}
-                {anime.duration && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />{anime.duration}
-                  </span>
-                )}
-                {anime.year && <span>{anime.year}</span>}
+                ))}
               </div>
+            )}
 
-              {/* Genres */}
-              {genres.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {genres.map((g) => (
-                    <span
-                      key={g.mal_id}
-                      className="glass-pill text-[9px] py-0.5 px-1.5"
-                    >
-                      {g.name}
-                    </span>
-                  ))}
-                </div>
-              )}
+            {/* ── Synopsis ── */}
+            {synopsis && (
+              <p className="px-4 pt-2.5 text-[11.5px] text-white/60 leading-relaxed line-clamp-4">
+                {synopsis}
+              </p>
+            )}
 
-              {/* Synopsis */}
-              {synopsis && (
-                <p className="text-[11px] text-white/55 leading-relaxed line-clamp-3">
-                  {synopsis}
-                </p>
-              )}
-
-              {/* Studios */}
-              {studios.length > 0 && (
-                <div className="flex items-center gap-1.5 pt-1 border-t border-white/[0.06]">
-                  <span className="text-[9px] text-white/30 uppercase tracking-wider">Studio</span>
-                  {studios.map((s) => (
-                    <span key={s.mal_id} className="text-[10px] font-medium text-white/50">
-                      {s.name}
-                    </span>
-                  ))}
-                </div>
-              )}
+            {/* ── Footer: click-through hint ── */}
+            <div className="mt-3 px-4 py-2.5 border-t border-white/[0.07] flex items-center gap-2">
+              <span className="h-5 w-5 rounded-full bg-white/10 grid place-items-center">
+                <Play className="h-2.5 w-2.5 fill-white text-white ml-px" />
+              </span>
+              <span className="text-xs font-medium text-white/70">Click to view details</span>
             </div>
           </div>
         </motion.div>
