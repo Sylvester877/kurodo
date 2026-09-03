@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea too small for an issue?
+    url: https://github.com/Sylvester877/kurodo/discussions
+    about: Open a discussion — feature ideas and questions live there.
