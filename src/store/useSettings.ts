@@ -102,24 +102,6 @@ export interface SettingsState {
 
   // ───── AniList activity ─────
   autoSyncAniList: boolean
-  autoPostActivity: boolean
-  /** Minimum episodes per batch before we post (1 = post even single
-   *  episodes — maximum reach; 2+ = quieter, only binges). */
-  activityMinEpisodes: number
-  /** Auto-flush debounce in seconds (5..600). Default 60. */
-  activityFlushSeconds: number
-  /** Include a Kurōdo link + sign-off line in posts. Off for a no-promo
-   *  feed; on by default to help the app go viral. */
-  activityBranded: boolean
-  /** Auto-fire a special celebration post when finishing an anime. */
-  activityCelebrateCompletion: boolean
-  /** User-customizable template for the headline line. The following
-   *  tokens are interpolated:
-   *    {title}     anime title
-   *    {episodes}  "episode 5" / "episodes 2–8" / "episodes 2, 5, 9"
-   *    {emoji}     a contextual emoji (📺 for binges, 🎬 for solo, 🎉 for last)
-   *  Leave blank to use the default. */
-  activityTemplate: string
 
   // ───── Player extras ─────
   /** Loop the current video when it ends. */
@@ -200,12 +182,6 @@ const DEFAULTS: Omit<SettingsState, 'set' | 'reset'> = {
   showDubBadges: true,
 
   autoSyncAniList: true,
-  autoPostActivity: true,
-  activityMinEpisodes: 1,
-  activityFlushSeconds: 60,
-  activityBranded: true,
-  activityCelebrateCompletion: true,
-  activityTemplate: '',
 
   loop: false,
   videoFit: 'contain',

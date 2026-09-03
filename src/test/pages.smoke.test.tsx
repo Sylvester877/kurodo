@@ -91,14 +91,6 @@ describe('Page smoke', () => {
     })
   })
 
-  it('Activity mounts', async () => {
-    const { default: Activity } = await import('../pages/Activity')
-    renderWithProviders(<Activity />, {
-      routerProps: { initialEntries: ['/activity'] },
-      withToaster: true,
-    })
-  })
-
   it('Profile mounts', async () => {
     const { default: Profile } = await import('../pages/Profile')
     renderWithProviders(<Profile />, {

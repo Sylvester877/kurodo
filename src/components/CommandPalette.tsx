@@ -14,7 +14,6 @@ import { searchAnime } from '../api/anime'
 import { useAuthStore } from '../store/useAuthStore'
 import { useSettings } from '../store/useSettings'
 import { useWatchListStore } from '../store/useWatchListStore'
-import { flushAllActivity } from '../lib/sync'
 import { clearPersistedCache } from '../lib/queryClient'
 import { preloaderForPath } from '../lib/routePreloaders'
 import { getSmallImageUrl, cn } from '../lib/utils'
@@ -294,21 +293,6 @@ export default function CommandPalette() {
           setTimeout(() => window.location.reload(), 600)
         },
       })
-
-      // Activity-related
-      if (auth) {
-        cmds.push({
-          id: 'flush-activity',
-          kind: 'action',
-          label: 'Flush pending AniList activity now',
-          keywords: 'post send activity now',
-          icon: <Send className="h-4 w-4 text-primary" />,
-          perform: () => {
-            flushAllActivity()
-            toast.info('Posting buffered activity…', 2500)
-          },
-        })
-      }
 
       // Caption shortcuts
       cmds.push({

@@ -47,7 +47,6 @@ import ErrorBoundary from '../components/ErrorBoundary'
 import TopLoadingBar from '../components/TopLoadingBar'
 import OfflineBanner from '../components/OfflineBanner'
 import UpdateNotification from '../components/UpdateNotification'
-import PendingActivityChip from '../components/PendingActivityChip'
 import SubDubToggle from '../components/SubDubToggle'
 import EpisodeRangePicker from '../components/EpisodeRangePicker'
 import StaggerCard from '../components/StaggerCard'
@@ -157,9 +156,6 @@ describe('Component smoke — simple', () => {
   })
   it('UpdateNotification mounts', () => {
     renderWithProviders(<UpdateNotification />)
-  })
-  it('PendingActivityChip mounts', () => {
-    renderWithProviders(<PendingActivityChip />)
   })
   it('SubDubToggle mounts', () => {
     renderWithProviders(<SubDubToggle />)

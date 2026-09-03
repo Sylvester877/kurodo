@@ -105,7 +105,6 @@ vi.mock('../api/anilistAuth', () => ({
   fetchUserList: vi.fn().mockResolvedValue([]),
   saveListEntry: vi.fn().mockResolvedValue(0),
   deleteListEntry: vi.fn().mockResolvedValue(false),
-  postTextActivity: vi.fn().mockResolvedValue(0),
   fetchRelations: vi.fn().mockResolvedValue([]),
   fetchMyActivity: vi.fn().mockResolvedValue({ items: [], hasNextPage: false }),
   deleteActivityById: vi.fn().mockResolvedValue(false),
@@ -177,17 +176,9 @@ vi.mock('../lib/sync', () => ({
   syncAdd: vi.fn().mockResolvedValue(undefined),
   syncRemove: vi.fn().mockResolvedValue(undefined),
   syncProgress: vi.fn().mockResolvedValue(undefined),
-  flushAllActivity: vi.fn(noop),
   pullFromAniList: vi.fn().mockResolvedValue(undefined),
   backfillEntryIds: vi.fn().mockResolvedValue(undefined),
-  _buildActivityText: vi.fn((args: { title: string; eps: number[]; isLast: boolean }) =>
-    `Watched ${args.eps.join(', ')} of ${args.title}${args.isLast ? ' 🎉' : ''}`),
   _resetSyncCache: vi.fn(noop),
-  subscribePendingActivity: vi.fn().mockReturnValue(() => {}),
-  getPendingActivity: vi.fn().mockReturnValue([]),
-  isActivityOptedOut: vi.fn().mockReturnValue(false),
-  getOptedOutMalIds: vi.fn().mockReturnValue([]),
-  setActivityOptedOut: vi.fn(noop),
 }))
 
 // framer-motion: spread the real module so motion.div, AnimatePresence,

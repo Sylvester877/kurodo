@@ -16,7 +16,6 @@ const AuthCallback = lazyWithRetry(() => import('./pages/AuthCallback'))
 const Admin = lazyWithRetry(() => import('./pages/Admin'))
 const Profile = lazyWithRetry(() => import('./pages/Profile'))
 const Settings = lazyWithRetry(() => import('./pages/Settings'))
-const Activity = lazyWithRetry(() => import('./pages/Activity'))
 const Seasonal = lazyWithRetry(() => import('./pages/Seasonal'))
 const MangaBrowse = lazyWithRetry(() => import('./pages/MangaBrowse'))
 const MangaDetails = lazyWithRetry(() => import('./pages/MangaDetails'))
@@ -102,7 +101,6 @@ export default function App() {
             <Route path="seasonal" element={<Page scope="seasonal"><Seasonal /></Page>} />
             <Route path="profile" element={<Page scope="profile"><Profile /></Page>} />
             <Route path="settings" element={<Page scope="settings"><Settings /></Page>} />
-            <Route path="activity" element={<Page scope="activity"><Activity /></Page>} />
             <Route path="auth/callback" element={<Page scope="authcallback"><AuthCallback /></Page>} />
             <Route path="admin" element={<Page scope="admin"><Admin /></Page>} />
             <Route path="health" element={<Page scope="health"><Health /></Page>} />

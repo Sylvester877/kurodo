@@ -347,7 +347,7 @@ export default function Browse() {
                         {mdx.coverUrl ? (
                           <img
                             src={`${getBackendOrigin()}/img?${[mdx.coverThumb, mdx.coverUrl]
-                              .filter(Boolean)
+                              .filter((u): u is string => !!u)
                               .map((u) => `url=${encodeURIComponent(u)}`)
                               .join('&')}`}
                             alt="" loading="lazy" decoding="async"

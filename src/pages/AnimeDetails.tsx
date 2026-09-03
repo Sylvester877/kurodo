@@ -4,7 +4,7 @@ import { useParams, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Star, Calendar, Heart, Film, Users, Globe, Hash, ArrowLeft,
   Play, Clock, Tv, ChevronRight, Bookmark, BookmarkCheck, SkipForward,
-  Send, EyeOff, TrendingUp, Trophy, Share2, RefreshCw,
+  TrendingUp, Trophy, Share2, RefreshCw,
 } from 'lucide-react'
 import { getAnimeById, getAnimeRecommendations, ANIME_LOAD_STUB_TITLE } from '../api/anime'
 import { getEpisodeInfoFromMal } from '../api/anilist'
@@ -22,8 +22,6 @@ import { queryClient } from '../lib/queryClient'
 import { prefetchAnidapInfo, prefetchAnidapServers, prefetchStream } from '../lib/prefetch'
 import { fetchAnidapInfo } from '../api/anidap'
 import { useSettings } from '../store/useSettings'
-import { isActivityOptedOut, setActivityOptedOut } from '../lib/sync'
-import { useAuthStore } from '../store/useAuthStore'
 import { Skeleton } from '../components/Skeleton'
 import StaggerCard from '../components/StaggerCard'
 import ScrollReveal from '../components/ScrollReveal'
@@ -59,8 +57,6 @@ export default function AnimeDetails() {
   const getLastEpisode = useWatchListStore((s) => s.getLastEpisode)
 
 
-  const isSignedIn = useAuthStore((s) => !!s.auth)
-  const [activityMuted, setActivityMuted] = useState(false)
   const canShare = typeof navigator !== 'undefined' && !!navigator.share
 
   // ── Anidap-style compact sub-nav — appears when hero scrolls past ──
@@ -202,11 +198,6 @@ export default function AnimeDetails() {
   // Scroll to top on anime change
   useEffect(() => {
     if (anime) window.scrollTo(0, 0)
-  }, [anime?.mal_id])
-
-  // Sync activity muted state once anime loads
-  useEffect(() => {
-    if (anime) setActivityMuted(isActivityOptedOut(anime.mal_id))
   }, [anime?.mal_id])
 
   // ─── Fetch TMDB title logo ───────────────────────────────────────
@@ -640,39 +631,6 @@ export default function AnimeDetails() {
                     </button>
                   )}
 
-                  {/* AniList activity toggle */}
-                  {isSignedIn && (
-                    <button
-                      onClick={() => {
-                        const next = !activityMuted
-                        setActivityOptedOut(anime.mal_id, next)
-                        setActivityMuted(next)
-                      }}
-                      aria-pressed={activityMuted}
-                      title={
-                        activityMuted
-                          ? 'Episode progress is NOT posted to your AniList feed for this show. Click to re-enable.'
-                          : 'Episode progress IS posted to your AniList feed for this show. Click to mute.'
-                      }
-                      aria-label={
-                        activityMuted
-                          ? 'Episode progress is NOT posted to your AniList feed for this show. Click to re-enable.'
-                          : 'Episode progress IS posted to your AniList feed for this show. Click to mute.'
-                      }
-                      className={cn(
-                        'inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border',
-                        activityMuted
-                          ? 'bg-white/[0.04] text-white/55 border-white/[0.08] hover:bg-white/[0.08]'
-                          : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/15',
-                      )}
-                    >
-                      {activityMuted ? (
-                        <><EyeOff className="h-4 w-4" /> <span className="hidden sm:inline">Muted</span></>
-                      ) : (
-                        <><Send className="h-4 w-4" /> <span className="hidden sm:inline">Activity</span></>
-                      )}
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

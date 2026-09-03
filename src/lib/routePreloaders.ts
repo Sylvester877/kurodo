@@ -22,7 +22,6 @@ export const preloaders = {
   schedule:    () => import('../pages/Schedule').catch(noop),
   profile:     () => import('../pages/Profile').catch(noop),
   settings:    () => import('../pages/Settings').catch(noop),
-  activity:    () => import('../pages/Activity').catch(noop),
   animeDetails: () => import('../pages/AnimeDetails').catch(noop),
   watch:       () => import('../pages/Watch').catch(noop),
 }
@@ -39,7 +38,6 @@ export function preloaderForPath(path: string): () => Promise<unknown> {
   if (path === '/schedule') return preloaders.schedule
   if (path === '/profile') return preloaders.profile
   if (path === '/settings') return preloaders.settings
-  if (path === '/activity') return preloaders.activity
   if (path.startsWith('/anime/')) return preloaders.animeDetails
   if (path.startsWith('/watch/')) return preloaders.watch
   return noop

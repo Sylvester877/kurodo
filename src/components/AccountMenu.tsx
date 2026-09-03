@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { LogIn, LogOut, RefreshCw, User, AlertCircle, BarChart3, ExternalLink, Settings as SettingsIcon, Send, ArrowRight, Loader2 } from 'lucide-react'
+import { LogIn, LogOut, RefreshCw, User, AlertCircle, BarChart3, ExternalLink, Settings as SettingsIcon, ArrowRight, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { getLoginUrl, getClientId, setClientId, getClientSecret, setClientSecret } from '../api/anilistAuth'
 import { getBackendOrigin } from '../lib/utils'
-import { pullFromAniList, flushAllActivity } from '../lib/sync'
+import { pullFromAniList } from '../lib/sync'
 import { toast } from './Toaster'
 import { cn } from '../lib/utils'
 
@@ -349,14 +349,6 @@ export default function AccountMenu() {
             My dashboard
           </Link>
           <Link
-            to="/activity"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-xs text-white/80 hover:bg-white/5 hover:text-white transition-colors"
-          >
-            <Send className="h-3.5 w-3.5" />
-            Activity
-          </Link>
-          <Link
             to="/settings"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 px-3 py-2 text-xs text-white/80 hover:bg-white/5 hover:text-white transition-colors"
@@ -380,18 +372,6 @@ export default function AccountMenu() {
           >
             <RefreshCw className={cn('h-3.5 w-3.5', syncing && 'animate-spin')} />
             {syncing ? 'Syncing…' : 'Re-sync list'}
-          </button>
-          <button
-            onClick={() => {
-              flushAllActivity()
-              setOpen(false)
-              toast.info('Flushing pending activity now', 2500)
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/80 hover:bg-white/5 transition-colors"
-            title="Post any buffered activity to AniList immediately"
-          >
-            <Send className="h-3.5 w-3.5" />
-            Flush pending now
           </button>
           <Link
             to="/admin"

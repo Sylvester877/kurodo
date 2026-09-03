@@ -6,7 +6,6 @@ import Footer from './Footer'
 import Celebrations from './Celebrations'
 import Toaster from './Toaster'
 import TopLoadingBar from './TopLoadingBar'
-import PendingActivityChip from './PendingActivityChip'
 import BackToTop from './BackToTop'
 import ScrollProgress from './ScrollProgress'
 import OfflineBanner from './OfflineBanner'
@@ -161,7 +160,6 @@ export default function Layout() {
       {/* ── PWA/browser-only features — hidden in Electron (desktop app) ── */}
       {!window.electronAPI?.isElectron && <OfflineBanner />}
       <Celebrations />
-      <PendingActivityChip />
       <Toaster />
       <UpdateNotification />
       <CompletionDialog />

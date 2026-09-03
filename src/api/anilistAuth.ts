@@ -336,7 +336,7 @@ export async function exchangeCodeForToken(
 // ─────────────────────────────────────────────────────────────────
 async function authQuery<T>(token: string, gql: string, variables: Record<string, unknown> = {}): Promise<T> {
   // Goes through the shared resilient client so authenticated reads AND
-  // mutations (saveListEntry/postTextActivity) survive AniList's 429s
+  // mutations (saveListEntry) survive AniList's 429s
   // during a binge instead of silently dropping the update.
   return anilistRequest<T>(gql, variables, { token })
 }
@@ -529,22 +529,6 @@ export async function deleteListEntry(token: string, id: number): Promise<boolea
     { id },
   )
   return data.DeleteMediaListEntry.deleted
-}
-
-/**
- * Post a text status to the user's AniList activity feed.
- * We use this for batched episode progress messages like
- * "📺 Watched episodes 2–8 of Hunter × Hunter (2011) on Kurōdo"
- */
-export async function postTextActivity(token: string, text: string): Promise<number> {
-  const data = await authQuery<{ SaveTextActivity: { id: number } }>(
-    token,
-    `mutation ($text: String) {
-      SaveTextActivity(text: $text) { id }
-    }`,
-    { text },
-  )
-  return data.SaveTextActivity.id
 }
 
 // ─────────────────────────────────────────────────────────────────
