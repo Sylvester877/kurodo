@@ -37,11 +37,13 @@ export default function AnimeHoverCard({ anime, children }: Props) {
   const titleLang = useSettings((s) => s.titleLang)
   const displayTitle = pickTitle(anime, titleLang)
 
-  // Spring-smoothed cursor position — the card "moves" like aniclover's.
+  // Spring-smoothed cursor position — snappy, near-1:1 tracking (aniclover's
+  // qtip is effectively instant; this keeps a whisper of glide to smooth
+  // hand-jitter without any perceivable lag). Settles in ~100ms, no wobble.
   const mx = useMotionValue(0)
   const my = useMotionValue(0)
-  const sx = useSpring(mx, { stiffness: 700, damping: 40, mass: 0.6 })
-  const sy = useSpring(my, { stiffness: 700, damping: 40, mass: 0.6 })
+  const sx = useSpring(mx, { stiffness: 1100, damping: 55, mass: 0.45 })
+  const sy = useSpring(my, { stiffness: 1100, damping: 55, mass: 0.45 })
 
   const clearTimers = useCallback(() => {
     if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null }
