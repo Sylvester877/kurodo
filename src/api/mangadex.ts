@@ -17,6 +17,8 @@ export interface MangaDexManga {
   contentRating: string
   tags: string[]
   coverUrl: string | null
+  /** 512px variant — may 404 upstream; use as first choice with coverUrl fallback. */
+  coverThumb: string | null
   lastChapter: string | null
   lastVolume: string | null
 }

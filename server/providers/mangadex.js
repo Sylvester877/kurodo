@@ -37,10 +37,21 @@ function cached(key, ttl, fn) {
 }
 
 // ── Build cover art URL ──
-function coverUrl(mangaId, fileName, size = '512') {
+// The ORIGINAL filename URL is the canonical asset — it always exists.
+// (The old code stripped the extension and forced a `.512.jpg` variant,
+// which MangaDex never generated for many covers → 404 → "?" placeholders
+// across the whole Browse grid.)
+function coverUrl(mangaId, fileName) {
   if (!fileName) return null
-  const base = fileName.replace(/\.[^.]+$/, '')
-  return `${UPLOADS}/covers/${mangaId}/${base}.${size}.jpg`
+  return `${UPLOADS}/covers/${mangaId}/${fileName}`
+}
+
+// Optional 512px thumbnail variant — smaller/faster when MangaDex has it,
+// but it 404s for some covers, so callers must fall back to coverUrl()
+// (the /img proxy accepts both in one request: url=<thumb>&url=<original>).
+function coverThumbUrl(mangaId, fileName) {
+  if (!fileName) return null
+  return `${UPLOADS}/covers/${mangaId}/${fileName.replace(/\.[^.]+$/, '')}.512.jpg`
 }
 
 // ── Normalize MangaDex manga object to our shape ──
@@ -58,6 +69,7 @@ function normalizeManga(md) {
     contentRating: attrs.contentRating || 'safe',
     tags: (attrs.tags || []).map((t) => t.attributes?.name?.en || ''),
     coverUrl: coverUrl(md.id, coverFileName),
+    coverThumb: coverThumbUrl(md.id, coverFileName),
     coverFileName,
     lastChapter: attrs.lastChapter || null,
     lastVolume: attrs.lastVolume || null,

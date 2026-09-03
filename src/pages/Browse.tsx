@@ -345,7 +345,12 @@ export default function Browse() {
                     >
                       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-white/10 group-hover:border-emerald-500/40 transition-colors">
                         {mdx.coverUrl ? (
-                          <img src={`${getBackendOrigin()}/img?url=${encodeURIComponent(mdx.coverUrl)}`} alt="" loading="lazy" decoding="async"
+                          <img
+                            src={`${getBackendOrigin()}/img?${[mdx.coverThumb, mdx.coverUrl]
+                              .filter(Boolean)
+                              .map((u) => `url=${encodeURIComponent(u)}`)
+                              .join('&')}`}
+                            alt="" loading="lazy" decoding="async"
                             className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
                         ) : (
                           <div className="h-full w-full grid place-items-center bg-gradient-to-br from-emerald-500/10 to-transparent">
