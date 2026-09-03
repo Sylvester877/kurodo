@@ -115,14 +115,6 @@ describe('Page smoke', () => {
     })
   })
 
-  it('Quotes mounts', async () => {
-    const { default: Quotes } = await import('../pages/Quotes')
-    renderWithProviders(<Quotes />, {
-      routerProps: { initialEntries: ['/quotes'] },
-      withToaster: true,
-    })
-  })
-
   it('Health mounts', async () => {
     const { default: Health } = await import('../pages/Health')
     renderWithProviders(<Health />, {

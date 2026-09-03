@@ -1,6 +1,6 @@
 import { memo, useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Search, Heart, Compass, Home, Bookmark, Menu, CalendarDays, Quote, X, Sparkles, Shuffle, Sun, Moon, BookOpen, Settings, Download, Loader2 } from 'lucide-react'
+import { Search, Heart, Compass, Home, Bookmark, Menu, CalendarDays, X, Sparkles, Shuffle, Sun, Moon, BookOpen, Settings, Download, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '../lib/utils'
 import Logo from './Logo'
@@ -99,7 +99,6 @@ export default memo(function Navbar() {
     { to: '/manga',     label: 'Manga',    icon: BookOpen      },
     { to: '/schedule',  label: 'Schedule', icon: CalendarDays  },
     { to: '/seasonal',  label: 'Seasons',  icon: Sparkles      },
-    { to: '/quotes',    label: 'Quotes',   icon: Quote         },
     { to: '/watchlist', label: 'My List',  icon: Bookmark      },
     { to: '/manga-list',label: 'Manga List',icon: BookOpen     },
     { to: '/settings',  label: 'Settings',  icon: Settings     },

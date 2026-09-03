@@ -12,7 +12,6 @@ const AnimeDetails = lazyWithRetry(() => import('./pages/AnimeDetails'))
 const Search = lazyWithRetry(() => import('./pages/Search'))
 const WatchList = lazyWithRetry(() => import('./pages/WatchList'))
 const Schedule = lazyWithRetry(() => import('./pages/Schedule'))
-const Quotes = lazyWithRetry(() => import('./pages/Quotes'))
 const AuthCallback = lazyWithRetry(() => import('./pages/AuthCallback'))
 const Admin = lazyWithRetry(() => import('./pages/Admin'))
 const Profile = lazyWithRetry(() => import('./pages/Profile'))
@@ -103,7 +102,6 @@ export default function App() {
             <Route path="seasonal" element={<Page scope="seasonal"><Seasonal /></Page>} />
             <Route path="profile" element={<Page scope="profile"><Profile /></Page>} />
             <Route path="settings" element={<Page scope="settings"><Settings /></Page>} />
-            <Route path="quotes" element={<Page scope="quotes"><Quotes /></Page>} />
             <Route path="activity" element={<Page scope="activity"><Activity /></Page>} />
             <Route path="auth/callback" element={<Page scope="authcallback"><AuthCallback /></Page>} />
             <Route path="admin" element={<Page scope="admin"><Admin /></Page>} />

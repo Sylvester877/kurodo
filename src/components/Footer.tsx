@@ -38,7 +38,6 @@ export default function Footer() {
             <ul className="space-y-2.5">
               {[
                 { to: '/schedule', label: 'Schedule' },
-                { to: '/quotes', label: 'Quotes' },
                 { to: '/activity', label: 'Activity' },
                 { to: '/music', label: 'Music' },
               ].map(({ to, label }) => (
