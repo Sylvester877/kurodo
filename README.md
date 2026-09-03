@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/dist/icon-256.png" alt="Kurōdo" width="110" />
+<img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/public/icon-256.png" alt="Kurōdo" width="110" />
 
 # 蔵人 · Kurōdo
 
