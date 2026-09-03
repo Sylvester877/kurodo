@@ -42,7 +42,7 @@ Most open-source anime players look like a settings panel. Kurōdo is built like
 
 | Watch | Search |
 |---|---|
-| <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/watch-jujutsu-kaisen.jpg" width="100%" /> | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/search-redesign-results.jpg" width="100%" /> |
+| <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/watch-playing.jpg" width="100%" /> | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/search-redesign-results.jpg" width="100%" /> |
 | **Servers** | **Schedule** |
 | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/review-watch-picker.jpg" width="100%" /> | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/loop-after-schedule.jpg" width="100%" /> |
 
