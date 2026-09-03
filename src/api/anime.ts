@@ -259,6 +259,8 @@ export async function getAnimeEpisodes(id: number, page = 1): Promise<AnimeEpiso
 export interface SearchFilters {
   /** Jikan `type` — TV / Movie / OVA / Special / ONA / Music */
   format?: string | null
+  /** Jikan `season` — winter / spring / summer / fall */
+  season?: string | null
   /** Jikan `status` — airing / complete / upcoming */
   status?: string | null
   /** Jikan `genres` — comma-separated MAL genre ids */
@@ -291,6 +293,7 @@ export async function searchAnime(
     params.sort = filters.sort ?? 'desc'
   }
   if (filters.format) params.type = filters.format
+  if (filters.season) params.season = filters.season
   if (filters.status) params.status = filters.status
   if (filters.genres?.length) params.genres = filters.genres.join(',')
   if (filters.minScore != null) params.min_score = filters.minScore
@@ -301,7 +304,7 @@ export async function searchAnime(
   // Race Jikan vs AniList — return whichever responds first so the user
   // never waits 20s for a slow/504 upstream. Jikan provides richer data
   // (scores, ranks, pagination) but AniList is consistently faster.
-  const hasActiveFilters = !!(filters.format || filters.status || (filters.genres?.length) || filters.minScore || filters.yearFrom || filters.yearTo)
+  const hasActiveFilters = !!(filters.format || filters.season || filters.status || (filters.genres?.length) || filters.minScore || filters.yearFrom || filters.yearTo)
 
   if (hasActiveFilters) {
     // Filters only work with Jikan — AniList fallback is title-only.

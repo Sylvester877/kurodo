@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useSearchParams, Link } from 'react-router-dom'
 import {
   Search as SearchIcon, X, Loader2, Sparkles, Frown, Clock, Trash2, Star, BookOpen,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { searchAnime, getAnimeGenres, type SearchFilters as Filters } from '../api/anime'
 import { searchMangaAniListPaginated, type MangaSearchResult } from '../api/anilistManga'
@@ -16,8 +17,8 @@ import { useSettings } from '../store/useSettings'
 import { SkeletonRow } from '../components/Skeleton'
 import SearchFilters from '../components/SearchFilters'
 import VirtualizedAnimeGrid from '../components/VirtualizedAnimeGrid'
-import { getImageUrl, cn, getBackendOrigin } from '../lib/utils'
-import ScrollReveal from '../components/ScrollReveal'
+import { cn, getBackendOrigin } from '../lib/utils'
+import AnimeCard from '../components/AnimeCard'
 import type { Genre } from '../types'
 import ErrorBoundary from '../components/ErrorBoundary'
 
@@ -34,6 +35,7 @@ function readFiltersFromUrl(p: URLSearchParams): Filters {
   const genres = p.get('genres')
   return {
     format:   p.get('type') || null,
+    season:   p.get('season') || null,
     status:   p.get('status') || null,
     genres:   genres ? genres.split(',').map(Number).filter(Boolean) : null,
     minScore: p.get('min_score') ? Number(p.get('min_score')) : null,
@@ -51,6 +53,7 @@ function writeFiltersToUrl(f: Filters, p: URLSearchParams): URLSearchParams {
     else next.set(key, val)
   }
   setOrDel('type',      f.format)
+  setOrDel('season',    f.season)
   setOrDel('status',    f.status)
   setOrDel('genres',    f.genres && f.genres.length ? f.genres.join(',') : null)
   setOrDel('min_score', f.minScore?.toString() ?? null)
@@ -63,7 +66,7 @@ function writeFiltersToUrl(f: Filters, p: URLSearchParams): URLSearchParams {
 
 function hasActiveFilters(f: Filters): boolean {
   return !!(
-    f.format || f.status ||
+    f.format || f.season || f.status ||
     (f.genres && f.genres.length) ||
     f.minScore || f.yearFrom || f.yearTo ||
     (f.orderBy && f.orderBy !== 'score') ||
@@ -90,9 +93,12 @@ function SearchPageContent() {
   const debouncedQuery = useDebounce(query, 250)
   useTitle(query ? `Search: ${query}` : 'Search')
 
-  // Mirror NSFW setting into filters.sfw
+  // Mirror NSFW setting into filters.sfw — and default the sort to
+  // Popularity (anikage-style): the search grid should lead with the
+  // well-known entries, and the Sort dropdown's default label must be
+  // truthful about it.
   const effectiveFilters = useMemo<Filters>(
-    () => ({ ...filters, sfw: !showNsfw }),
+    () => ({ ...filters, sfw: !showNsfw, orderBy: filters.orderBy ?? 'popularity', sort: filters.sort ?? 'desc' }),
     [filters, showNsfw],
   )
 
@@ -315,111 +321,108 @@ function SearchPageContent() {
   return (
     <ErrorBoundary scope="Search">
     <div className="pt-20 pb-12">
-      <div className="max-w-[1600px] mx-auto px-4">
-        {/* ───── Header ───── */}
-        <ScrollReveal>
-        <div className="relative rounded-2xl overflow-hidden mb-5">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
-          <div className="glass-card rounded-2xl p-5 relative">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/25 grid place-items-center shrink-0">
-                <SearchIcon className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="kicker-bar" />
-                  <h1 className="text-2xl font-extrabold text-white leading-tight">Search</h1>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Find {activeTab === 'manga' ? 'manga & manhwa' : 'anime'} by title · press{' '}
-                  <kbd className="font-mono text-[10px] px-1 py-0.5 rounded bg-white/10 border border-white/15">/</kbd>
-                  {' '}to focus
-                </p>
-              </div>
-            </div>
-
-            {/* Search input */}
-            <div className="flex items-center gap-3 rounded-xl border-2 border-white/10 bg-black/40 px-4 py-3 focus-within:border-primary/60 focus-within:bg-black/60 focus-within:shadow-[0_0_30px_-8px_hsl(245,75%,60%,0.35)] transition-all">
-              <SearchIcon className="h-5 w-5 text-muted-foreground shrink-0" />
+      {/* ══════════ Compact anikage-style top bar: Search | Genres | Sort by | Year | Trash ══════════ */}
+      <div className="max-w-[1600px] mx-auto px-4 mb-4">
+        <div className="flex items-end gap-4 flex-wrap">
+          {/* Search field with its label above — matches "Search / Genres / Sort by / Year" header row */}
+          <div className="flex-[2] min-w-[280px]">
+            <h1 className="text-base font-extrabold text-white mb-2">Search</h1>
+            <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 focus-within:border-primary/50 focus-within:bg-white/[0.05] transition-all">
+              <SearchIcon className="h-4 w-4 text-muted-foreground shrink-0" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by title… try 'Attack on Titan' (or use filters below)"
-                className="bg-transparent border-none outline-none text-base w-full text-white placeholder:text-muted-foreground"
+                placeholder="Search anime…"
+                className="bg-transparent border-none outline-none text-sm w-full text-white placeholder:text-muted-foreground"
                 autoFocus
                 spellCheck={false}
               />
-              {query && (
+              {loading && <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />}
+              {query && !loading && (
                 <button
                   onClick={() => { setQuery(''); inputRef.current?.focus() }}
                   aria-label="Clear search"
-                  className="text-muted-foreground hover:text-white transition-colors p-1 rounded"
+                  className="text-muted-foreground hover:text-white transition-colors p-0.5 rounded"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
-              {loading && (
-                <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
-              )}
             </div>
+          </div>
 
-            {/* Mobile filter bar — visible below lg (anime only) */}
-            {activeTab === 'anime' && (
-              <div className="mt-4 lg:hidden">
-                <SearchFilters value={filters} onChange={setFilters} />
-              </div>
-            )}
+          {/* Genres dropdown (anime tab) */}
+          {activeTab === 'anime' && (
+            <div className="w-40">
+              <h2 className="text-base font-extrabold text-white mb-2">Genres</h2>
+              <GenreDropdown
+                genres={allGenres}
+                selected={filters.genres ?? []}
+                onToggle={toggleGenre}
+                onClear={() => setFilters((p) => ({ ...p, genres: null }))}
+              />
+            </div>
+          )}
 
-            {/* Quick genre chips — one-tap genre filtering, all breakpoints */}
-            {activeTab === 'anime' && allGenres.length > 0 && (
-              <div className="mt-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {allGenres.slice(0, 12).map((g) => {
-                    const active = (filters.genres ?? []).includes(g.mal_id)
-                    return (
-                      <button
-                        key={g.mal_id}
-                        type="button"
-                        onClick={() => toggleGenre(g.mal_id)}
-                        className={cn(
-                          'group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200 border',
-                          active
-                            ? 'bg-gradient-to-r from-pink-500/25 to-purple-500/25 border-primary/50 text-primary shadow-[0_0_14px_-4px_hsl(245,75%,60%,0.4)]'
-                            : 'glass-pill text-white/60 border-white/10 hover:text-white hover:border-white/25 hover:bg-white/[0.08]',
-                        )}
-                      >
-                        <span>{g.name}</span>
-                        <span className={cn(
-                          'text-[9px] tabular-nums',
-                          active ? 'text-primary/70' : 'text-white/30 group-hover:text-white/50',
-                        )}>
-                          {g.count >= 1000
-                            ? `${(g.count / 1000).toFixed(1)}k`
-                            : g.count}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+          {/* Sort by dropdown */}
+          <div className="w-44">
+            <h2 className="text-base font-extrabold text-white mb-2">Sort by</h2>
+            <SortDropdown
+              value={(filters.orderBy ?? 'popularity')}
+              asc={(filters.sort ?? 'desc') === 'asc'}
+              onChange={(orderBy, asc) =>
+                setFilters((p) => ({ ...p, orderBy, sort: asc ? 'asc' : 'desc' }))
+              }
+            />
+          </div>
+
+          {/* Year dropdown (anime tab) */}
+          {activeTab === 'anime' && (
+            <div className="w-32">
+              <h2 className="text-base font-extrabold text-white mb-2">Year</h2>
+              <YearDropdown
+                value={filters.yearFrom ?? null}
+                onChange={(y) => setFilters((p) => ({ ...p, yearFrom: y, yearTo: y }))}
+              />
+            </div>
+          )}
+
+          {/* Clear-all (trash) — always visible, resets filters + query */}
+          <div className="flex items-end gap-2">
+            <button
+              onClick={() => { setFilters({}); setQuery('') }}
+              aria-label="Clear search and filters"
+              title="Clear search and filters"
+              className="h-[42px] w-[46px] grid place-items-center rounded-xl bg-white/[0.03] border border-white/10 text-white/60 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 transition-all"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
-        </ScrollReveal>
 
-        {/* ── Search filters (always visible at top, no sidebar) ── */}
-        {activeTab === 'anime' && (trimmed || filtersActive) && (
-          <div className="hidden lg:block mb-5 glass-card rounded-2xl p-4 space-y-4">
-            <FilterSidebar filters={filters} onChange={setFilters} />
+        {/* Mobile filter panel — below lg (has format/status/year/genres) */}
+        {activeTab === 'anime' && (
+          <div className="mt-3 lg:hidden">
+            <SearchFilters value={filters} onChange={setFilters} />
           </div>
         )}
+      </div>
 
-        {/* ── Main content ── */}
-        <div className="min-w-0">
+      {/* ══════════ Left filter rail + results ══════════ */}
+      <div className="max-w-[1600px] mx-auto px-4">
+        <div className="flex gap-5 items-start">
+          {/* ── Left rail — Season / Format / Status / Min score (desktop) ── */}
+          {activeTab === 'anime' && (
+            <aside className="hidden lg:flex flex-col gap-3 w-[230px] shrink-0 sticky top-20">
+              <FilterRail filters={filters} onChange={setFilters} />
+            </aside>
+          )}
 
-            {/* ───── Tabs ───── */}
+          {/* ── Main content ── */}
+          <div className="min-w-0 flex-1">
+
+            {/* ── Tabs ── */}
             {(trimmed || filtersActive) && (
               <div className="flex items-center gap-1 mb-4">
                 <button
@@ -592,7 +595,7 @@ function SearchPageContent() {
               </div>
             ) : (
               <>
-                {/* Mobile: poster grid — virtualized for scroll performance */}
+                {/* Mobile: virtualized poster grid */}
                 <div className="lg:hidden">
                   <VirtualizedAnimeGrid
                     animes={searchResults}
@@ -604,77 +607,10 @@ function SearchPageContent() {
                   />
                 </div>
 
-                {/* Desktop: anidap-style horizontal list cards */}
-                <div className="hidden lg:block space-y-2">
+                {/* Desktop: poster grid (anikage-style) — full AnimeCard features */}
+                <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-6">
                   {searchResults.map((anime) => (
-                    <Link
-                      key={anime.mal_id}
-                      to={`/anime/${anime.mal_id}`}
-                      className="group flex items-center gap-4 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] hover:border-primary/30 transition-all"
-                    >
-                      {/* Poster */}
-                      <div className="relative h-[88px] w-[60px] shrink-0 rounded-lg overflow-hidden bg-card border border-white/10">
-                        <img
-                          src={getImageUrl(anime)}
-                          alt={anime.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        {anime.status === 'Currently Airing' && (
-                          <div className="absolute top-1 left-1 h-2 w-2 rounded-full bg-emerald-500 animate-pulse ring-1 ring-black/40" />
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">
-                          {anime.title_english || anime.title}
-                        </h3>
-                        <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                          {anime.title !== (anime.title_english || anime.title) ? anime.title : anime.title_japanese}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <span className="glass-pill text-[10px] py-0.5 px-1.5">
-                            {anime.type}
-                          </span>
-                          {anime.episodes && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {anime.episodes} ep
-                            </span>
-                          )}
-                          {anime.year && (
-                            <span className="text-[10px] text-muted-foreground">
-                              &middot; {anime.year}
-                            </span>
-                          )}
-                          {anime.status && (
-                            <span className={`glass-pill text-[10px] py-0.5 px-1.5 ${
-                              anime.status === 'Currently Airing'
-                                ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
-                                : 'text-white/60'
-                            }`}>
-                              {anime.status === 'Currently Airing' ? 'Airing' : anime.status === 'Finished Airing' ? 'Completed' : anime.status}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Score + Rank badge */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {anime.score && (
-                          <div className="flex items-center gap-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1.5">
-                            <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-                            <span className="text-xs font-bold text-yellow-400 tabular-nums">{anime.score.toFixed(1)}</span>
-                          </div>
-                        )}
-                        {anime.rank && (
-                          <div className="rounded-lg bg-primary/10 border border-primary/20 px-2.5 py-1.5">
-                            <span className="text-[10px] font-bold text-primary tabular-nums">#{anime.rank}</span>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
+                    <AnimeCard key={anime.mal_id} anime={anime} />
                   ))}
                 </div>
 
@@ -986,6 +922,7 @@ function SearchPageContent() {
             </>
             )}
           </div>
+        </div>{/* /flex row: rail + content */}
       </div>
     </div>
     </ErrorBoundary>
@@ -993,33 +930,36 @@ function SearchPageContent() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Desktop filter sidebar — renders the same filters as SearchFilters
-// but in a vertical sidebar card layout for lg+ screens.
+// Collapsible radio rail (Season / Format / Status / Min score) —
+// the left sidebar from the anikage-style redesign. Sections collapse
+// with a chevron; options behave like radios (click to select, click
+// again to reset to "any").
 // ─────────────────────────────────────────────────────────────────
 
-const SIDEBAR_FORMATS = [
-  { value: 'tv', label: 'TV' },
-  { value: 'movie', label: 'Movie' },
-  { value: 'ova', label: 'OVA' },
-  { value: 'special', label: 'Special' },
-  { value: 'ona', label: 'ONA' },
+const RAIL_SEASONS = [
+  { value: 'winter', label: 'Winter' },
+  { value: 'spring', label: 'Spring' },
+  { value: 'summer', label: 'Summer' },
+  { value: 'fall', label: 'Fall' },
 ]
 
-const SIDEBAR_STATUSES = [
+const RAIL_FORMATS = [
+  { value: 'tv', label: 'TV' },
+  { value: 'tv_short', label: 'TV Short' },
+  { value: 'movie', label: 'Movie' },
+  { value: 'special', label: 'Special' },
+  { value: 'ova', label: 'OVA' },
+  { value: 'ona', label: 'ONA' },
+  { value: 'music', label: 'Music' },
+]
+
+const RAIL_STATUSES = [
   { value: 'airing', label: 'Airing' },
   { value: 'complete', label: 'Completed' },
-  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'upcoming', label: 'Not Yet Released' },
 ]
 
-const SIDEBAR_SORTS = [
-  { value: 'score', label: 'Score' },
-  { value: 'popularity', label: 'Popularity' },
-  { value: 'start_date', label: 'Newest' },
-  { value: 'title', label: 'Title A–Z' },
-  { value: 'rank', label: 'Rank' },
-]
-
-const SIDEBAR_SCORES = [
+const RAIL_SCORES = [
   { value: null, label: 'Any' },
   { value: 9, label: '9+' },
   { value: 8, label: '8+' },
@@ -1027,230 +967,295 @@ const SIDEBAR_SCORES = [
   { value: 6, label: '6+' },
 ]
 
-const CURRENT_YEAR = new Date().getFullYear()
-
-const FilterSidebar = React.memo(function FilterSidebar({ filters, onChange }: { filters: Filters; onChange: (f: Filters) => void }) {
-  const set = <K extends keyof Filters>(key: K, v: Filters[K]) => onChange({ ...filters, [key]: v })
-
-  const genresQuery = useQuery({
-    queryKey: ['genres'],
-    queryFn: getAnimeGenres,
-    staleTime: 24 * 60 * 60 * 1000,
-    meta: { persist: true },
-  })
-  const allGenres: Genre[] = genresQuery.data?.data ?? []
-  const activeGenres = filters.genres ?? []
-
-  const activeCount = (filters.format ? 1 : 0) + (filters.status ? 1 : 0) + (activeGenres.length ? 1 : 0) + (filters.minScore ? 1 : 0) + (filters.yearFrom || filters.yearTo ? 1 : 0)
-
+/** One collapsible radio group inside the rail. */
+function RailSection({
+  title, options, active, onSelect,
+}: {
+  title: string
+  options: { value: string | number | null; label: string }[]
+  active: string | number | null
+  onSelect: (v: string | number | null) => void
+}) {
+  const [open, setOpen] = useState(true)
   return (
-    <>
-      {/* Active filters summary */}
-      {activeCount > 0 && (
-        <div className="glass-card rounded-xl p-3 flex items-center justify-between">
-          <span className="text-xs text-white font-semibold">{activeCount} active filter{activeCount !== 1 ? 's' : ''}</span>
-          <button
-            onClick={() => onChange({ format: null, status: null, genres: null, minScore: null, yearFrom: null, yearTo: null, orderBy: null, sort: null, sfw: filters.sfw })}
-            className="text-[10px] uppercase tracking-wider font-bold text-red-400 hover:text-red-300 transition-colors"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-
-      {/* Sort */}
-      <div className="glass-card rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="kicker-bar" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Sort by</h3>
-        </div>
-        <div className="space-y-1">
-          {SIDEBAR_SORTS.map((o) => {
-            const active = (filters.orderBy ?? 'score') === o.value
-            return (
-              <button
-                key={o.value}
-                onClick={() => {
-                  onChange({ ...filters, orderBy: o.value, sort: filters.sort ?? 'desc' })
-                }}
-                className={cn(
-                  'w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors',
-                  active ? 'bg-primary/15 text-primary font-semibold' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
-                )}
-              >
-                {o.label}
-                {active && <span className="text-[10px] text-primary/70">{filters.sort === 'asc' ? '↑' : '↓'}</span>}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Format */}
-      <div className="glass-card rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="kicker-bar" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Format</h3>
-        </div>
-        <div className="space-y-1">
-          <button
-            onClick={() => set('format', null)}
-            className={cn(
-              'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
-              !filters.format ? 'bg-primary/15 text-primary font-semibold' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
-            )}
-          >
-            All formats
-          </button>
-          {SIDEBAR_FORMATS.map((f) => {
-            const active = filters.format === f.value
-            return (
-              <button
-                key={f.value}
-                onClick={() => set('format', active ? null : f.value)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
-                  active ? 'bg-primary/15 text-primary font-semibold' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
-                )}
-              >
-                {f.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Status */}
-      <div className="glass-card rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="kicker-bar" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Status</h3>
-        </div>
-        <div className="space-y-1">
-          <button
-            onClick={() => set('status', null)}
-            className={cn(
-              'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
-              !filters.status ? 'bg-primary/15 text-primary font-semibold' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
-            )}
-          >
-            Any status
-          </button>
-          {SIDEBAR_STATUSES.map((s) => {
-            const active = filters.status === s.value
-            return (
-              <button
-                key={s.value}
-                onClick={() => set('status', active ? null : s.value)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
-                  active ? 'bg-primary/15 text-primary font-semibold' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
-                )}
-              >
-                {s.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Score */}
-      <div className="glass-card rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="kicker-bar" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Min score</h3>
-        </div>
-        <div className="space-y-1">
-          {SIDEBAR_SCORES.map((o) => {
-            const active = filters.minScore === o.value
+    <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between text-left"
+        aria-expanded={open}
+      >
+        <span className="text-sm font-bold text-white">{title}</span>
+        {open
+          ? <ChevronUp className="h-4 w-4 text-white/50" />
+          : <ChevronDown className="h-4 w-4 text-white/50" />}
+      </button>
+      {open && (
+        <div className="mt-2.5 space-y-0.5">
+          {options.map((o) => {
+            const selected = active === o.value
             return (
               <button
                 key={String(o.value)}
-                onClick={() => set('minScore', o.value)}
-                className={cn(
-                  'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
-                  active ? 'bg-primary/15 text-primary font-semibold' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
-                )}
+                type="button"
+                onClick={() => onSelect(selected ? null : o.value)}
+                className="w-full flex items-center gap-2.5 px-1 py-1.5 text-left text-xs text-white/55 hover:text-white transition-colors group"
               >
-                {o.label}
+                {/* Radio dot */}
+                <span
+                  className={cn(
+                    'h-3.5 w-3.5 rounded-full border grid place-items-center shrink-0 transition-colors',
+                    selected ? 'border-primary' : 'border-white/25 group-hover:border-white/45',
+                  )}
+                >
+                  {selected && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                </span>
+                <span className={selected ? 'text-white font-semibold' : ''}>{o.label}</span>
               </button>
             )
           })}
         </div>
-      </div>
-      
-      {/* Year */}
-      <div className="glass-card rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="kicker-bar" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Year</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            placeholder="1999"
-            value={filters.yearFrom || ''}
-            min={1940}
-            max={filters.yearTo || CURRENT_YEAR + 2}
-            onChange={(e) => {
-              const val = e.target.value ? Number(e.target.value) : null
-              set('yearFrom', val)
-            }}
-            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
-          />
-          <span className="text-muted-foreground text-xs">to</span>
-          <input
-            type="number"
-            placeholder={String(CURRENT_YEAR)}
-            value={filters.yearTo || ''}
-            min={filters.yearFrom || 1940}
-            max={CURRENT_YEAR + 2}
-            onChange={(e) => {
-              const val = e.target.value ? Number(e.target.value) : null
-              set('yearTo', val)
-            }}
-            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
-          />
-        </div>
-      </div>
+      )}
+    </div>
+  )
+}
 
-      {/* Genre */}
-      <div className="glass-card rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="kicker-bar" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-            Genre{activeGenres.length > 0 && ` (${activeGenres.length})`}
-          </h3>
-        </div>
-        <div data-lenis-prevent className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-          {allGenres.map((g) => {
-            const active = activeGenres.includes(g.mal_id)
-            return (
-              <button
-                key={g.mal_id}
-                onClick={() => {
-                  if (active) {
-                    const next = activeGenres.filter((id) => id !== g.mal_id)
-                    set('genres', next.length ? next : null)
-                  } else {
-                    set('genres', [...activeGenres, g.mal_id])
-                  }
-                }}
-                className={cn(
-                  'w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors',
-                  active ? 'bg-primary/15 text-primary font-semibold' : 'text-white/60 hover:bg-white/[0.04] hover:text-white',
-                )}
-              >
-                <span>{g.name}</span>
-                <span className="text-[10px] text-muted-foreground tabular-nums">{g.count.toLocaleString()}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+/** Left rail: Season / Format / Status / Min score. */
+const FilterRail = React.memo(function FilterRail({ filters, onChange }: { filters: Filters; onChange: (f: Filters) => void }) {
+  return (
+    <>
+      <RailSection
+        title="Season"
+        options={RAIL_SEASONS}
+        active={filters.season ?? null}
+        onSelect={(v) => onChange({ ...filters, season: (v as Filters['season']) ?? null })}
+      />
+      <RailSection
+        title="Format"
+        options={RAIL_FORMATS}
+        active={filters.format ?? null}
+        onSelect={(v) => onChange({ ...filters, format: (v as Filters['format']) ?? null })}
+      />
+      <RailSection
+        title="Status"
+        options={RAIL_STATUSES}
+        active={filters.status ?? null}
+        onSelect={(v) => onChange({ ...filters, status: (v as Filters['status']) ?? null })}
+      />
+      <RailSection
+        title="Min score"
+        options={RAIL_SCORES}
+        active={filters.minScore ?? null}
+        onSelect={(v) => onChange({ ...filters, minScore: v == null ? null : Number(v) })}
+      />
     </>
   )
 })
+
+// ─────────────────────────────────────────────────────────────────
+// Top-bar dropdowns — Genres (multi-select), Sort by, Year.
+// ╰─ checkbox list inside a floating panel, chevron flip on open.
+// ─────────────────────────────────────────────────────────────────
+
+const SORT_OPTIONS = [
+  { value: 'popularity', label: 'Popularity' },
+  { value: 'score', label: 'Score' },
+  { value: 'start_date', label: 'Newest' },
+  { value: 'title', label: 'Title A–Z' },
+  { value: 'rank', label: 'Rank' },
+]
+
+const CURRENT_YEAR = new Date().getFullYear()
+const YEAR_OPTIONS = Array.from({ length: 31 }, (_, i) => CURRENT_YEAR + 1 - i)
+
+/** Shared click-outside + chevron dropdown wrapper. */
+function Dropdown({ label, open, onToggle, children, width = 'w-full' }: {
+  label: React.ReactNode
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+  width?: string
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onToggle()
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open, onToggle])
+
+  return (
+    <div ref={ref} className={cn('relative', width)}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'w-full flex items-center justify-between gap-2 h-[42px] px-4 rounded-xl border text-sm transition-all',
+          open
+            ? 'border-primary/50 bg-white/[0.05] text-white'
+            : 'border-white/10 bg-white/[0.03] text-white/85 hover:bg-white/[0.05]',
+        )}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-white/50 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div
+          className={cn(
+            'absolute z-40 mt-2 rounded-xl border border-white/10 bg-zinc-950/95 backdrop-blur-xl shadow-2xl',
+            'max-h-[340px] overflow-y-auto custom-scrollbar',
+          )}
+          data-lenis-prevent
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Genres multi-select dropdown. */
+function GenreDropdown({ genres, selected, onToggle, onClear }: {
+  genres: Genre[]
+  selected: number[]
+  onToggle: (id: number) => void
+  onClear: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const toggle = useCallback(() => setOpen((o) => !o), [])
+  const label =
+    selected.length === 0
+      ? 'Any'
+      : selected.length === 1
+        ? genres.find((g) => g.mal_id === selected[0])?.name ?? '1 genre'
+        : `${selected.length} genres`
+
+  return (
+    <Dropdown label={label} open={open} onToggle={toggle}>
+      <div className="p-1.5 w-56">
+        <button
+          type="button"
+          onClick={() => { onClear(); setOpen(false) }}
+          className={cn(
+            'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
+            selected.length === 0 ? 'text-primary font-semibold bg-primary/10' : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
+          )}
+        >
+          Any genre
+        </button>
+        <div className="h-px bg-white/8 my-1" />
+        {genres.map((g) => {
+          const checked = selected.includes(g.mal_id)
+          return (
+            <button
+              key={g.mal_id}
+              type="button"
+              onClick={() => onToggle(g.mal_id)}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-white/70 hover:bg-white/[0.05] hover:text-white transition-colors"
+            >
+              <span
+                className={cn(
+                  'h-3.5 w-3.5 rounded border grid place-items-center shrink-0 transition-colors',
+                  checked ? 'bg-primary border-primary' : 'border-white/25',
+                )}
+              >
+                {checked && (
+                  <svg viewBox="0 0 10 8" className="h-2 w-2 fill-none stroke-white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 4l2.5 2.5L9 1" />
+                  </svg>
+                )}
+              </span>
+              <span className={checked ? 'text-white' : ''}>{g.name}</span>
+              <span className="ml-auto text-[10px] text-white/30 tabular-nums">
+                {g.count >= 1000 ? `${(g.count / 1000).toFixed(1)}k` : g.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </Dropdown>
+  )
+}
+
+/** Sort-by dropdown with asc/desc direction flip on re-click. */
+function SortDropdown({ value, asc, onChange }: {
+  value: string
+  asc: boolean
+  onChange: (orderBy: string, asc: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const toggle = useCallback(() => setOpen((o) => !o), [])
+  const current = SORT_OPTIONS.find((o) => o.value === value)
+  const label = current?.label ?? 'Popularity'
+
+  return (
+    <Dropdown label={label} open={open} onToggle={toggle}>
+      <div className="p-1.5 w-48">
+        {SORT_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => {
+              if (o.value === value) onChange(o.value, !asc) // flip direction
+              else onChange(o.value, false)
+              setOpen(false)
+            }}
+            className={cn(
+              'w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors',
+              o.value === value ? 'text-primary font-semibold bg-primary/10' : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
+            )}
+          >
+            {o.label}
+            {o.value === value && (
+              <span className="text-[10px] text-primary/80">{asc ? '↑ asc' : '↓ desc'}</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </Dropdown>
+  )
+}
+
+/** Year dropdown — single "from" year, Any resets. */
+function YearDropdown({ value, onChange }: {
+  value: number | null
+  onChange: (y: number | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const toggle = useCallback(() => setOpen((o) => !o), [])
+
+  return (
+    <Dropdown label={value != null ? String(value) : 'Any'} open={open} onToggle={toggle}>
+      <div className="p-1.5 w-32">
+        <button
+          type="button"
+          onClick={() => { onChange(null); setOpen(false) }}
+          className={cn(
+            'w-full text-left px-3 py-2 rounded-lg text-xs transition-colors',
+            value == null ? 'text-primary font-semibold bg-primary/10' : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
+          )}
+        >
+          Any
+        </button>
+        {YEAR_OPTIONS.map((y) => (
+          <button
+            key={y}
+            type="button"
+            onClick={() => { onChange(y); setOpen(false) }}
+            className={cn(
+              'w-full text-left px-3 py-2 rounded-lg text-xs tabular-nums transition-colors',
+              value === y ? 'text-primary font-semibold bg-primary/10' : 'text-white/60 hover:bg-white/[0.05] hover:text-white',
+            )}
+          >
+            {y}
+          </button>
+        ))}
+      </div>
+    </Dropdown>
+  )
+}
 
 export default function SearchPage() {
   return (
