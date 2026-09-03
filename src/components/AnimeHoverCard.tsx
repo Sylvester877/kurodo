@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion'
 import { Star, Play } from 'lucide-react'
 import { getImageUrl, formatScore, pickTitle } from '../lib/utils'
 import { useSettings } from '../store/useSettings'
@@ -11,129 +11,102 @@ interface Props {
   children: React.ReactNode
 }
 
-const HOVER_DELAY = 400
-const LEAVE_DELAY = 200
+const HOVER_DELAY = 350
+const LEAVE_DELAY = 120
 const CARD_WIDTH = 320
-const CARD_MARGIN = 12
 
 /**
- * A rich hover preview card that floats beside an AnimeCard, showing
- * synopsis, score, genres, studios, and metadata in a compact panel.
+ * Aniclover-style hover qtip: a fixed-position card that FOLLOWS THE CURSOR.
  *
- * Rendered via portal to document.body so it never gets clipped by
- * parent overflow containers (grids, horizontal rails).
+ * Movement model (reverse-engineered from aniclover.cc's .anime-card-qtip):
+ *  • position: fixed, pointer-events: none — it never intercepts the mouse
+ *  • the card tracks the pointer with a spring so it glides behind movement
+ *  • it sits to the right of the cursor, flipping left near the right edge,
+ *    and clamps vertically inside the viewport
+ *  • show/hide is a fast opacity fade (0.12s), no scale wobble
+ *
+ * Rendered via portal to document.body so it never gets clipped by parent
+ * overflow containers (grids, horizontal rails).
  */
 export default function AnimeHoverCard({ anime, children }: Props) {
   const [visible, setVisible] = useState(false)
-  const [cardStyle, setCardStyle] = useState<React.CSSProperties | null>(null)
+  const [armed, setArmed] = useState(false) // gates rendering until first position
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const titleLang = useSettings((s) => s.titleLang)
   const displayTitle = pickTitle(anime, titleLang)
 
+  // Spring-smoothed cursor position — the card "moves" like aniclover's.
+  const mx = useMotionValue(0)
+  const my = useMotionValue(0)
+  const sx = useSpring(mx, { stiffness: 700, damping: 40, mass: 0.6 })
+  const sy = useSpring(my, { stiffness: 700, damping: 40, mass: 0.6 })
+
   const clearTimers = useCallback(() => {
     if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null }
     if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null }
   }, [])
 
-  const computePosition = useCallback((): React.CSSProperties | null => {
-    if (!wrapperRef.current) return null
-    // wrapper uses display:contents (no layout box), so use first child's rect.
-    // Guard: if firstElementChild isn't rendered yet (e.g. React hasn't committed
-    // the DOM), return null — don't flash the card at (0,0).
-    const child = wrapperRef.current.firstElementChild as HTMLElement | null
-    const rect = child?.getBoundingClientRect()
-    if (!rect || rect.width === 0 || rect.height === 0) return null
+  const track = useCallback((e: MouseEvent) => {
+    const offset = 24 // card floats this far right of the cursor
+    const w = CARD_WIDTH
+    const h = 380 // approx card height; clamped below anyway
+    let x = e.clientX + offset
+    // flip to the left side when overflowing the right edge
+    if (x + w > window.innerWidth - 12) x = e.clientX - w - offset
+    // vertical clamp
+    const y = Math.max(12, Math.min(e.clientY - 60, window.innerHeight - h - 12))
+    mx.set(x)
+    my.set(y)
+  }, [mx, my])
 
-    const viewW = window.innerWidth
-    const viewH = window.innerHeight
-    const totalW = CARD_WIDTH + CARD_MARGIN + 20
-    const spaceRight = viewW - rect.right - 12
-    const spaceLeft = rect.left - 12
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    track(e.nativeEvent)
+    if (!armed) setArmed(true)
+  }, [track, armed])
 
-    // Pick side: prefer right, then left, then center below
-    let left: number
-    if (spaceRight >= totalW) {
-      left = rect.right + CARD_MARGIN
-    } else if (spaceLeft >= totalW) {
-      left = rect.left - CARD_WIDTH - CARD_MARGIN
-    } else {
-      left = Math.max(12, (viewW - CARD_WIDTH) / 2)
-    }
-
-    // Clamp top so card stays in viewport with 12px breathing room
-    // (card ≈ 330px tall: banner 110 + title + meta + genres + synopsis + footer)
-    const cardTop = rect.top > 0 ? rect.top - 20 : 0
-    const top = Math.max(12, Math.min(cardTop, viewH - 360))
-
-    return {
-      position: 'fixed',
-      left,
-      top,
-      width: CARD_WIDTH,
-      zIndex: 9999,
-    }
-  }, [])
-
-  const onMouseEnter = useCallback(() => {
+  const onMouseEnter = useCallback((e: React.MouseEvent) => {
     if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null }
-    hoverTimer.current = setTimeout(() => {
-      const pos = computePosition()
-      if (!pos) return // firstElementChild not ready yet — skip this frame
-      setCardStyle(pos)
-      setVisible(true)
-    }, HOVER_DELAY)
-  }, [computePosition])
+    track(e.nativeEvent)
+    setArmed(true)
+    hoverTimer.current = setTimeout(() => setVisible(true), HOVER_DELAY)
+  }, [track])
 
   const onMouseLeave = useCallback(() => {
     if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null }
-    leaveTimer.current = setTimeout(() => setVisible(false), LEAVE_DELAY)
+    leaveTimer.current = setTimeout(() => {
+      setVisible(false)
+      setArmed(false)
+    }, LEAVE_DELAY)
   }, [])
-
-  // Track scroll AND resize to keep the portal position in sync while visible
-  useEffect(() => {
-    if (!visible) return
-    const update = () => {
-      const pos = computePosition()
-      if (pos) setCardStyle(pos)
-    }
-    window.addEventListener('scroll', update, { passive: true })
-    window.addEventListener('resize', update, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', update)
-      window.removeEventListener('resize', update)
-    }
-  }, [visible, computePosition])
 
   useEffect(() => clearTimers, [clearTimers])
 
   const synopsis = anime.synopsis
   const genres = anime.genres?.slice(0, 3) ?? []
 
-  // Landscape banner for the header — trailer thumbnail (1280x720) when
-  // available, else the poster stretched behind a gradient (still looks
-  // intentional under the blur overlay).
   const bannerSrc =
     anime.trailer?.images?.maximum_image_url ||
     anime.trailer?.images?.large_image_url ||
     getImageUrl(anime)
 
-  // Aniclover-style hover card: banner header with overlapping poster,
-  // score • type • year meta row, genre pills, synopsis, details footer.
   const hoverCard = (
     <AnimatePresence>
-      {visible && (
+      {visible && armed && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 4 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 4 }}
-          transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-          style={cardStyle ?? undefined}
-          onMouseEnter={() => {
-            if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null }
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
+          style={{
+            position: 'fixed',
+            left: sx,
+            top: sy,
+            width: CARD_WIDTH,
+            zIndex: 9999,
+            pointerEvents: 'none', // aniclover behavior: never intercept the cursor
           }}
-          onMouseLeave={onMouseLeave}
         >
           <div className="rounded-2xl bg-zinc-900/[0.97] border border-white/10 shadow-2xl shadow-black/60 overflow-hidden relative backdrop-blur-xl">
             {/* ── Banner header with overlapping poster ── */}
@@ -233,6 +206,7 @@ export default function AnimeHoverCard({ anime, children }: Props) {
       className="contents"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onMouseMove={onMouseMove}
     >
       {children}
       {createPortal(hoverCard, document.body)}

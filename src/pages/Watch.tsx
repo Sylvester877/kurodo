@@ -457,6 +457,20 @@ export default function Watch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anime?.mal_id, currentEp])
 
+  // ── Auto-mark watched when the episode is effectively finished ──
+  // With autoplay-next enabled, the countdown starts at >90% and switches
+  // episodes before the <video> ever fires 'ended' — so an ended-only
+  // auto-mark silently never ran for most users ("manual marking crap").
+  // The player's near-end signal (past 90% AND within the last 2 min) is
+  // the reliable "finished" signal: mark immediately when it fires.
+  const onPlayerNearEndMarkWatched = useCallback(() => {
+    if (!malId || !anime) return
+    if (isEpisodeWatched(anime.mal_id, currentEp)) return
+    if (!isInWatchlist(anime.mal_id)) addToWatchlist(anime)
+    markEpisodeWatched(anime.mal_id, currentEp)
+    toast.success(`✓ EP ${currentEp} completed`, 2000)
+  }, [malId, anime, currentEp, isEpisodeWatched, isInWatchlist, addToWatchlist, markEpisodeWatched])
+
   // ───── Autoplay next ─────
   // When the player fires onNearEnd, start a countdown the user can cancel.
   // Length comes from autoplayDelay; if autoplayNext is off, nothing
@@ -1398,7 +1412,7 @@ export default function Watch() {
                   accent: aniListAccent,
                 })}
                 skipTimes={skipTimes}
-                onNearEnd={onPlayerNearEnd}
+                onNearEnd={() => { onPlayerNearEnd(); onPlayerNearEndMarkWatched() }}
                 onProgress={onPlayerProgress}
                 hasNextEpisode={currentEp < (episodes.length || anime?.episodes || 0)}
                 hasPrevEpisode={currentEp > 1}
