@@ -1132,7 +1132,7 @@ export default function Watch() {
       </div>
 
       {/* Compact top bar — back link only. */}
-      <div className="max-w-[1600px] mx-auto px-4 mb-3">
+      <div className="max-w-[2000px] mx-auto px-4 mb-3">
         <Link
           to={`/anime/${anime.mal_id}`}
           className="inline-flex items-center gap-1.5 text-xs text-white/55 hover:text-white transition-colors group"
@@ -1150,9 +1150,12 @@ export default function Watch() {
       <div
         className={cn(
           'mx-auto px-4 grid grid-cols-1 gap-4 items-start relative z-[1] transition-[max-width,grid-template-columns] duration-300',
+          // Wide caps so 16:10 / 1080p+ screens get an edge-to-edge player
+          // (the old 1600px cap left ~160px of dead black space per side on
+          // 1920-wide displays). Theater mode is fully full-bleed.
           theaterMode
-            ? 'max-w-[1800px]'
-            : 'max-w-[1600px] lg:grid-cols-[minmax(0,1fr)_380px]',
+            ? 'max-w-none'
+            : 'max-w-[2000px] lg:grid-cols-[minmax(0,1fr)_380px]',
         )}
       >
         {/* Ambient backdrop glow — soft, blurred copy of the episode thumb
@@ -2016,7 +2019,7 @@ export default function Watch() {
       <KeyboardShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
 
       {recommendations.length > 0 && (
-        <section className="max-w-[1600px] mx-auto px-4 mt-8 pb-8">
+        <section className="max-w-[2000px] mx-auto px-4 mt-8 pb-8">
           <div className="glass-card rounded-2xl p-5 sm:p-6 relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/80 rounded-r-full" />
             <h2 className="text-lg sm:text-xl font-bold text-white mb-6 flex items-center gap-2.5">
