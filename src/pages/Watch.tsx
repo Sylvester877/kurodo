@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'rea
 import { useParams, Link, useSearchParams, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { motion } from 'framer-motion'
 import {
   Star, Calendar, Heart, Film, Globe, Hash, ArrowLeft,
-  Play, AlertCircle, Search, Keyboard, X, CheckCircle2, Eye, Mic, RefreshCw,
+  AlertCircle, Search, Keyboard, X, CheckCircle2, Eye, EyeOff, Mic, RefreshCw,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useTitle } from '../hooks/useTitle'
 import { getAnimeById, getAnimeRecommendations } from '../api/anime'
@@ -29,7 +29,7 @@ import ServerPicker from '../components/ServerPicker'
 import NextEpisodeCountdown from '../components/NextEpisodeCountdown'
 import EpisodeRangePicker from '../components/EpisodeRangePicker'
 import DownloadButton from '../components/DownloadButton'
-import EpisodePreviewTooltip from '../components/EpisodePreviewTooltip'
+import EpisodeRow from '../components/EpisodeRow'
 import RelatedAnime from '../components/RelatedAnime'
 import { toast } from '../components/Toaster'
 import { pickPreferredProvider } from '../lib/providers'
@@ -151,7 +151,7 @@ export default function Watch() {
   // Local UI state
   const [epQuery, setEpQuery] = useState('')
   const [hideWatched, setHideWatched] = useState(false)
-  const [skipFiller, setSkipFiller] = useState(() => {
+  const [skipFiller] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.localStorage.getItem('kurodo-skip-filler') !== '0'
   })
@@ -333,7 +333,15 @@ export default function Watch() {
       isEpisodeWatched, RANGE_SIZE])
 
   // ── Episode sidebar virtualization (100+ eps only). Each row ~84px. ──
-  const EP_ROW_HEIGHT = 84
+  const EP_ROW_HEIGHT = 118
+  // Range dropdown + prev/next paging (anidap-style header).
+  const totalEpisodesAll = Math.max(episodes.length, airedThrough ?? totalEpisodes ?? 0)
+  const allRanges = useMemo(() => {
+    const rs: { start: number; end: number }[] = []
+    for (let s = 1; s <= totalEpisodesAll; s += RANGE_SIZE) rs.push({ start: s, end: Math.min(s + RANGE_SIZE - 1, totalEpisodesAll) })
+    return rs
+  }, [totalEpisodesAll, RANGE_SIZE])
+  const lastRangeStart = allRanges.length ? allRanges[allRanges.length - 1].start : 1
   const shouldVirtualize = episodes.length > 100 && filteredEpisodes.length > 0
   const episodeVirtualizer = useVirtualizer({
     count: shouldVirtualize ? filteredEpisodes.length : 0,
@@ -1746,45 +1754,78 @@ export default function Watch() {
         )}>
           {/* Sticky header card — toolbar + search, stays visible while scrolling list */}
           <div className="glass-card rounded-xl p-3 space-y-2.5 shrink-0">
-            {/* Header row */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <h3 className="text-sm font-bold text-white tracking-tight">Episodes</h3>
-                {episodes.length > 0 && (
-                  <span className="glass-pill text-[10px] font-mono text-muted-foreground">
-                    {episodes.length}
-                  </span>
+            {/* Toolbar row: range selector + paging + filter + toggles */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              {totalEpisodesAll > RANGE_SIZE ? (
+                <select
+                  value={activeRangeStart}
+                  onChange={(e) => setActiveRangeStart(Number(e.target.value))}
+                  className="shrink-0 glass-pill text-[11px] font-semibold text-white/80 bg-white/[0.03] outline-none cursor-pointer py-1.5 px-2 [&>option]:bg-neutral-900 [&>option]:text-white"
+                  aria-label="Episode range"
+                >
+                  {allRanges.map((r) => (
+                    <option key={r.start} value={r.start}>{r.start} - {r.end}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="shrink-0 glass-pill text-[11px] font-mono text-white/70 py-1.5 px-2.5">1 - {totalEpisodesAll}</span>
+              )}
+              {totalEpisodesAll > RANGE_SIZE && (
+                <>
+                  <button
+                    onClick={() => setActiveRangeStart((s) => Math.max(1, s - RANGE_SIZE))}
+                    disabled={activeRangeStart <= 1}
+                    className="shrink-0 glass-pill p-1.5 text-white/60 hover:text-white disabled:opacity-30 disabled:hover:text-white/60 transition-all"
+                    aria-label="Previous range"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setActiveRangeStart((s) => Math.min(lastRangeStart, s + RANGE_SIZE))}
+                    disabled={activeRangeStart >= lastRangeStart}
+                    className="shrink-0 glass-pill p-1.5 text-white/60 hover:text-white disabled:opacity-30 disabled:hover:text-white/60 transition-all"
+                    aria-label="Next range"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+              {episodes.length > 6 && (
+                <div className="flex items-center gap-1.5 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1.5 min-w-0 flex-1 focus-within:border-primary/30 transition-all">
+                  <Search className="h-3 w-3 text-white/30 shrink-0" />
+                  <input
+                    type="text"
+                    value={epQuery}
+                    onChange={(e) => setEpQuery(e.target.value)}
+                    placeholder="Filter episodes…"
+                    className="min-w-0 flex-1 bg-transparent border-none outline-none text-[11px] text-white placeholder:text-white/30"
+                  />
+                  {epQuery && (
+                    <button
+                      onClick={() => setEpQuery('')}
+                      aria-label="Clear filter"
+                      className="text-white/40 hover:text-white/80 transition-colors shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={() => setHideWatched((h) => !h)}
+                className={cn(
+                  'shrink-0 glass-pill p-1.5 transition-all',
+                  hideWatched
+                    ? 'bg-primary/15 text-primary border-primary/25'
+                    : 'text-white/55 hover:text-white/90',
                 )}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setSkipFiller((s) => !s)}
-                  className={cn(
-                    'glass-pill text-[10px] font-semibold transition-all',
-                    skipFiller
-                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
-                      : 'bg-white/[0.03] text-white/55 border-white/8 hover:bg-white/[0.06] hover:text-white/80',
-                  )}
-                  title={skipFiller ? 'Auto-skip filler episodes' : 'Include filler episodes'}
-                >
-                  {skipFiller ? 'No filler' : 'All'}
-                </button>
-                <button
-                  onClick={() => setHideWatched((h) => !h)}
-                  className={cn(
-                    'glass-pill text-[10px] font-semibold transition-all',
-                    hideWatched
-                      ? 'bg-primary/15 text-primary border-primary/25 hover:bg-primary/20'
-                      : 'bg-white/[0.03] text-white/55 border-white/8 hover:bg-white/[0.06] hover:text-white/80',
-                  )}
-                  title={hideWatched ? 'Show all episodes' : 'Hide watched episodes'}
-                >
-                  {hideWatched ? 'Unwatched' : 'All'}
-                </button>
-              </div>
+                title={hideWatched ? 'Show all episodes' : 'Hide watched episodes'}
+              >
+                {hideWatched ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
             </div>
 
-            {/* Range picker row */}
+            {/* Range tabs (when several ranges exist) */}
             <EpisodeRangePicker
               totalEpisodes={Math.max(
                 episodes.length,
@@ -1796,33 +1837,10 @@ export default function Watch() {
               onSelectRange={(start) => setActiveRangeStart(start)}
             />
 
-            {/* Episode search */}
-            {episodes.length > 6 && (
-              <div className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.02] px-2.5 py-1.5 focus-within:border-primary/30 focus-within:bg-white/[0.04] transition-all">
-                <Search className="h-3.5 w-3.5 text-white/30 shrink-0" />
-                <input
-                  type="text"
-                  value={epQuery}
-                  onChange={(e) => setEpQuery(e.target.value)}
-                  placeholder="Search episode…"
-                  className="flex-1 bg-transparent border-none outline-none text-xs text-white placeholder:text-white/30"
-                />
-                {epQuery && (
-                  <button
-                    onClick={() => setEpQuery('')}
-                    aria-label="Clear search"
-                    className="text-white/40 hover:text-white/80 transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            )}
-
             {/* Keyboard shortcuts */}
             <button
               onClick={() => setShowShortcuts(true)}
-              className="flex items-center gap-1.5 text-[10px] text-white/35 hover:text-white/70 transition-colors w-full justify-center py-1"
+              className="flex items-center gap-1.5 text-[10px] text-white/35 hover:text-white/70 transition-colors w-full justify-center py-0.5"
             >
               <Keyboard className="h-3 w-3" />
               Shortcuts
@@ -1888,74 +1906,41 @@ export default function Watch() {
                         {episodeVirtualizer.getVirtualItems().map((vItem) => {
                           const ep = filteredEpisodes[vItem.index]
                           if (!ep) return null
-                          const watched = isEpisodeWatched(anime.mal_id, ep.episode)
-                          const isCurrent = ep.episode === currentEp
-                          const epTitle = ep.title?.en || ep.title?.['x-jat'] || null
-                          const filler = isFiller(ep.episode, fillerInfo)
-                          const isMixed = fillerInfo?.mixed?.includes(Number(ep.episode)) ?? false
-                          const progress = malId ? getEpisodeProgress(malId, ep.episode) : null
-                          const progressPct = progress && progress.duration > 0 ? Math.min((progress.time / progress.duration) * 100, 100) : 0
-                          const isMostlyDone = progressPct >= 90
                           return (
                             <div key={vItem.key} data-index={vItem.index} ref={episodeVirtualizer.measureElement} style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vItem.start}px)` }}>
-                              <EpisodePreviewTooltip episode={ep.episode} title={epTitle} overview={ep.overview ?? null} image={buildEpisodeImageUrl(ep, { showCover: getImageUrl(anime), label: ep.episode })} durationMin={ep.runtime ?? null} isCurrent={isCurrent} isWatched={watched}>
-                                <motion.button ref={isCurrent ? currentEpBtnRef : undefined} onClick={() => { setCurrentEp(ep.episode) }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className={cn('group w-full flex items-center gap-2.5 p-2 rounded-xl transition-all text-left relative overflow-hidden', isCurrent ? 'bg-primary/10 border-2 border-primary/50 shadow-[0_0_20px_-6px_hsl(245,75%,60%,0.4)]' : 'bg-white/[0.02] hover:bg-white/[0.05] border-2 border-transparent hover:border-white/8')}>
-                                  {isCurrent && (<div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full" style={{ background: aniListAccent ? `linear-gradient(180deg, ${aniListAccent}, ${aniListAccent}88)` : 'linear-gradient(180deg, hsl(245,75%,60%), hsl(245,75%,60%,0.5))' }} />)}
-                                  <div className="relative shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-card to-black/60 shadow-md" style={{ width: 120, height: 68 }}>
-                                    <img src={buildEpisodeImageUrl(ep, { showCover: getImageUrl(anime), label: ep.episode, accent: aniListAccent })} alt={`Episode ${ep.episode}`} loading="lazy" decoding="async" className={cn('h-full w-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out', watched && !isCurrent && 'grayscale-[50%] opacity-60')} onError={(e) => { const img = e.currentTarget; if (!img.dataset.fallbackTried && getImageUrl(anime)) { img.dataset.fallbackTried = '1'; img.src = buildEpisodeImageUrl(null, { showCover: getImageUrl(anime), label: ep.episode, accent: aniListAccent }) } }} />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                                    <span className="absolute bottom-1.5 left-1.5 glass-pill py-0.5 px-1.5 text-[9px] font-bold font-mono text-white/90 bg-black/70 border-white/10 shadow-lg">{ep.episode}</span>
-                                    {(filler || isMixed) && (<span className={cn('absolute top-1.5 left-1.5 glass-pill text-[8px] font-bold uppercase tracking-wider py-0.5 px-1.5 shadow-lg', isMixed ? 'bg-purple-500/80 text-white border-purple-400/40' : 'bg-amber-500/80 text-white border-amber-400/40')}>{isMixed ? 'MIXED CANON' : 'FILLER'}</span>)}
-                                    {isCurrent && (<div className="absolute inset-0 grid place-items-center bg-primary/30"><div className="h-8 w-8 rounded-full bg-primary/90 grid place-items-center shadow-lg shadow-primary/40"><Play className="h-3.5 w-3.5 text-white fill-white ml-0.5" /></div></div>)}
-                                    {watched && !isCurrent && (<div className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-emerald-500/90 grid place-items-center shadow-md"><CheckCircle2 className="h-3 w-3 text-white" /></div>)}
-                                    {isCurrent && (<span className="absolute top-1.5 right-1.5 glass-pill py-0.5 px-1.5 text-[8px] font-bold uppercase tracking-wider bg-black/70 border-white/10 text-white/80 shadow-lg">{streamType.toUpperCase()}</span>)}
-                                    {ep.runtime && (<span className="absolute bottom-1.5 right-1.5 glass-pill py-0.5 px-1.5 text-[9px] font-mono text-white/60 bg-black/60 border-white/10 shadow-lg">{ep.runtime}m</span>)}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className={cn('text-xs leading-tight line-clamp-2 transition-colors', isCurrent ? 'text-white font-semibold' : watched ? 'text-white/40 line-through decoration-white/20' : 'text-white/75 group-hover:text-white/90')}>{epTitle || `Episode ${ep.episode}`}</p>
-                                    {isCurrent && (<div className="flex items-center gap-1.5 mt-1.5"><span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /><span className="text-[9px] font-semibold text-primary uppercase tracking-wider">Now playing</span></div>)}
-                                  </div>
-                                  {progressPct > 0 && !watched && (<div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.03]"><div className={cn('h-full transition-all duration-500 rounded-r-full', isMostlyDone ? 'bg-emerald-500/70' : 'bg-primary/60')} style={{ width: `${Math.max(3, progressPct)}%` }} /></div>)}
-                                </motion.button>
-                              </EpisodePreviewTooltip>
+                              <EpisodeRow
+                                ep={ep}
+                                animeImage={getImageUrl(anime)}
+                                accent={aniListAccent}
+                                isCurrent={ep.episode === currentEp}
+                                watched={isEpisodeWatched(anime.mal_id, ep.episode)}
+                                fillerMark={(() => { const f = isFiller(ep.episode, fillerInfo); const m = fillerInfo?.mixed?.includes(Number(ep.episode)) ?? false; return f ? 'FILLER' : m ? 'MIXED CANON' : null })()}
+                                progressPct={(() => { const p = malId ? getEpisodeProgress(malId, ep.episode) : null; return p && p.duration > 0 ? Math.min((p.time / p.duration) * 100, 100) : 0 })()}
+                                streamTypeLabel={streamType.toUpperCase()}
+                                onSelect={() => setCurrentEp(ep.episode)}
+                                btnRef={ep.episode === currentEp ? currentEpBtnRef : undefined}
+                              />
                             </div>
                           )
                         })}
                       </div>
                     ) : (
-                      <div className="space-y-1">
-                      {filteredEpisodes.map((ep) => {
-                        const watched = isEpisodeWatched(anime.mal_id, ep.episode)
-                        const isCurrent = ep.episode === currentEp
-                        const epTitle = ep.title?.en || ep.title?.['x-jat'] || null
-                        const filler = isFiller(ep.episode, fillerInfo)
-                        const isMixed = fillerInfo?.mixed?.includes(Number(ep.episode)) ?? false
-                        const progress = malId ? getEpisodeProgress(malId, ep.episode) : null
-                        const progressPct = progress && progress.duration > 0 ? Math.min((progress.time / progress.duration) * 100, 100) : 0
-                        const isMostlyDone = progressPct >= 90
-                        return (
-                          <EpisodePreviewTooltip key={ep.episode} episode={ep.episode} title={epTitle} overview={ep.overview ?? null} image={buildEpisodeImageUrl(ep, { showCover: getImageUrl(anime), label: ep.episode })} durationMin={ep.runtime ?? null} isCurrent={isCurrent} isWatched={watched}>
-                            <motion.button ref={isCurrent ? currentEpBtnRef : undefined} onClick={() => { setCurrentEp(ep.episode) }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className={cn('group w-full flex items-center gap-2.5 p-2 rounded-xl transition-all text-left relative overflow-hidden', isCurrent ? 'bg-primary/10 border-2 border-primary/50 shadow-[0_0_20px_-6px_hsl(245,75%,60%,0.4)]' : 'bg-white/[0.02] hover:bg-white/[0.05] border-2 border-transparent hover:border-white/8')}>
-                              {isCurrent && (<div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full" style={{ background: aniListAccent ? `linear-gradient(180deg, ${aniListAccent}, ${aniListAccent}88)` : 'linear-gradient(180deg, hsl(245,75%,60%), hsl(245,75%,60%,0.5))' }} />)}
-                              <div className="relative shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-card to-black/60 shadow-md" style={{ width: 120, height: 68 }}>
-                                <img src={buildEpisodeImageUrl(ep, { showCover: getImageUrl(anime), label: ep.episode, accent: aniListAccent })} alt={`Episode ${ep.episode}`} loading="lazy" decoding="async" className={cn('h-full w-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out', watched && !isCurrent && 'grayscale-[50%] opacity-60')} onError={(e) => { const img = e.currentTarget; if (!img.dataset.fallbackTried && getImageUrl(anime)) { img.dataset.fallbackTried = '1'; img.src = buildEpisodeImageUrl(null, { showCover: getImageUrl(anime), label: ep.episode, accent: aniListAccent }) } }} />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                                <span className="absolute bottom-1.5 left-1.5 glass-pill py-0.5 px-1.5 text-[9px] font-bold font-mono text-white/90 bg-black/70 border-white/10 shadow-lg">{ep.episode}</span>
-                                {(filler || isMixed) && (<span className={cn('absolute top-1.5 left-1.5 glass-pill text-[8px] font-bold uppercase tracking-wider py-0.5 px-1.5 shadow-lg', isMixed ? 'bg-purple-500/80 text-white border-purple-400/40' : 'bg-amber-500/80 text-white border-amber-400/40')}>{isMixed ? 'MIXED CANON' : 'FILLER'}</span>)}
-                                {isCurrent && (<div className="absolute inset-0 grid place-items-center bg-primary/30"><div className="h-8 w-8 rounded-full bg-primary/90 grid place-items-center shadow-lg shadow-primary/40"><Play className="h-3.5 w-3.5 text-white fill-white ml-0.5" /></div></div>)}
-                                {watched && !isCurrent && (<div className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-emerald-500/90 grid place-items-center shadow-md"><CheckCircle2 className="h-3 w-3 text-white" /></div>)}
-                                {isCurrent && (<span className="absolute top-1.5 right-1.5 glass-pill py-0.5 px-1.5 text-[8px] font-bold uppercase tracking-wider bg-black/70 border-white/10 text-white/80 shadow-lg">{streamType.toUpperCase()}</span>)}
-                                {ep.runtime && (<span className="absolute bottom-1.5 right-1.5 glass-pill py-0.5 px-1.5 text-[9px] font-mono text-white/60 bg-black/60 border-white/10 shadow-lg">{ep.runtime}m</span>)}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className={cn('text-xs leading-tight line-clamp-2 transition-colors', isCurrent ? 'text-white font-semibold' : watched ? 'text-white/40 line-through decoration-white/20' : 'text-white/75 group-hover:text-white/90')}>{epTitle || `Episode ${ep.episode}`}</p>
-                                {isCurrent && (<div className="flex items-center gap-1.5 mt-1.5"><span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" /><span className="text-[9px] font-semibold text-primary uppercase tracking-wider">Now playing</span></div>)}
-                              </div>
-                              {progressPct > 0 && !watched && (<div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.03]"><div className={cn('h-full transition-all duration-500 rounded-r-full', isMostlyDone ? 'bg-emerald-500/70' : 'bg-primary/60')} style={{ width: `${Math.max(3, progressPct)}%` }} /></div>)}
-                            </motion.button>
-                          </EpisodePreviewTooltip>
-                        )
-                      })}
+                      <div className="space-y-2">
+                      {filteredEpisodes.map((ep) => (
+                        <EpisodeRow
+                          key={ep.episode}
+                          ep={ep}
+                          animeImage={getImageUrl(anime)}
+                          accent={aniListAccent}
+                          isCurrent={ep.episode === currentEp}
+                          watched={isEpisodeWatched(anime.mal_id, ep.episode)}
+                          fillerMark={(() => { const f = isFiller(ep.episode, fillerInfo); const m = fillerInfo?.mixed?.includes(Number(ep.episode)) ?? false; return f ? 'FILLER' : m ? 'MIXED CANON' : null })()}
+                          progressPct={(() => { const p = malId ? getEpisodeProgress(malId, ep.episode) : null; return p && p.duration > 0 ? Math.min((p.time / p.duration) * 100, 100) : 0 })()}
+                          streamTypeLabel={streamType.toUpperCase()}
+                          onSelect={() => setCurrentEp(ep.episode)}
+                          btnRef={ep.episode === currentEp ? currentEpBtnRef : undefined}
+                        />
+                      ))}
                       </div>
                     )}
                   </div>

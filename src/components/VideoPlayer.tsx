@@ -325,6 +325,15 @@ export default React.memo(function VideoPlayer({
   // cover + a scale. Manual "Video fit" choice (fill/cover) disables the
   // auto zoom so the user always has the final say.
   const [intrinsicAspect, setIntrinsicAspect] = useState<number | null>(null)
+  // True while the player box is the browser-fullscreen element. In that
+  // state the box is sized by the UA to the screen — our aspect-ratio and
+  // crop reshaping must not fight it.
+  const [fullscreenActive, setFullscreenActive] = useState(false)
+  useEffect(() => {
+    const onFs = () => setFullscreenActive(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onFs)
+    return () => document.removeEventListener('fullscreenchange', onFs)
+  }, [])
   // Baked-in bar crop, as fractions of the frame per side (0 = no crop).
   // The player box adopts the CONTENT's aspect ratio and the video element
   // is oversized/offset so the content rect maps 1:1 into the box — no
@@ -1658,8 +1667,10 @@ ${offset > 0 ? `
 
   // Content-space geometry derived from the crop: the box shows exactly the
   // content rect; the video element inside is oversized/offset to match.
-  // Manual fit modes (fill/cover) bypass the crop entirely.
-  const effCrop = videoFit === 'contain' ? crop : { l: 0, r: 0, t: 0, b: 0 }
+  // Manual fit modes (fill/cover) bypass the crop entirely. In fullscreen
+  // the box MUST fill the screen — the bar-crop reshaping is disabled there
+  // (fullscreen already letterboxes correctly via object-fit).
+  const effCrop = videoFit === 'contain' && !fullscreenActive ? crop : { l: 0, r: 0, t: 0, b: 0 }
   const hasHBar = effCrop.l > 0 || effCrop.r > 0
   const hasVBar = effCrop.t > 0 || effCrop.b > 0
   const contentAspect = (() => {
@@ -1679,7 +1690,7 @@ ${offset > 0 ? `
       ref={wrapRef}
       tabIndex={-1}
       className="group relative w-full overflow-hidden rounded-xl bg-black touch-none select-none outline-none"
-      style={{ aspectRatio: contentAspect ? `${contentAspect}` : '16 / 9' }}
+      style={{ aspectRatio: !fullscreenActive && contentAspect ? `${contentAspect}` : undefined }}
       onPointerDown={onPointerDown}
       onPointerMove={(e) => { onPointerMove(e); setControlsVisible(true) }}
       onPointerUp={onPointerUp}
