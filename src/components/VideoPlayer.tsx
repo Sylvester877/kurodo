@@ -311,6 +311,118 @@ export default React.memo(function VideoPlayer({
   // Reset the "seeked already" guard whenever the src changes.
   useEffect(() => { resumeAppliedRef.current = false }, [activeSrc])
 
+  // ── Smart aspect + baked-in black-bar removal ──────────────────────
+  // Two problems this solves:
+  //  1. Some CDNs serve 4:3 or odd-aspect rips inside a forced 16:9 box
+  //     (object-fit: contain) → pillarbox bars on the sides.
+  //  2. Some encodes BAKE black bars into the pixels themselves — contain
+  //     can't fix that because the bars are part of the video.
+  // Fix 1: the player box adopts the stream's intrinsic aspect ratio once
+  // metadata loads (CSS aspect-ratio; falls back to 16/9 until known).
+  // Fix 2: after playback starts we sample the video's edge pixels via
+  // canvas; if the left/right (or top/bottom) edges are persistently near
+  // black while the middle isn't, we zoom-crop past them with object-fit
+  // cover + a scale. Manual "Video fit" choice (fill/cover) disables the
+  // auto zoom so the user always has the final say.
+  const [intrinsicAspect, setIntrinsicAspect] = useState<number | null>(null)
+  const [autoZoom, setAutoZoom] = useState(1)
+  useEffect(() => {
+    setIntrinsicAspect(null)
+    setAutoZoom(1)
+  }, [activeSrc])
+  // Adopt intrinsic aspect when metadata arrives.
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    const onMeta = () => {
+      if (v.videoWidth > 0 && v.videoHeight > 0) {
+        setIntrinsicAspect(v.videoWidth / v.videoHeight)
+      }
+    }
+    v.addEventListener('loadedmetadata', onMeta)
+    if (v.readyState >= 1) onMeta()
+    return () => v.removeEventListener('loadedmetadata', onMeta)
+  }, [activeSrc])
+  // Detect baked-in black bars from actual decoded frames.
+  useEffect(() => {
+    if (videoFit !== 'contain') return // manual fit wins
+    const v = videoRef.current
+    if (!v) return
+    let timer: number | null = null
+    let cancelled = false
+    let consecutive = 0
+    const CONSECUTIVE_NEEDED = 4
+    // Sample every 500ms — bars must persist ~2s so a merely dark scene
+    // never triggers a false crop.
+    const analyze = () => {
+      if (cancelled) return
+      if (v.readyState < 2 || v.videoWidth === 0 || v.paused) {
+        timer = window.setTimeout(analyze, 500)
+        return
+      }
+      try {
+        // Downsample hard — we only need edge vs center luminance.
+        const W = 32
+        const H = 18
+        const c = document.createElement('canvas')
+        c.width = W; c.height = H
+        const ctx = c.getContext('2d', { willReadFrequently: true })!
+        ctx.drawImage(v, 0, 0, W, H)
+        const row = ctx.getImageData(0, 0, W, H).data
+        const lum = (x: number, y: number) => {
+          const i = (y * W + x) * 4
+          return 0.2126 * row[i] + 0.7152 * row[i + 1] + 0.0722 * row[i + 2]
+        }
+        // Column/row means.
+        const colMean: number[] = []
+        const rowMean: number[] = []
+        for (let x = 0; x < W; x++) {
+          let s = 0
+          for (let y = 0; y < H; y++) s += lum(x, y)
+          colMean.push(s / H)
+        }
+        for (let y = 0; y < H; y++) {
+          let s = 0
+          for (let x = 0; x < W; x++) s += lum(x, y)
+          rowMean.push(s / W)
+        }
+        const mean = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length
+        const overall = mean(colMean)
+        // Count fully-dark columns from left and right, dark rows top/bottom.
+        const isDark = (n: number) => n < 22
+        let left = 0
+        while (left < W / 3 && isDark(colMean[left])) left++
+        let right = 0
+        while (right < W / 3 && isDark(colMean[W - 1 - right])) right++
+        let top = 0
+        while (top < H / 3 && isDark(rowMean[top])) top++
+        let bottom = 0
+        while (bottom < H / 3 && isDark(rowMean[H - 1 - bottom])) bottom++
+        const hasCenterContent = overall > 34
+        if (hasCenterContent && (left > 1 || right > 1 || top > 1 || bottom > 1)) {
+          consecutive++
+        } else {
+          consecutive = 0
+        }
+        if (consecutive >= CONSECUTIVE_NEEDED) {
+          // Zoom just past the bars. A bar of fraction f per side needs
+          // zoom = 1/(1-2f) to crop it exactly; +4% margin for soft edges.
+          const f = Math.max(Math.max(left, right) / W, Math.max(top, bottom) / H)
+          const z = Math.min(1.45, Math.max(1, 1 / (1 - 2 * f) * 1.04))
+          setAutoZoom(z)
+          return // bars found — stop analyzing
+        }
+        // Give up after ~14s of samples without finding bars.
+        if (consecutive === 0 && v.currentTime > 14) return
+      } catch {
+        return // cross-origin taint or similar — silent no-op
+      }
+      timer = window.setTimeout(analyze, 500)
+    }
+    analyze()
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
+  }, [activeSrc, videoFit])
+
   // ---- Load HLS source ----
   useEffect(() => {
     const video = videoRef.current
@@ -1500,7 +1612,8 @@ ${offset > 0 ? `
     <div
       ref={wrapRef}
       tabIndex={-1}
-      className="group relative aspect-video w-full overflow-hidden rounded-xl bg-black touch-none select-none outline-none"
+      className="group relative w-full overflow-hidden rounded-xl bg-black touch-none select-none outline-none"
+      style={{ aspectRatio: intrinsicAspect ? `${intrinsicAspect}` : '16 / 9' }}
       onPointerDown={onPointerDown}
       onPointerMove={(e) => { onPointerMove(e); setControlsVisible(true) }}
       onPointerUp={onPointerUp}
@@ -1526,6 +1639,8 @@ ${offset > 0 ? `
         style={{
           objectFit: videoFit,
           filter: brightness === 1 ? undefined : `brightness(${brightness})`,
+          transform: autoZoom !== 1 ? `scale(${autoZoom})` : undefined,
+          transformOrigin: 'center center',
         }}
       >
         {offsetSubtitles.map((s) => (
