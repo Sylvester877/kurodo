@@ -1,7 +1,7 @@
 {
   "name": "kurodo",
   "private": true,
-  "version": "0.3.36",
+  "version": "0.3.37",
   "type": "module",
   "main": "electron/main.js",
   "dependencies": {
@@ -99,6 +99,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^33.4.11",
     "electron-builder": "^25.0.0",
     "jsdom": "^29.1.1",
     "puppeteer": "^25.10.0",
