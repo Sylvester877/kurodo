@@ -347,10 +347,14 @@ export default React.memo(function VideoPlayer({
     if (v.readyState >= 1) onMeta()
     return () => v.removeEventListener('loadedmetadata', onMeta)
   }, [activeSrc])
-  // Detect baked-in black bars from actual decoded frames and crop them by
-  // reshaping the player box to the content rect (never by scaling, which
-  // would chop real picture). Self-reverting: if the claimed bar region
-  // later shows picture (scene change / eye-catch ended), the crop resets.
+  // Detect baked-in black bars — ffmpeg-cropdetect style, but tuned for
+  // anime streams whose scenes constantly FADE through black. A single-frame
+  // check can never tell a held fade from a baked bar (ground truth: edges
+  // legitimately sit at 0.00 brightness mid-fade), so the decisive signal is
+  // LONG-TERM EXACT BOUNDARY STABILITY: baked bars sit at the same column
+  // for the whole episode, while a fade boundary always grows or shrinks.
+  // Crop is applied by reshaping the box to the content rect (never scaling),
+  // and self-reverts the moment the boundary moves or picture appears.
   useEffect(() => {
     if (videoFit !== 'contain') return // manual fit wins
     const v = videoRef.current
@@ -361,61 +365,65 @@ export default React.memo(function VideoPlayer({
     let streak = 0
     let applied = false
     let revertVotes = 0
-    const CONFIRM_SAMPLES = 8 // ~4s at 500ms — bars must be stable this long
+    // Bars must hold the EXACT same boundary (±1 col) for ~12s straight.
+    // Fades never freeze that long; episode-length bars always do.
+    const CONFIRM_SAMPLES = 24
     const measure = () => {
-      // Downsample hard — we only need edge vs center luminance.
-      const W = 32
-      const H = 18
+      // Sample at 1/4 native res with smoothing DISABLED — block-blending
+      // a tiny canvas smears the sharp bar boundary away and hides texture.
+      const SW = Math.max(64, Math.floor(v.videoWidth / 4))
+      const SH = Math.max(36, Math.floor(v.videoHeight / 4))
       const c = document.createElement('canvas')
-      c.width = W; c.height = H
+      c.width = SW; c.height = SH
       const ctx = c.getContext('2d', { willReadFrequently: true })!
-      ctx.drawImage(v, 0, 0, W, H)
-      const px = ctx.getImageData(0, 0, W, H).data
-      const lum = (x: number, y: number) => {
-        const i = (y * W + x) * 4
-        return 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(v, 0, 0, SW, SH)
+      const px = ctx.getImageData(0, 0, SW, SH).data
+      const lum = (i: number) => 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]
+      // Fraction of pixels above near-black per column/row. A real bar
+      // column is digital black — not a single pixel of picture (frac ~0),
+      // while fade edges and dark scene edges still carry pixels >26.
+      const colFrac: number[] = []
+      const rowFrac: number[] = []
+      const colLumSum = new Array<number>(SW).fill(0)
+      for (let x = 0; x < SW; x++) {
+        let n = 0
+        for (let y = 0; y < SH; y++) { const i = (y * SW + x) * 4; colLumSum[x] += lum(i); if (lum(i) > 26) n++ }
+        colFrac.push(n / SH)
       }
-      const colMean: number[] = []
-      const colMax: number[] = []
-      const rowMean: number[] = []
-      const rowMax: number[] = []
-      for (let x = 0; x < W; x++) {
-        let s = 0
-        let mx = 0
-        for (let y = 0; y < H; y++) { const l = lum(x, y); s += l; if (l > mx) mx = l }
-        colMean.push(s / H)
-        colMax.push(mx)
+      for (let y = 0; y < SH; y++) {
+        let n = 0
+        for (let x = 0; x < SW; x++) if (lum((y * SW + x) * 4) > 26) n++
+        rowFrac.push(n / SW)
       }
-      for (let y = 0; y < H; y++) {
-        let s = 0
-        let mx = 0
-        for (let x = 0; x < W; x++) { const l = lum(x, y); s += l; if (l > mx) mx = l }
-        rowMean.push(s / W)
-        rowMax.push(mx)
-      }
-      const mean = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length
-      // Center band must have real picture — dark scenes never trigger.
-      const centerBand = mean(colMean.slice(W / 4, (3 * W) / 4))
-      if (centerBand < 45) return null
-      // A REAL baked-in bar is flat black: not one bright pixel in it.
-      // Dark scene edges (walls, hair, vignettes) always carry texture.
-      const isBarCol = (x: number) => colMean[x] < 24 && colMax[x] < 40
-      const isBarRow = (y: number) => rowMean[y] < 24 && rowMax[y] < 40
-      const capX = Math.floor(W * 0.3)
-      const capY = Math.floor(H * 0.3)
+      // Center band must have real picture — blackouts never trigger.
+      let cSum = 0
+      for (let x = Math.floor(SW / 4); x < (3 * SW) / 4; x++) cSum += colLumSum[x] / SH
+      if (cSum / (SW / 2) < 45) return null
+      const isBarCol = (x: number) => colFrac[x] < 0.02
+      const isBarRow = (y: number) => rowFrac[y] < 0.02
+      const capX = Math.floor(SW * 0.25)
+      const capY = Math.floor(SH * 0.25)
+      const minBarX = Math.max(2, Math.round(SW * 0.03)) // ignore sliver noise
+      const minBarY = Math.max(2, Math.round(SH * 0.03))
       let l = 0
       while (l < capX && isBarCol(l)) l++
       let r = 0
-      while (r < capX && isBarCol(W - 1 - r)) r++
-      // Bars come in symmetric pairs (pillarbox encode). A single dark edge
-      // is a scene, not a bar — reject asymmetric candidates outright.
-      if ((l > 0) !== (r > 0) || (l > 0 && Math.abs(l - r) > 2)) { l = 0; r = 0 }
+      while (r < capX && isBarCol(SW - 1 - r)) r++
+      // Bars come in symmetric pairs; a lone dark edge is a scene.
+      if ((l > 0) !== (r > 0) || (l > 0 && Math.abs(l - r) > 1)) { l = 0; r = 0 }
+      if (l > 0 && (l < minBarX || r < minBarX)) { l = 0; r = 0 }
+      // Sharp boundary: the first content column must be mostly picture.
+      // A soft gradient (fade/vignette) ramps up gradually instead.
+      if (l > 0 && colFrac[l] < 0.3) { l = 0; r = 0 }
       let t = 0
       while (t < capY && isBarRow(t)) t++
       let b = 0
-      while (b < capY && isBarRow(H - 1 - b)) b++
+      while (b < capY && isBarRow(SH - 1 - b)) b++
       if ((t > 0) !== (b > 0) || (t > 0 && Math.abs(t - b) > 1)) { t = 0; b = 0 }
-      if (l + r <= 1 && t + b <= 1) return null // no meaningful bars
+      if (t > 0 && (t < minBarY || b < minBarY)) { t = 0; b = 0 }
+      if (t > 0 && rowFrac[t] < 0.3) { t = 0; b = 0 }
+      if (l + r <= 0 && t + b <= 0) return null
       return { l, r, t, b }
     }
     const analyze = () => {
@@ -427,7 +435,8 @@ export default React.memo(function VideoPlayer({
       try {
         const m = measure()
         if (!applied) {
-          // Confirmation phase: candidate must repeat stably before applied.
+          // Confirmation phase: boundary must repeat EXACTLY (±1 col of the
+          // 1/4-res sample = ±4 real pixels) for 12s straight.
           const same =
             m && pending &&
             Math.abs(m.l - pending.l) <= 1 && Math.abs(m.r - pending.r) <= 1 &&
@@ -435,13 +444,15 @@ export default React.memo(function VideoPlayer({
           if (m && same) streak++
           else { pending = m; streak = m ? 1 : 0 }
           if (pending && streak >= CONFIRM_SAMPLES) {
-            const W = 32, H = 18
-            setCrop({ l: pending.l / W, r: pending.r / W, t: pending.t / H, b: pending.b / H })
+            const SW = Math.max(64, Math.floor(v.videoWidth / 4))
+            const SH = Math.max(36, Math.floor(v.videoHeight / 4))
+            setCrop({ l: pending.l / SW, r: pending.r / SW, t: pending.t / SH, b: pending.b / SH })
             applied = true
             revertVotes = 0
           }
         } else {
-          // Verification phase: if edges show picture again, revert.
+          // Verification phase: any boundary movement or picture in the bar
+          // region twice in a row → the "bars" were scene content. Revert.
           if (!m) {
             revertVotes++
             if (revertVotes >= 2) {
@@ -457,7 +468,7 @@ export default React.memo(function VideoPlayer({
       } catch {
         return // cross-origin taint or similar — silent no-op
       }
-      timer = window.setTimeout(analyze, applied ? 1000 : 500)
+      timer = window.setTimeout(analyze, applied ? 500 : 500)
     }
     analyze()
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
