@@ -1163,7 +1163,10 @@ export default function Watch() {
           // 1920-wide displays). Theater mode is fully full-bleed.
           theaterMode
             ? 'max-w-none'
-            : 'max-w-[2000px] lg:grid-cols-[minmax(0,1fr)_380px]',
+            // 16:10 screens (1920×1200 VivoBook at 125% = 1536 CSS px, which
+            // lands on the 2xl breakpoint): a 340px rail keeps the episode
+            // rows usable while giving the player the reclaimed width.
+            : 'max-w-[2000px] lg:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_340px]',
         )}
       >
         {/* Ambient backdrop glow — soft, blurred copy of the episode thumb

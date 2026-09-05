@@ -133,6 +133,10 @@ export default function PlayerControls({
   const [buffered, setBuffered] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
   const [visible, setVisible] = useState(true)
+  // Track whether the cursor is currently over the control bar itself —
+  // while it is, the auto-hide timer must not fire (moving the mouse ONTO
+  // the bar then holding it still must NOT hide the controls).
+  const mouseOnBarRef = useRef(false)
   const [hoveredPct, setHoveredPct] = useState<number | null>(null)
   const [menu, setMenu] = useState<'settings' | 'captions' | 'quality' | null>(null)
   const [captionsTab, setCaptionsTab] = useState<'tracks' | 'appearance'>('tracks')
@@ -202,7 +206,12 @@ export default function PlayerControls({
     if (hideTimer.current) window.clearTimeout(hideTimer.current)
     if (!playing) return  // never auto-hide while paused
     if (menu) return      // never auto-hide while a menu is open
-    hideTimer.current = window.setTimeout(() => setVisible(false), 3000)
+    if (mouseOnBarRef.current) return // cursor parked on the control bar
+    hideTimer.current = window.setTimeout(() => {
+      // Re-check at fire time: the cursor may have moved onto the bar
+      // during the countdown.
+      if (!mouseOnBarRef.current) setVisible(false)
+    }, 3000)
   }, [playing, menu])
 
   const showAndReschedule = useCallback(() => {
@@ -349,7 +358,15 @@ export default function PlayerControls({
         visible ? 'opacity-100' : 'opacity-0 translate-y-2',
       )}
       onMouseMove={showAndReschedule}
-      onMouseLeave={() => { if (playing && !menu) setVisible(false) }}
+      onMouseLeave={() => {
+        // Grace period instead of instant hide: crossing the black gap
+        // between the video edge and the player edge (or leaving toward the
+        // page) must not blink the controls off. If the cursor comes back
+        // within the window, nothing visibly happens.
+        window.setTimeout(() => {
+          if (!mouseOnBarRef.current && playing && !menu) setVisible(false)
+        }, 1200)
+      }}
       onTouchStart={showAndReschedule}
     >
       {/* Click-anywhere surface: smart single/double-tap handling.
@@ -493,7 +510,10 @@ export default function PlayerControls({
         </div>
       )}
 
-      <div className="pointer-events-auto absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 pt-1 flex flex-col gap-1.5">
+      <div
+        onMouseEnter={() => { mouseOnBarRef.current = true }}
+        onMouseLeave={() => { mouseOnBarRef.current = false; scheduleHide() }}
+        className="pointer-events-auto absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 pt-1 flex flex-col gap-1.5">
         {/* Hovered chapter label — shown above the timeline */}
         {hoveredChapter && (
           <div className="flex items-center justify-center mb-0.5 pointer-events-none">
