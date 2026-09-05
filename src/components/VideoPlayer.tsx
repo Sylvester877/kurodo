@@ -325,10 +325,14 @@ export default React.memo(function VideoPlayer({
   // cover + a scale. Manual "Video fit" choice (fill/cover) disables the
   // auto zoom so the user always has the final say.
   const [intrinsicAspect, setIntrinsicAspect] = useState<number | null>(null)
-  const [autoZoom, setAutoZoom] = useState(1)
+  // Baked-in bar crop, as fractions of the frame per side (0 = no crop).
+  // The player box adopts the CONTENT's aspect ratio and the video element
+  // is oversized/offset so the content rect maps 1:1 into the box — no
+  // scaling, so no part of the actual picture is ever cropped away.
+  const [crop, setCrop] = useState({ l: 0, r: 0, t: 0, b: 0 })
   useEffect(() => {
     setIntrinsicAspect(null)
-    setAutoZoom(1)
+    setCrop({ l: 0, r: 0, t: 0, b: 0 })
   }, [activeSrc])
   // Adopt intrinsic aspect when metadata arrives.
   useEffect(() => {
@@ -343,17 +347,64 @@ export default React.memo(function VideoPlayer({
     if (v.readyState >= 1) onMeta()
     return () => v.removeEventListener('loadedmetadata', onMeta)
   }, [activeSrc])
-  // Detect baked-in black bars from actual decoded frames.
+  // Detect baked-in black bars from actual decoded frames and crop them by
+  // reshaping the player box to the content rect (never by scaling, which
+  // would chop real picture). Self-reverting: if the claimed bar region
+  // later shows picture (scene change / eye-catch ended), the crop resets.
   useEffect(() => {
     if (videoFit !== 'contain') return // manual fit wins
     const v = videoRef.current
     if (!v) return
     let timer: number | null = null
     let cancelled = false
-    let consecutive = 0
-    const CONSECUTIVE_NEEDED = 4
-    // Sample every 500ms — bars must persist ~2s so a merely dark scene
-    // never triggers a false crop.
+    let pending: { l: number; r: number; t: number; b: number } | null = null
+    let streak = 0
+    let applied = false
+    let revertVotes = 0
+    const CONFIRM_SAMPLES = 6 // ~3s at 500ms — bars must be stable this long
+    const measure = () => {
+      // Downsample hard — we only need edge vs center luminance.
+      const W = 32
+      const H = 18
+      const c = document.createElement('canvas')
+      c.width = W; c.height = H
+      const ctx = c.getContext('2d', { willReadFrequently: true })!
+      ctx.drawImage(v, 0, 0, W, H)
+      const px = ctx.getImageData(0, 0, W, H).data
+      const lum = (x: number, y: number) => {
+        const i = (y * W + x) * 4
+        return 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]
+      }
+      const colMean: number[] = []
+      const rowMean: number[] = []
+      for (let x = 0; x < W; x++) {
+        let s = 0
+        for (let y = 0; y < H; y++) s += lum(x, y)
+        colMean.push(s / H)
+      }
+      for (let y = 0; y < H; y++) {
+        let s = 0
+        for (let x = 0; x < W; x++) s += lum(x, y)
+        rowMean.push(s / W)
+      }
+      const mean = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length
+      // Center band must have real picture — dark scenes never trigger.
+      const centerBand = mean(colMean.slice(W / 4, (3 * W) / 4))
+      if (centerBand < 45) return null
+      const isDark = (n: number) => n < 24
+      const capX = Math.floor(W * 0.3)
+      const capY = Math.floor(H * 0.3)
+      let l = 0
+      while (l < capX && isDark(colMean[l])) l++
+      let r = 0
+      while (r < capX && isDark(colMean[W - 1 - r])) r++
+      let t = 0
+      while (t < capY && isDark(rowMean[t])) t++
+      let b = 0
+      while (b < capY && isDark(rowMean[H - 1 - b])) b++
+      if (l + r <= 1 && t + b <= 1) return null // no meaningful bars
+      return { l, r, t, b }
+    }
     const analyze = () => {
       if (cancelled) return
       if (v.readyState < 2 || v.videoWidth === 0 || v.paused) {
@@ -361,63 +412,39 @@ export default React.memo(function VideoPlayer({
         return
       }
       try {
-        // Downsample hard — we only need edge vs center luminance.
-        const W = 32
-        const H = 18
-        const c = document.createElement('canvas')
-        c.width = W; c.height = H
-        const ctx = c.getContext('2d', { willReadFrequently: true })!
-        ctx.drawImage(v, 0, 0, W, H)
-        const row = ctx.getImageData(0, 0, W, H).data
-        const lum = (x: number, y: number) => {
-          const i = (y * W + x) * 4
-          return 0.2126 * row[i] + 0.7152 * row[i + 1] + 0.0722 * row[i + 2]
-        }
-        // Column/row means.
-        const colMean: number[] = []
-        const rowMean: number[] = []
-        for (let x = 0; x < W; x++) {
-          let s = 0
-          for (let y = 0; y < H; y++) s += lum(x, y)
-          colMean.push(s / H)
-        }
-        for (let y = 0; y < H; y++) {
-          let s = 0
-          for (let x = 0; x < W; x++) s += lum(x, y)
-          rowMean.push(s / W)
-        }
-        const mean = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length
-        const overall = mean(colMean)
-        // Count fully-dark columns from left and right, dark rows top/bottom.
-        const isDark = (n: number) => n < 22
-        let left = 0
-        while (left < W / 3 && isDark(colMean[left])) left++
-        let right = 0
-        while (right < W / 3 && isDark(colMean[W - 1 - right])) right++
-        let top = 0
-        while (top < H / 3 && isDark(rowMean[top])) top++
-        let bottom = 0
-        while (bottom < H / 3 && isDark(rowMean[H - 1 - bottom])) bottom++
-        const hasCenterContent = overall > 34
-        if (hasCenterContent && (left > 1 || right > 1 || top > 1 || bottom > 1)) {
-          consecutive++
+        const m = measure()
+        if (!applied) {
+          // Confirmation phase: candidate must repeat stably before applied.
+          const same =
+            m && pending &&
+            Math.abs(m.l - pending.l) <= 1 && Math.abs(m.r - pending.r) <= 1 &&
+            Math.abs(m.t - pending.t) <= 1 && Math.abs(m.b - pending.b) <= 1
+          if (m && same) streak++
+          else { pending = m; streak = m ? 1 : 0 }
+          if (pending && streak >= CONFIRM_SAMPLES) {
+            const W = 32, H = 18
+            setCrop({ l: pending.l / W, r: pending.r / W, t: pending.t / H, b: pending.b / H })
+            applied = true
+            revertVotes = 0
+          }
         } else {
-          consecutive = 0
+          // Verification phase: if edges show picture again, revert.
+          if (!m) {
+            revertVotes++
+            if (revertVotes >= 2) {
+              applied = false
+              pending = null
+              streak = 0
+              setCrop({ l: 0, r: 0, t: 0, b: 0 })
+            }
+          } else {
+            revertVotes = 0
+          }
         }
-        if (consecutive >= CONSECUTIVE_NEEDED) {
-          // Zoom just past the bars. A bar of fraction f per side needs
-          // zoom = 1/(1-2f) to crop it exactly; +4% margin for soft edges.
-          const f = Math.max(Math.max(left, right) / W, Math.max(top, bottom) / H)
-          const z = Math.min(1.45, Math.max(1, 1 / (1 - 2 * f) * 1.04))
-          setAutoZoom(z)
-          return // bars found — stop analyzing
-        }
-        // Give up after ~14s of samples without finding bars.
-        if (consecutive === 0 && v.currentTime > 14) return
       } catch {
         return // cross-origin taint or similar — silent no-op
       }
-      timer = window.setTimeout(analyze, 500)
+      timer = window.setTimeout(analyze, applied ? 1000 : 500)
     }
     analyze()
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
@@ -1605,6 +1632,21 @@ ${offset > 0 ? `
     )
   }, [activeSkip, skipCountdown, autoSkipIntro, autoSkipOutro, autoSkipRecap, skipSegment])
 
+  // Content-space geometry derived from the crop: the box shows exactly the
+  // content rect; the video element inside is oversized/offset to match.
+  // Manual fit modes (fill/cover) bypass the crop entirely.
+  const effCrop = videoFit === 'contain' ? crop : { l: 0, r: 0, t: 0, b: 0 }
+  const hasHBar = effCrop.l > 0 || effCrop.r > 0
+  const hasVBar = effCrop.t > 0 || effCrop.b > 0
+  const contentAspect = (() => {
+    const base = intrinsicAspect ?? 16 / 9
+    if (!hasHBar && !hasVBar) return base
+    // Content rect inside the stream: (1-l-r) of width, (1-t-b) of height.
+    const wFrac = 1 - effCrop.l - effCrop.r
+    const hFrac = 1 - effCrop.t - effCrop.b
+    return (base * wFrac) / hFrac
+  })()
+
   // Subtitle tracks with offset applied (blob URLs when offset != 0)
   const offsetSubtitles = useOffsetSubtitles(subtitles, subtitleOffset)
 
@@ -1613,7 +1655,7 @@ ${offset > 0 ? `
       ref={wrapRef}
       tabIndex={-1}
       className="group relative w-full overflow-hidden rounded-xl bg-black touch-none select-none outline-none"
-      style={{ aspectRatio: intrinsicAspect ? `${intrinsicAspect}` : '16 / 9' }}
+      style={{ aspectRatio: contentAspect ? `${contentAspect}` : '16 / 9' }}
       onPointerDown={onPointerDown}
       onPointerMove={(e) => { onPointerMove(e); setControlsVisible(true) }}
       onPointerUp={onPointerUp}
@@ -1639,8 +1681,15 @@ ${offset > 0 ? `
         style={{
           objectFit: videoFit,
           filter: brightness === 1 ? undefined : `brightness(${brightness})`,
-          transform: autoZoom !== 1 ? `scale(${autoZoom})` : undefined,
-          transformOrigin: 'center center',
+          // Bar-crop geometry: video is oversized by the bar fractions and
+          // shifted so the content rect fills the box 1:1 (no scaling, no
+          // cropping of real picture). At 16:9 content in a 4:3-crop box:
+          // width = 4/3 relative to box, shifted left by the left-bar share.
+          width: hasHBar || hasVBar ? `${(100 / (1 - effCrop.l - effCrop.r)).toFixed(4)}%` : undefined,
+          height: hasHBar || hasVBar ? `${(100 / (1 - effCrop.t - effCrop.b)).toFixed(4)}%` : undefined,
+          left: effCrop.l > 0 ? `${((-effCrop.l * 100) / (1 - effCrop.l - effCrop.r)).toFixed(4)}%` : undefined,
+          top: effCrop.t > 0 ? `${((-effCrop.t * 100) / (1 - effCrop.t - effCrop.b)).toFixed(4)}%` : undefined,
+          position: hasHBar || hasVBar ? 'relative' : undefined,
         }}
       >
         {offsetSubtitles.map((s) => (
