@@ -361,7 +361,7 @@ export default React.memo(function VideoPlayer({
     let streak = 0
     let applied = false
     let revertVotes = 0
-    const CONFIRM_SAMPLES = 6 // ~3s at 500ms — bars must be stable this long
+    const CONFIRM_SAMPLES = 8 // ~4s at 500ms — bars must be stable this long
     const measure = () => {
       // Downsample hard — we only need edge vs center luminance.
       const W = 32
@@ -376,32 +376,45 @@ export default React.memo(function VideoPlayer({
         return 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]
       }
       const colMean: number[] = []
+      const colMax: number[] = []
       const rowMean: number[] = []
+      const rowMax: number[] = []
       for (let x = 0; x < W; x++) {
         let s = 0
-        for (let y = 0; y < H; y++) s += lum(x, y)
+        let mx = 0
+        for (let y = 0; y < H; y++) { const l = lum(x, y); s += l; if (l > mx) mx = l }
         colMean.push(s / H)
+        colMax.push(mx)
       }
       for (let y = 0; y < H; y++) {
         let s = 0
-        for (let x = 0; x < W; x++) s += lum(x, y)
+        let mx = 0
+        for (let x = 0; x < W; x++) { const l = lum(x, y); s += l; if (l > mx) mx = l }
         rowMean.push(s / W)
+        rowMax.push(mx)
       }
       const mean = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length
       // Center band must have real picture — dark scenes never trigger.
       const centerBand = mean(colMean.slice(W / 4, (3 * W) / 4))
       if (centerBand < 45) return null
-      const isDark = (n: number) => n < 24
+      // A REAL baked-in bar is flat black: not one bright pixel in it.
+      // Dark scene edges (walls, hair, vignettes) always carry texture.
+      const isBarCol = (x: number) => colMean[x] < 24 && colMax[x] < 40
+      const isBarRow = (y: number) => rowMean[y] < 24 && rowMax[y] < 40
       const capX = Math.floor(W * 0.3)
       const capY = Math.floor(H * 0.3)
       let l = 0
-      while (l < capX && isDark(colMean[l])) l++
+      while (l < capX && isBarCol(l)) l++
       let r = 0
-      while (r < capX && isDark(colMean[W - 1 - r])) r++
+      while (r < capX && isBarCol(W - 1 - r)) r++
+      // Bars come in symmetric pairs (pillarbox encode). A single dark edge
+      // is a scene, not a bar — reject asymmetric candidates outright.
+      if ((l > 0) !== (r > 0) || (l > 0 && Math.abs(l - r) > 2)) { l = 0; r = 0 }
       let t = 0
-      while (t < capY && isDark(rowMean[t])) t++
+      while (t < capY && isBarRow(t)) t++
       let b = 0
-      while (b < capY && isDark(rowMean[H - 1 - b])) b++
+      while (b < capY && isBarRow(H - 1 - b)) b++
+      if ((t > 0) !== (b > 0) || (t > 0 && Math.abs(t - b) > 1)) { t = 0; b = 0 }
       if (l + r <= 1 && t + b <= 1) return null // no meaningful bars
       return { l, r, t, b }
     }
