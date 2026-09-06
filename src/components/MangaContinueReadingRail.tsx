@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Play, X, BookOpen } from 'lucide-react'
+import { Play, X, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMangaListStore } from '../store/useMangaListStore'
 import { cn } from '../lib/utils'
+import { useRef } from 'react'
 import SectionHeader from './SectionHeader'
 import EmptyState from './EmptyState'
 
@@ -46,6 +47,14 @@ export default function MangaContinueReadingRail() {
   )
 
   const displayEntries = continueReading.slice(0, 6)
+  const railRef = useRef<HTMLDivElement>(null)
+
+  const nudge = (dir: 1 | -1) => {
+    const el = railRef.current
+    if (!el) return
+    const amount = Math.max(el.clientWidth * 0.85, 320)
+    el.scrollBy({ left: dir * amount, behavior: 'smooth' })
+  }
 
   return (
     <section className="mt-8">
@@ -56,7 +65,29 @@ export default function MangaContinueReadingRail() {
         pillTone="accent"
       />
 
+      {displayEntries.length > 4 && (
+        <div className="hidden md:flex items-center justify-end gap-1.5 -mt-1 mb-2">
+          <button
+            type="button"
+            onClick={() => nudge(-1)}
+            aria-label="Scroll Continue Reading back"
+            className="grid place-items-center h-7 w-7 rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.1] hover:border-white/[0.16] transition-all duration-150"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => nudge(1)}
+            aria-label="Scroll Continue Reading forward"
+            className="grid place-items-center h-7 w-7 rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.1] hover:border-white/[0.16] transition-all duration-150"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div
+        ref={railRef}
         className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 -mx-1 px-1 contain-auto"
         style={{ scrollSnapType: 'x mandatory' }}
       >
