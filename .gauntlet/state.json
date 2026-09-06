@@ -4,7 +4,7 @@
   "note": "Kurodo is near-canon. Session ran 4 iterations (cast row, Jikan outage fix, ghost-numeral rail, font CSP fix) + image-layer round earlier. Electron window closes externally during long probes — verify fast.",
   "phase": "P3/P5 mixed",
   "minutesElapsedEst": 175,
-  "iteration": 5,
+  "iteration": 6,
   "commitsThisRun": [
     "45a148f feat(parity): Characters & Cast row",
     "63118cd fix(bug): Jikan outage no longer empties Browse",
@@ -12,7 +12,8 @@
     "6e1f9f1 feat(parity): ghost-numeral Trending rail",
     "9df4fd2 chore(gauntlet): correct state.json trending commit hash",
     "1a28f23 fix(bug): Google-Fonts stylesheet refused by CSP",
-    "e82c07c perf: TMDB hero backdrops -> w1280"
+    "e82c07c perf: TMDB hero backdrops -> w1280",
+    "18ebe30 feat(parity): hover-card cast strip"
   ],
   "accentDecision": "KEEP existing theme; no token migration needed at this parity",
   "parityScores": {

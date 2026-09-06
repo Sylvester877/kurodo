@@ -51,3 +51,9 @@
 - PLAN: hero fetched multi-MB /original backdrops via /img.
 - EDIT: getTmdbBackdrop returns w1280 tier (5-10x smaller, same look).
 - VERIFY: tsc + 71/71 tests; only consumer is Hero.tsx.
+
+### ITER-6 — feat(parity) hover-card cast strip (cache-only)  18ebe30
+- PLAN: enrich the hover qtip with cast avatars, zero extra network.
+- EDIT: AnimeHoverCard reads getQueryData(['characters', malId]) when
+  visible; renders 5 avatars + Cast label only if cached.
+- VERIFY: tsc + 71/71 tests.
