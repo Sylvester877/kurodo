@@ -10,6 +10,7 @@ import {
 } from '../api/anilist'
 import { feedToAnimeList } from '../lib/adapters'
 import Hero from '../components/Hero'
+import FeaturedPicks from '../components/FeaturedPicks'
 import AnimeCard from '../components/AnimeCard'
 import RecentEpisodes from '../components/RecentEpisodes'
 import ContinueWatchingRail from '../components/ContinueWatchingRail'
@@ -171,7 +172,13 @@ export default function Home() {
         <SubDubToggle />
       </div>
 
-      {/* Continue Watching — right after hero, anikage-style */}
+      {/* Featured Anime + Editor's Pick — anikage-style spotlight card,
+          directly under the hero (Continue Watching lives below it). */}
+      <ScrollReveal>
+        <FeaturedPicks />
+      </ScrollReveal>
+
+      {/* Continue Watching rail */}
       <ScrollReveal>
         <ContinueWatchingRail />
       </ScrollReveal>
