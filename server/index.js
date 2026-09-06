@@ -2057,12 +2057,26 @@ app.get('/api/jikan/*', async (req, res) => {
       return res.status(200).json(staleEntry.data)
     }
 
-    // 3. Check negative cache — if this path recently failed, fail fast
+    // 3. Check negative cache — if this path recently failed, fail fast.
+    //    BUT a recent failure only proves JIKAN was down, not AniList.
+    //    Failing fast here (without even trying the AniList fallback) is what
+    //    turned a Jikan outage into an empty Browse catalog for up to 30s at
+    //    a time. Race the AniList fallback on a short budget instead.
     const failed = jikanFailCache.get(cacheKey)
     if (failed && Date.now() - failed.at < JIKAN_FAIL_TTL) {
       if (isRecommendations) {
         console.warn(`[jikan-proxy] negative cache hit ${targetPath}, returning empty recommendations`)
         return res.status(200).json({ data: [] })
+      }
+      const negFallback = await Promise.race([
+        tryAniListFallback(targetPath, req.query).catch(() => null),
+        new Promise((r) => setTimeout(() => r(null), 6000)),
+      ])
+      if (negFallback) {
+        console.log(`[jikan-proxy] negative-cache ${targetPath}: AniList fallback served`)
+        jikanCache.set(cacheKey, { at: Date.now(), data: negFallback })
+        if (jikanCache.size % 50 === 0) pruneJikanCache()
+        return res.status(200).json(filterNsfwJikanResponse(negFallback))
       }
       return res.status(502).json({ status: 502, type: 'BadGateway', message: failed.message })
     }
