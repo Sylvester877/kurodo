@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useTitle } from '../hooks/useTitle'
+import { useDominantColor } from '../hooks/useDominantColor'
 import { getAnimeById, getAnimeRecommendations } from '../api/anime'
 import { getEpisodeInfoFromMal } from '../api/anilist'
 import { getEpisodesByMalId, getAniListIdFromMal, type AniZipEpisode } from '../api/anizip'
@@ -248,6 +249,17 @@ export default function Watch() {
   const totalEpisodes = epInfoQuery.data?.totalEpisodes ?? anime?.episodes ?? null
   const nextAiring = epInfoQuery.data?.nextAiring ?? null
   const aniListAccent = epInfoQuery.data?.accentColor ?? null
+
+  // ── Cover-keyed ambient colour ────────────────────────────────────
+  // Samples the poster's dominant colour (same hook as the details page)
+  // and uses it for the player-area glows below. Skipped on iGPU /
+  // reduce-quality machines.
+  const dominantWatchColor = useDominantColor(
+    anime?.images?.webp?.large_image_url ||
+      anime?.images?.jpg?.large_image_url ||
+      null,
+    !reduceQuality && !!anime,
+  )
   /** Best available wide background image — immediate cover from router state
    *  (avoids flat gradient during loading), then upgraded to AniList banner
    *  when epInfo resolves. Priority: AniList banner > AniList coverXL > MAL trailer max > cover. */
@@ -1101,6 +1113,17 @@ export default function Watch() {
               }}
             />
 
+            {/* Layer 1b — cover-keyed glow rising from below the player,
+                so the page tints with the show's actual poster palette */}
+            {dominantWatchColor && (
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `radial-gradient(ellipse 95% 55% at 50% 105%, rgb(${dominantWatchColor} / 0.22), transparent 65%)`,
+                }}
+              />
+            )}
+
             {/* Layer 2 — bottom-to-top deep fade for content readability */}
             <div
               className="absolute inset-0"
@@ -1185,7 +1208,29 @@ export default function Watch() {
         )}
 
         {/* ---- Player + episode info ---- */}
-        <div className="space-y-4 min-w-0">
+        <div className="space-y-4 min-w-0 relative">
+          {/* Cover-keyed aura hugging the player frame — a soft coloured
+              bloom around the video edges (does not touch the video itself) */}
+          {dominantWatchColor && (
+            <>
+              <div
+                aria-hidden
+                className="absolute -inset-x-6 -top-10 h-40 -z-10 pointer-events-none rounded-full"
+                style={{
+                  background: `radial-gradient(ellipse 60% 100% at 50% 100%, rgb(${dominantWatchColor} / 0.25), transparent 70%)`,
+                  filter: 'blur(10px)',
+                }}
+              />
+              <div
+                aria-hidden
+                className="absolute -inset-x-10 -bottom-12 h-44 -z-10 pointer-events-none rounded-full"
+                style={{
+                  background: `radial-gradient(ellipse 70% 100% at 50% 0%, rgb(${dominantWatchColor} / 0.18), transparent 70%)`,
+                  filter: 'blur(14px)',
+                }}
+              />
+            </>
+          )}
           {/* Player */}
           {!anidapSlug ? (
             <div className="aspect-video w-full rounded-xl bg-gradient-to-b from-zinc-900 via-zinc-900/90 to-black/70 grid place-items-center overflow-hidden relative border border-white/10">
