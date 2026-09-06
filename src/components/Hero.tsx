@@ -237,7 +237,7 @@ export default function Hero(_props: Props = {}) {
   const trailerEmbedUrl = null as string | null
 
   return (
-    <section ref={heroRef} className="relative w-full h-screen overflow-hidden bg-black">
+    <section ref={heroRef} className="relative w-full h-[68vh] min-h-[600px] max-h-[720px] overflow-hidden bg-black">
       {/* ── Backdrop + trailer layer ─────────────────────────────── */}
       <motion.div className="absolute inset-0 z-0" style={{ y: backdropY, scale: backdropScale }}>
         {/* Auto-playing YouTube trailer or static TMDB backdrop */}
@@ -302,7 +302,7 @@ export default function Hero(_props: Props = {}) {
 
       {/* ── Foreground content ─────────────────────────────────────── */}
       <div className="relative z-10 h-full flex flex-col pt-8">
-        <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-8 lg:px-14 flex flex-col justify-end pb-28 sm:pb-32">
+        <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-8 lg:px-14 flex flex-col justify-end pb-24 sm:pb-28">
           {/* ── Tab switcher ────────────────────────────────────── */}
           <div className="flex items-center gap-1 mb-4">
             {(
