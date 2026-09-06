@@ -384,3 +384,20 @@ export async function getPopularAnime(page = 1, limit = 24): Promise<AnimeSearch
     page, limit, filter: 'bypopularity',
   })
 }
+
+export async function getAnimeByLetter(
+  letter: string, page = 1, limit = 24,
+): Promise<AnimeSearchResponse> {
+  // Jikan v4 /anime supports ?letter=X (exact starting-letter filter, always
+  // alphabetical with order_by=title). The server proxy races this against an
+  // AniList fallback that prefix-filters a search pool, so the A–Z catalog
+  // stays truthful even when MAL/Jikan is down.
+  return stripNsfw(await cachedGet<AnimeSearchResponse>('/anime', {
+    letter: String(letter || '').trim().charAt(0).toUpperCase() || 'A',
+    order_by: 'title',
+    sort: 'asc',
+    sfw: true,
+    page,
+    limit,
+  }))
+}

@@ -311,6 +311,93 @@ export async function getTopAnimeFromAniList(page = 1, limit = 24, filter = '') 
   }
 }
 
+/** Jikan-shaped /anime?letter=X list from AniList (Jikan is often down).
+ *  AniList has no native "starts-with" filter — its `search` is fuzzy
+ *  (searching "b" can surface titles with b anywhere). So we fetch a
+ *  SEARCH_MATCH pool and keep ONLY entries whose romaji/english title
+ *  genuinely starts with the letter, then serve it Jikan-shaped with
+ *  working pagination. Truthful subset > misleading full list.
+ */
+export async function getAnimeByLetterFromAniList(letter = '', page = 1, limit = 24) {
+  const safePage = Math.max(1, Number.isFinite(page) ? page : 1)
+  const safeLimit = Math.max(1, Math.min(50, Number.isFinite(limit) ? limit : 24))
+  const ch = String(letter || '').trim().charAt(0).toLowerCase()
+  if (!ch || !/[a-z]/.test(ch)) {
+    throw new Error('Invalid letter')
+  }
+
+  const query = `query ($q: String, $page: Int, $perPage: Int) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { hasNextPage currentPage lastPage total }
+      media(search: $q, type: ANIME, isAdult: false, sort: SEARCH_MATCH) {
+        id idMal
+        title { romaji english native }
+        description(asHtml: false)
+        bannerImage
+        coverImage { extraLarge large }
+        episodes duration averageScore popularity format status season seasonYear genres
+        studios(isMain: true) { nodes { name } }
+        trailer { id site }
+      }
+    }
+  }`
+
+  // AniList search is relevance-ranked, not alphabetical — and for a single
+  // letter the top page is still dominated by genuine prefix matches. Pull a
+  // pool of up to 4 pages (200 candidates, well under the per-letter fuzzy
+  // result depth for common letters), keep only true prefix matches, sort
+  // alphabetically, then slice for the requested Jikan page.
+  const wanted = safePage * safeLimit + 1
+  const matched = []
+  const seen = new Set()
+  for (let alPage = 1; alPage <= 4 && matched.length < wanted; alPage++) {
+    let data
+    try {
+      data = await anilistRequest(query, { q: ch, page: alPage, perPage: 50 })
+    } catch (e) {
+      // Graceful degradation: if AniList rate-limits mid-pool (429) but we
+      // ALREADY collected enough prefix matches to serve the requested page
+      // (or at least page 1 of a sparse letter), return the partial pool
+      // rather than failing the whole request — a truthful subset beats a 502.
+      // Only hard-fail when the requested page has zero matches to show.
+      if (matched.length >= (safePage - 1) * safeLimit + 1) break
+      throw e
+    }
+    if (data?.errors?.length) {
+      throw new Error(data.errors[0]?.message || 'AniList GraphQL error')
+    }
+    const media = data?.data?.Page?.media || []
+    if (!media.length) break
+    for (const m of media) {
+      if (seen.has(m.id)) continue
+      seen.add(m.id)
+      const romaji = (m.title?.romaji || '').toLowerCase()
+      const english = (m.title?.english || '').toLowerCase()
+      if (romaji.startsWith(ch) || english.startsWith(ch)) matched.push(m)
+    }
+    const pageInfo = data?.data?.Page?.pageInfo
+    if (!pageInfo?.hasNextPage) break
+  }
+
+  matched.sort((a, b) => {
+    const ta = (a.title?.english || a.title?.romaji || '').toLowerCase()
+    const tb = (b.title?.english || b.title?.romaji || '').toLowerCase()
+    return ta.localeCompare(tb)
+  })
+
+  const start = (safePage - 1) * safeLimit
+  const slice = matched.slice(start, start + safeLimit)
+  return {
+    data: slice.map(mapMedia),
+    pagination: {
+      has_next_page: matched.length > start + safeLimit,
+      current_page: safePage,
+      last_visible_page: Math.max(1, Math.ceil(matched.length / safeLimit)),
+      items: { count: slice.length, total: matched.length, per_page: safeLimit },
+    },
+  }
+}
+
 /**
  * Route-level dispatcher: try to satisfy a Jikan-style request from AniList
  * when Jikan itself is down or returns a 504. Returns Jikan-shaped data for
@@ -325,6 +412,13 @@ export async function tryAniListFallback(targetPath, query) {
   const rawQ = Array.isArray(query.q) ? query.q[0] : query.q
 
   if (targetPath === '/anime') {
+    // /anime?letter=X is the A–Z catalog browse — needs a DIFFERENT fallback
+    // than plain search. The generic path (searchAniListAsJikan with no q)
+    // would silently return a popularity list, mislabeling it as letter X.
+    const rawLetter = Array.isArray(query.letter) ? query.letter[0] : query.letter
+    if (rawLetter) {
+      return await getAnimeByLetterFromAniList(String(rawLetter), page, limit)
+    }
     return await searchAniListAsJikan(rawQ ? String(rawQ) : undefined, page, limit)
   }
 

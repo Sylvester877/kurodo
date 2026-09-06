@@ -3,11 +3,11 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Filter, ChevronDown, SlidersHorizontal, Compass, Loader2, Check,
-  Flame, TrendingUp, Rocket, Star, BookOpen,
+  Flame, TrendingUp, Rocket, Star, BookOpen, ALargeSmall,
 } from 'lucide-react'
 import {
   getAnimeGenres, getAnimeByGenre, getTopAnime, getSeasonalAnime,
-  getUpcomingAnime, getPopularAnime,
+  getUpcomingAnime, getPopularAnime, getAnimeByLetter,
 } from '../api/anime'
 
 import { useTitle } from '../hooks/useTitle'
@@ -20,9 +20,11 @@ import VirtualizedAnimeGrid from '../components/VirtualizedAnimeGrid'
 import { useSettings } from '../store/useSettings'
 import type { Genre } from '../types'
 
-type FilterType = 'top-rated' | 'seasonal' | 'upcoming' | 'popular' | 'genre'
+type FilterType = 'top-rated' | 'seasonal' | 'upcoming' | 'popular' | 'genre' | 'az'
 
-const FILTER_META: Record<Exclude<FilterType, 'genre'>, {
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+const FILTER_META: Record<Exclude<FilterType, 'genre' | 'az'>, {
   label: string
   subtitle: string
   icon: typeof Star
@@ -44,6 +46,7 @@ export default function Browse() {
   const activeFilter = (searchParams.get('filter') as FilterType) || 'top-rated'
   const activeGenreId = searchParams.get('genreId') ? Number(searchParams.get('genreId')) : null
   const contentType = (searchParams.get('type') || 'anime') as 'anime' | 'manga'
+  const azLetter = (searchParams.get('letter') || 'A').trim().charAt(0).toUpperCase()
 
   useTitle('Catalog')
 
@@ -64,7 +67,7 @@ export default function Browse() {
   // Key includes filter + genre so switching either starts a fresh paginated
   // sequence (with its own cache).
   const listQuery = useInfiniteQuery({
-    queryKey: ['browse', activeFilter, activeGenreId],
+    queryKey: ['browse', activeFilter, activeGenreId, activeFilter === 'az' ? azLetter : null],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const p = pageParam as number
@@ -76,6 +79,7 @@ export default function Browse() {
         case 'seasonal':  return getSeasonalAnime(undefined, undefined, p, 24)
         case 'upcoming':  return getUpcomingAnime(p, 24)
         case 'popular':   return getPopularAnime(p, 24)
+        case 'az':        return getAnimeByLetter(azLetter, p, 24)
         default:          return getTopAnime(p, 24)
       }
     },
@@ -153,6 +157,16 @@ export default function Browse() {
     const params = new URLSearchParams(searchParams)
     params.set('filter', filter)
     params.delete('genreId')
+    // Entering A–Z with no letter yet — land on A so content shows instantly.
+    if (filter === 'az' && !params.get('letter')) params.set('letter', 'A')
+    setSearchParams(params)
+  }
+
+  const updateLetter = (letter: string) => {
+    const params = new URLSearchParams(searchParams)
+    params.set('filter', 'az')
+    params.set('letter', letter)
+    params.delete('genreId')
     setSearchParams(params)
   }
 
@@ -175,14 +189,16 @@ export default function Browse() {
     }
   }, [listQuery.hasNextPage, listQuery.isFetchingNextPage])
 
-  const activeMeta = !activeGenreId && activeFilter !== 'genre'
+  const activeMeta = !activeGenreId && (activeFilter === 'top-rated' || activeFilter === 'popular' || activeFilter === 'seasonal' || activeFilter === 'upcoming')
     ? FILTER_META[activeFilter as keyof typeof FILTER_META]
     : null
-  const HeaderIcon = activeGenre ? Compass : activeMeta?.icon ?? Star
-  const headerTitle = activeGenre ? activeGenre.name : activeMeta?.label ?? 'Browse'
+  const HeaderIcon = activeGenre ? Compass : activeFilter === 'az' ? ALargeSmall : activeMeta?.icon ?? Star
+  const headerTitle = activeGenre ? activeGenre.name : activeFilter === 'az' ? `A–Z · ${azLetter}` : activeMeta?.label ?? 'Browse'
   const headerSubtitle = activeGenre
     ? `${activeGenre.count.toLocaleString()} titles in this genre`
-    : activeMeta?.subtitle ?? 'Discover your next favorite anime'
+    : activeFilter === 'az'
+      ? 'Every title, alphabetically — pick a letter'
+      : activeMeta?.subtitle ?? 'Discover your next favorite anime'
 
   return (
     <div className="pt-20 pb-12">
@@ -253,6 +269,20 @@ export default function Browse() {
               )
             })}
 
+            {/* A–Z catalog mode */}
+            <button
+              onClick={() => updateFilter('az')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border',
+                activeFilter === 'az' && !activeGenreId
+                  ? 'bg-primary text-white border-primary shadow-[0_4px_16px_-6px_hsl(245,75%,60%,0.5)]'
+                  : 'bg-white/[0.04] text-white/70 border-white/8 hover:bg-white/[0.08] hover:text-white',
+              )}
+            >
+              <ALargeSmall className="h-3.5 w-3.5" />
+              A–Z
+            </button>
+
             <div ref={genreMenuRef} className="relative">
               <button
                 onClick={() => setShowFilters((s) => !s)}
@@ -319,6 +349,30 @@ export default function Browse() {
               )}
             </div>
           </div>
+          )}
+
+          {/* Alphabet index bar — only in A–Z mode */}
+          {contentType === 'anime' && activeFilter === 'az' && !activeGenreId && (
+            <div className="mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center gap-1">
+              {ALPHABET.map((ch) => {
+                const isActive = azLetter === ch
+                return (
+                  <button
+                    key={ch}
+                    onClick={() => updateLetter(ch)}
+                    aria-label={`Anime starting with ${ch}`}
+                    className={cn(
+                      'h-8 min-w-8 px-1 rounded-lg text-sm font-bold transition-all border grid place-items-center',
+                      isActive
+                        ? 'bg-primary text-white border-primary shadow-[0_4px_16px_-6px_hsl(245,75%,60%,0.5)] scale-110'
+                        : 'bg-white/[0.03] text-white/60 border-white/8 hover:bg-white/[0.1] hover:text-white hover:scale-105',
+                    )}
+                  >
+                    {ch}
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
         </ScrollReveal>
@@ -408,8 +462,16 @@ export default function Browse() {
         ) : browseAnime.length === 0 ? (
           <div className="glass-card rounded-2xl py-20 text-center">
             <Filter className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
-            <p className="text-white/80 font-semibold mb-1">No anime found</p>
-            <p className="text-xs text-muted-foreground">Try a different filter or genre</p>
+            <p className="text-white/80 font-semibold mb-1">
+              {activeFilter === 'az'
+                ? `No anime found starting with “${azLetter}”`
+                : 'No anime found'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {activeFilter === 'az'
+                ? 'Try another letter'
+                : 'Try a different filter or genre'}
+            </p>
           </div>
         ) : (
           <VirtualizedAnimeGrid
