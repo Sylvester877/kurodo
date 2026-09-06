@@ -929,6 +929,124 @@ function findHistoryEntry(url) {
 // IMPORTANT: downloadURL() requires an ABSOLUTE URL. If the renderer
 // sends a relative path like "/api/anidap/download/...", we resolve it
 // against http://localhost:PORT before passing to Chromium.
+//
+// B0-3: ONE will-download dispatcher for ALL downloads. The old code
+// registered a fresh session.on('will-download') per download:start — with
+// N concurrent downloads every listener fired for EVERY item, cross-
+// routing progress to the wrong channel and creating duplicate history
+// entries. Now a single module-level listener matches each incoming item to
+// its pending { url, channel, win } by URL and routes it exactly once.
+
+// Pending downloads awaiting a will-download match. Keyed by the resolved
+// URL; each entry carries the IPC channel + window to report back to.
+const pendingDownloads = new Map() // resolvedUrl → { channel, win, at }
+const PENDING_DL_TTL = 60_000 // sweep unmatched entries after 60s
+
+// Sweep stale pending entries so a downloadURL() that never produces a
+// will-download event (invalid URL, aborted before start) can't leak.
+setInterval(() => {
+  const now = Date.now()
+  for (const [url, p] of pendingDownloads) {
+    if (now - p.at > PENDING_DL_TTL) pendingDownloads.delete(url)
+  }
+}, 30_000)
+
+// Single session-level listener — registered ONCE. Matches the incoming
+// download item to its pending entry and attaches per-item handlers.
+function onSessionWillDownload(_evt, item) {
+  const itemUrl = item.getURL() || ''
+  // Exact-URL match first; fall back to the oldest pending entry (some
+  // redirect chains end on a URL different from the one we asked for).
+  let pending = pendingDownloads.get(itemUrl)
+  if (!pending && pendingDownloads.size > 0) {
+    const first = pendingDownloads.values().next().value
+    if (first) pending = first
+  }
+  if (!pending) return // not one of ours — let Chromium's default run
+
+  pendingDownloads.delete(itemUrl)
+  // Also clear any other pending entry whose channel matches (fallback
+  // path consumed it).
+  for (const [url, p] of pendingDownloads) {
+    if (p.channel === pending.channel) pendingDownloads.delete(url)
+  }
+
+  const { channel, win } = pending
+  const send = (data) => {
+    if (!win.isDestroyed()) win.webContents.send(channel, data)
+  }
+
+  const filename = item.getFilename()
+  const savePath = item.getSavePath?.() || ''
+
+  // Create or find the history entry for this download
+  let entry = findHistoryEntry(itemUrl)
+  if (!entry) {
+    entry = {
+      id: ++downloadIdCounter,
+      url: itemUrl,
+      filename,
+      savePath,
+      state: 'preparing',
+      percent: 0,
+      received: 0,
+      total: 0,
+      startTime: Date.now(),
+      endTime: null,
+    }
+    downloadHistory.push(entry)
+    broadcastHistory()
+  } else {
+    entry.filename = filename
+    entry.savePath = savePath
+  }
+
+  item.on('updated', () => {
+    const total = item.getTotalBytes()
+    const received = item.getReceivedBytes()
+    entry.total = total
+    entry.received = received
+    entry.state = 'downloading'
+    if (total > 0) {
+      entry.percent = Math.round((received / total) * 100)
+    }
+    broadcastHistory()
+
+    send({
+      state: 'downloading',
+      percent: entry.percent,
+      received,
+      total,
+      filename,
+    })
+  })
+
+  item.on('done', (_evt, state) => {
+    entry.state = state === 'completed' ? 'completed' : state === 'cancelled' ? 'cancelled' : 'interrupted'
+    if (state === 'completed') entry.percent = 100
+    entry.endTime = Date.now()
+    entry.savePath = item.getSavePath?.() || entry.savePath
+    broadcastHistory()
+
+    send({
+      state: entry.state,
+      percent: entry.percent,
+      filename,
+    })
+  })
+}
+
+// Ensure the dispatcher is registered exactly once (the main session is
+// created lazily; register when the first window's webContents is ready).
+let willDownloadRegistered = false
+function ensureWillDownloadDispatcher() {
+  if (willDownloadRegistered) return
+  const ses = session.defaultSession
+  if (!ses) return
+  ses.on('will-download', onSessionWillDownload)
+  willDownloadRegistered = true
+}
+
 ipcMain.on('download:start', (event, { url, channel }) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win) return
@@ -950,82 +1068,10 @@ ipcMain.on('download:start', (event, { url, channel }) => {
   // Notify the renderer we're starting
   send({ state: 'preparing', percent: 0 })
 
-  // Listen for the actual download item on the session.
-  // safetyTimer is declared after this closure but captured by reference,
-  // so it is available when the 'will-download' event fires later.
-  const onWillDownload = (_evt, item) => {
-    clearTimeout(safetyTimer)
-    const filename = item.getFilename()
-    const savePath = item.getSavePath?.() || ''
-
-    // Create or find the history entry for this download
-    let entry = findHistoryEntry(resolvedUrl)
-    if (!entry) {
-      entry = {
-        id: ++downloadIdCounter,
-        url: resolvedUrl,
-        filename,
-        savePath,
-        state: 'preparing',
-        percent: 0,
-        received: 0,
-        total: 0,
-        startTime: Date.now(),
-        endTime: null,
-      }
-      downloadHistory.push(entry)
-      broadcastHistory()
-    } else {
-      entry.filename = filename
-      entry.savePath = savePath
-    }
-
-    item.on('updated', () => {
-      const total = item.getTotalBytes()
-      const received = item.getReceivedBytes()
-      entry.total = total
-      entry.received = received
-      entry.state = 'downloading'
-      if (total > 0) {
-        entry.percent = Math.round((received / total) * 100)
-      }
-      broadcastHistory()
-
-      send({
-        state: 'downloading',
-        percent: entry.percent,
-        received,
-        total,
-        filename,
-      })
-    })
-
-    item.on('done', (_evt, state) => {
-      entry.state = state === 'completed' ? 'completed' : state === 'cancelled' ? 'cancelled' : 'interrupted'
-      if (state === 'completed') entry.percent = 100
-      entry.endTime = Date.now()
-      entry.savePath = item.getSavePath?.() || entry.savePath
-      broadcastHistory()
-
-      send({
-        state: entry.state,
-        percent: entry.percent,
-        filename,
-      })
-      // Remove the listener once this download is done
-      clearTimeout(safetyTimer)
-      win.webContents.session.removeListener('will-download', onWillDownload)
-    })
-  }
-
-  // Use session.on (persistent) instead of session.once so concurrent
-  // downloads each get their own handler. The safety timeout below
-  // removes the listener if downloadURL() never triggers will-download
-  // (e.g. invalid URL), preventing listener leaks over time.
-  win.webContents.session.on('will-download', onWillDownload)
-  const safetyTimer = setTimeout(() => {
-    win.webContents.session.removeListener('will-download', onWillDownload)
-  }, 30000)
+  // Register the single dispatcher on first use, then park this URL so
+  // the dispatcher can route the incoming item back to this channel.
+  ensureWillDownloadDispatcher()
+  pendingDownloads.set(resolvedUrl, { channel, win, at: Date.now() })
 
   // Trigger the download
   win.webContents.downloadURL(resolvedUrl)
