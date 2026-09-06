@@ -12,6 +12,7 @@ import OfflineBanner from './OfflineBanner'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import CommandPalette from './CommandPalette'
 import UpdateNotification from './UpdateNotification'
+import CrashNotice from './CrashNotice'
 import CompletionDialog from './CompletionDialog'
 import SetupWizard from './SetupWizard'
 import AuroraBackground from './AuroraBackground'
@@ -161,6 +162,7 @@ export default function Layout() {
       {!window.electronAPI?.isElectron && <OfflineBanner />}
       <Celebrations />
       <Toaster />
+      <CrashNotice />
       <UpdateNotification />
       <CompletionDialog />
       <SetupWizard />

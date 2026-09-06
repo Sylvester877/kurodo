@@ -22,6 +22,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** True when running inside Electron (vs a regular browser tab). */
   isElectron: true,
 
+  // ── Crash toasts (B0-2) ───────────────────────────────────────────
+  /** Subscribe to main-process crash notifications (uncaughtException /
+   *  unhandledRejection). The renderer surfaces them as a persistent
+   *  error toast. Returns an unsubscribe function. */
+  onCrash: (callback) => {
+    const handler = (_event, message) => callback(String(message || ''))
+    ipcRenderer.on('app:crash', handler)
+    return () => ipcRenderer.removeListener('app:crash', handler)
+  },
+
   // ── Crash recovery ───────────────────────────────────────────────
   /** True when this window was recreated/reloaded after a renderer crash
    *  within the last `maxAgeMs` (default 15s). Pages use this to avoid

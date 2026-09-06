@@ -108,6 +108,9 @@ export interface DownloadEntry {
 /** Shape of the electronAPI exposed by preload.cjs (only present in Electron). */
 export interface ElectronAPI {
   isElectron: true
+  /** Subscribe to main-process crash notifications (uncaughtException /
+   *  unhandledRejection). Returns an unsubscribe function. */
+  onCrash?: (callback: (message: string) => void) => (() => void)
   /** Backend origin (e.g. http://localhost:5173) for absolute API/image URLs. */
   backendOrigin?: string
   versions: { electron: string; chrome: string; node: string }
