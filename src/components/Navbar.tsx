@@ -167,7 +167,7 @@ export default memo(function Navbar() {
                   {isActive && (
                     <motion.div
                       layoutId="nav-pill"
-                      className="absolute inset-0 rounded-full bg-white/[0.1] border border-white/[0.06]"
+                      className="absolute inset-0 rounded-full bg-primary/[0.14] border border-primary/[0.28] shadow-[0_0_16px_-4px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.45)]"
                       transition={{ type: 'spring', stiffness: 500, damping: 34 }}
                     />
                   )}

@@ -455,7 +455,7 @@ export default function AnimeDetails() {
                 ) : (
                   <motion.h1
                     key="h1"
-                    className="text-3xl md:text-5xl font-extrabold text-gradient leading-tight tracking-tight"
+                    className="font-display text-3xl md:text-5xl font-bold text-gradient leading-[1.05] tracking-tight"
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}

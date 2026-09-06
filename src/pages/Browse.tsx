@@ -195,7 +195,7 @@ export default function Browse() {
               <HeaderIcon className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white leading-tight">
+              <h1 className="font-display text-[26px] sm:text-[30px] font-bold tracking-tight text-white leading-tight">
                 {activeGenre ? headerTitle : (activeFilter === 'top-rated' ? 'Catalog' : headerTitle)}
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">{headerSubtitle}</p>
