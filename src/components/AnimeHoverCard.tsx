@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { Star, Play } from 'lucide-react'
-import { getImageUrl, formatScore, pickTitle } from '../lib/utils'
+import { getImageUrl, formatScore, pickTitle, proxifyImgUrl } from '../lib/utils'
 import { useSettings } from '../store/useSettings'
+import type { AnimeCharacter } from '../api/anilist'
 import type { Anime } from '../types'
 
 interface Props {
@@ -29,8 +31,18 @@ const CARD_WIDTH = 320
  * overflow containers (grids, horizontal rails).
  */
 export default function AnimeHoverCard({ anime, children }: Props) {
+  const queryClient = useQueryClient()
   const [visible, setVisible] = useState(false)
   const [armed, setArmed] = useState(false) // gates rendering until first position
+  // Cast mini-strip — purely additive: only shows when the details page
+  // already cached the characters query (30 min), so hovering never costs
+  // an extra AniList request.
+  const [cachedCast, setCachedCast] = useState<AnimeCharacter[] | null>(null)
+  useEffect(() => {
+    if (!visible || !anime.mal_id) return
+    const data = queryClient.getQueryData<AnimeCharacter[]>(['characters', anime.mal_id])
+    setCachedCast(data && data.length ? data.slice(0, 5) : null)
+  }, [visible, anime.mal_id, queryClient])
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -179,6 +191,28 @@ export default function AnimeHoverCard({ anime, children }: Props) {
                     {g.name}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* ── Cast mini-strip (cached only — no extra network) ── */}
+            {cachedCast && cachedCast.length > 0 && (
+              <div className="px-4 pt-2.5 flex items-center gap-1.5">
+                {cachedCast.map((c, i) => (
+                  <span
+                    key={c.id}
+                    title={c.name}
+                    className={`h-7 w-7 rounded-full overflow-hidden ring-2 bg-zinc-800 ${i === 0 ? 'ring-white/25' : 'ring-white/10'}`}
+                  >
+                    {c.image ? (
+                      <img src={proxifyImgUrl(c.image)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="h-full w-full grid place-items-center text-[10px] font-bold text-white/40">
+                        {c.name.trim().charAt(0)}
+                      </span>
+                    )}
+                  </span>
+                ))}
+                <span className="ml-1 text-[9px] uppercase tracking-wider text-white/35 font-semibold">Cast</span>
               </div>
             )}
 
