@@ -1,27 +1,29 @@
 {
   "operation": "ANIME ASCENSION",
   "protocol": "v2.0 adapted",
-  "note": "Kurodo is near-canon (~87%); running targeted gap iterations. Electron window is being closed externally during long probes — verify fast or rely on build+tests.",
+  "note": "Kurodo is near-canon. Session ran 4 iterations (cast row, Jikan outage fix, ghost-numeral rail, font CSP fix) + image-layer round earlier. Electron window closes externally during long probes — verify fast.",
   "phase": "P3/P5 mixed",
-  "minutesElapsedEst": 165,
-  "iteration": 3,
+  "minutesElapsedEst": 175,
+  "iteration": 4,
   "commitsThisRun": [
     "45a148f feat(parity): Characters & Cast row",
     "63118cd fix(bug): Jikan outage no longer empties Browse",
     "bdf962c chore(gauntlet): persist loop state",
-    "6e1f9f1 feat(parity): ghost-numeral Trending rail"
+    "6e1f9f1 feat(parity): ghost-numeral Trending rail",
+    "9df4fd2 chore(gauntlet): correct state.json trending commit hash",
+    "1a28f23 fix(bug): Google-Fonts stylesheet refused by CSP"
   ],
   "accentDecision": "KEEP existing theme; no token migration needed at this parity",
   "parityScores": {
     "home": 94,
-    "detail": 88,
+    "detail": 89,
     "watch": 90,
-    "browse": 78,
+    "browse": 80,
     "search": 85,
     "schedule": 88,
     "watchlist": 86,
-    "average": 87
+    "average": 87.4
   },
   "depsAdded": [],
-  "next": "A-Z mode (wait for healthy Jikan); hover-card cast strip; font-link cleanup; re-run error sweep"
+  "next": "A-Z mode (wait for healthy Jikan, or AniList letter paging); hover-card cast strip; final error-sweep re-run; cold Browse first-paint timing"
 }

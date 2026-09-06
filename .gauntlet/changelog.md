@@ -36,3 +36,13 @@
   feed area; removed the trending grid entry from SECTIONS.
 - VERIFY: live capture found 18 ghost numerals (01–18) on Home;
   screenshot screenshots/gauntlet-trending-rail.png. 71/71 tests pass.
+
+### ITER-4 — fix(bug) Google-Fonts stylesheet refused by CSP  1a28f23
+- PLAN: kill the recurring "Refused to load the stylesheet" console error.
+- EDIT: style-src += https://fonts.googleapis.com in index.html CSP.
+- VERIFY: live probe — Poppins + Bricolage both load (document.fonts
+  check true after a weight-800 render); earlier false reading was a
+  check() weight/usage quirk. Remaining ERR_BLOCKED_BY_CLIENT ×2/route =
+  by-design SW block (Electron refuses SW registration).
+- Shots: gauntlet-verify-home.png, gauntlet-verify-details.png,
+  gauntlet-final-home.png.

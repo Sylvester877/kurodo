@@ -189,9 +189,10 @@ export async function fetchAnimeLogo(
 }
 
 /**
- * Fetch the highest-quality TMDB backdrop image for an anime title.
- * Returns the absolute URL (original size) or null if nothing found.
- * Cached for 24h — safe to call repeatedly in React Query.
+ * Fetch a high-quality TMDB backdrop image for an anime title.
+ * Returns the absolute URL (w1280 — crisp at hero scale, ~5-10x smaller
+ * than /original) or null if nothing found. Cached for 24h — safe to
+ * call repeatedly in React Query.
  */
 export async function getTmdbBackdrop(title: string): Promise<string | null> {
   if (!API_KEY) return null
@@ -220,7 +221,10 @@ export async function getTmdbBackdrop(title: string): Promise<string | null> {
     .sort((a, b) => b.vote_average - a.vote_average)[0]
     ?? backdrops.sort((a, b) => b.vote_average - a.vote_average)[0]
 
-  const url = best ? `${IMG}/original${best.file_path}` : null
+  // w1280 — visually identical at hero scale (~1600px max, usually shown
+  // 900-1600 wide) but 5-10x smaller than /original, so the first fetch
+  // through /img (and every disk-cache fill) is dramatically faster.
+  const url = best ? `${IMG}/w1280${best.file_path}` : null
   cache.set(cacheKey, { at: Date.now(), value: url })
   return url
 }
