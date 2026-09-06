@@ -9,7 +9,7 @@
     "45a148f feat(parity): Characters & Cast row",
     "63118cd fix(bug): Jikan outage no longer empties Browse",
     "bdf962c chore(gauntlet): persist loop state",
-    "bdf962c feat(parity): ghost-numeral Trending rail"
+    "6e1f9f1 feat(parity): ghost-numeral Trending rail"
   ],
   "accentDecision": "KEEP existing theme; no token migration needed at this parity",
   "parityScores": {
