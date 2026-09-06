@@ -25,6 +25,7 @@ import { fetchAnidapInfo } from '../api/anidap'
 import { useSettings } from '../store/useSettings'
 import { Skeleton } from '../components/Skeleton'
 import StaggerCard from '../components/StaggerCard'
+import CharactersRow from '../components/CharactersRow'
 import ScrollReveal from '../components/ScrollReveal'
 import Relations from '../components/Relations'
 import WatchOrder from '../components/WatchOrder'
@@ -1076,6 +1077,12 @@ export default function AnimeDetails() {
           </ScrollReveal>
         </aside>
       </div>
+
+      {/* Characters & Cast — circular cast avatars + Japanese VA (SITE-05
+          AniClover canon). Renders null when the show has no cast data. */}
+      <ScrollReveal>
+        <CharactersRow malId={anime.mal_id} />
+      </ScrollReveal>
 
       {/* Recommendations — StaggerCard children handle their own whileInView animation.
           A sentinel div lets the IntersectionObserver fire even when the

@@ -38,6 +38,77 @@ async function query<T>(gql: string, variables: Record<string, unknown>): Promis
   return promise
 }
 
+// ---------- Characters + voice actors (details page cast row) ----------
+export interface AnimeCharacter {
+  id: number
+  name: string
+  nativeName: string | null
+  image: string | null
+  /** 'MAIN' | 'SUPPORTING' | null */
+  role: string | null
+  voiceActor: { id: number; name: string; image: string | null } | null
+}
+
+interface CharactersResponse {
+  Media: {
+    characters: {
+      edges: Array<{
+        role: string | null
+        node: { id: number; name: { full: string; native: string | null }; image: { large: string | null } } | null
+        voiceActors: Array<{ id: number; name: { full: string }; image: { large: string | null } }> | null
+      }>
+    } | null
+  } | null
+}
+
+/**
+ * Main cast for an anime (keyed by MAL id), with Japanese voice actors.
+ * Mains first (role sort), capped at 12. Cached 30 min via the shared
+ * query cache. Returns [] on any failure — the details page hides the
+ * whole row then, never a broken state.
+ */
+export async function getAnimeCharacters(malId: number): Promise<AnimeCharacter[]> {
+  try {
+    const data = await query<CharactersResponse>(
+      `query ($malId: Int) {
+        Media(idMal: $malId, type: ANIME) {
+          characters(perPage: 12, sort: [ROLE, RELEVANCE]) {
+            edges {
+              role
+              node {
+                id
+                name { full native }
+                image { large }
+              }
+              voiceActors(language: JAPANESE, sort: RELEVANCE) {
+                id
+                name { full }
+                image { large }
+              }
+            }
+          }
+        }
+      }`,
+      { malId },
+    )
+    const edges = data?.Media?.characters?.edges ?? []
+    return edges
+      .map((e) => ({
+        id: e.node?.id ?? -1,
+        name: e.node?.name?.full ?? 'Unknown',
+        nativeName: e.node?.name?.native ?? null,
+        image: e.node?.image?.large ?? null,
+        role: e.role ?? null,
+        voiceActor: e.voiceActors?.[0]
+          ? { id: e.voiceActors[0].id, name: e.voiceActors[0].name.full, image: e.voiceActors[0].image.large }
+          : null,
+      }))
+      .filter((c) => c.id !== -1)
+  } catch {
+    return []
+  }
+}
+
 // ---------- MAL → AniList ID ----------
 export async function getAniListIdFromMal(malId: number): Promise<number | null> {
   const data = await query<{ Media: { id: number } | null }>(
