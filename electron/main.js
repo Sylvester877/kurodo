@@ -16,7 +16,7 @@
  * publish.provider in package.json > build.publish.
  */
 
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, screen, powerSaveBlocker } from 'electron'
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
@@ -38,6 +38,38 @@ import WebTorrent from 'webtorrent'
 // suggests.
 import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
+
+// ── Windows AppUserModelID ──────────────────────────────────────
+// Give Windows a stable application identity (must run before app ready).
+// Without this, Windows can't reliably attach the System Media Transport
+// Controls (volume-flyover media keys / lock-screen controls — which the
+// renderer's navigator.mediaSession wiring in VideoPlayer.tsx drives) or
+// group the taskbar icon / notifications under a real app identity instead
+// of a generic Chromium one.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.kurodo.app')
+}
+
+// ── Keep the display awake during video playback ─────────────────
+// The renderer's Screen Wake Lock (VideoPlayer.tsx) is released by Chromium
+// whenever the document is no longer "fully active" (window minimized,
+// another window focused — electron/electron#30859), so a long episode can
+// still let the display sleep. A main-process powerSaveBlocker is immune to
+// document visibility. The renderer reports playing/paused state over IPC;
+// the blocker is started/stopped idempotently.
+let playbackBlockerId = null
+function setPlaybackActive(active) {
+  if (active && playbackBlockerId === null) {
+    playbackBlockerId = powerSaveBlocker.start('prevent-display-sleep')
+    console.log('[electron] Display sleep blocked (video playing)')
+  } else if (!active && playbackBlockerId !== null) {
+    powerSaveBlocker.stop(playbackBlockerId)
+    playbackBlockerId = null
+    console.log('[electron] Display sleep unblocked')
+  }
+}
+// Register once — handlers just flip the idempotent blocker above.
+ipcMain.on('media:playback', (_event, playing) => setPlaybackActive(!!playing))
 
 // ── Single-instance lock ──────────────────────────────────────
 // Must be requested BEFORE app.whenReady() / app.on('ready').
@@ -232,11 +264,68 @@ function waitForServer(retries = 80, interval = 100) {
   })
 }
 
+// ── Window-state persistence ──────────────────────────────────────
+// Remember the window's bounds + maximized state between sessions
+// (standard desktop behavior: resize once, it sticks). Plain JSON in
+// userData — no dependency needed.
+const winStatePath = () => path.join(app.getPath('userData'), 'window-state.json')
+
+function loadWindowState() {
+  try {
+    const d = JSON.parse(fs.readFileSync(winStatePath(), 'utf8'))
+    if (
+      d && typeof d.x === 'number' && typeof d.y === 'number' &&
+      typeof d.width === 'number' && typeof d.height === 'number'
+    ) {
+      return d
+    }
+  } catch { /* first run or corrupt file */ }
+  return null
+}
+
+function saveWindowState(win) {
+  try {
+    if (!win || win.isDestroyed() || win.isFullScreen()) return
+    const b = win.getNormalBounds()
+    fs.writeFileSync(winStatePath(), JSON.stringify({
+      x: b.x, y: b.y, width: b.width, height: b.height,
+      maximized: win.isMaximized(),
+    }))
+  } catch { /* ignore */ }
+}
+
 // ── Create the main application window (hidden until splash finishes) ──
 function createMainWindow() {
+  // Restore previous size/position if it still lands on a connected display
+  // (a monitor may have been unplugged since last session).
+  const saved = loadWindowState()
+  let width = 1280
+  let height = 800
+  let x
+  let y
+  let maximized = false
+  if (saved) {
+    const onScreen = screen.getAllDisplays().some((d) => {
+      const a = d.workArea
+      return (
+        saved.x < a.x + a.width && saved.x + saved.width > a.x &&
+        saved.y < a.y + a.height && saved.y + saved.height > a.y
+      )
+    })
+    if (onScreen) {
+      // Clamp to sane minimums so a stale tiny state can't hide the window.
+      width = Math.max(900, Math.round(saved.width))
+      height = Math.max(600, Math.round(saved.height))
+      x = Math.round(saved.x)
+      y = Math.round(saved.y)
+      maximized = !!saved.maximized
+    }
+  }
+
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width,
+    height,
+    ...(x !== undefined && y !== undefined ? { x, y } : {}),
     minWidth: 800,
     minHeight: 600,
     title: 'Kurōdo',
@@ -258,6 +347,28 @@ function createMainWindow() {
   win.removeMenu()
   mainWinCreatedAt = Date.now()
 
+  // If the last session ended maximized, start maximized (before show, so the
+  // user never sees the un-maximized flash).
+  if (maximized) win.maximize()
+
+  // Debounced persist on move/resize, plus a final save on close.
+  let winStateTimer = null
+  const persistWinState = () => {
+    clearTimeout(winStateTimer)
+    winStateTimer = setTimeout(() => saveWindowState(win), 400)
+  }
+  win.on('resize', persistWinState)
+  win.on('move', persistWinState)
+  win.on('maximize', persistWinState)
+  win.on('unmaximize', persistWinState)
+  win.on('close', () => {
+    clearTimeout(winStateTimer)
+    saveWindowState(win)
+    // The page can die without ever sending "paused" — don't leave the
+    // display blocked forever.
+    setPlaybackActive(false)
+  })
+
   // Purge any service-worker registration/caches left over from previous
   // versions (they preload a stale SPA shell → blank window after update).
   // Idempotent and cheap once clean.
@@ -278,6 +389,23 @@ function createMainWindow() {
     }
     return { action: 'deny' }
   })
+
+  // ── Never let the app window navigate away from the local app ──
+  // A stray <a> click or a bad redirect would strand the user on a website
+  // with no way back (routing is the SPA's job — every other navigation is
+  // a mistake). External URLs are opened in the system browser instead.
+  win.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith(SERVER_URL)) return
+    event.preventDefault()
+    if (url.startsWith('http')) shell.openExternal(url)
+  })
+
+  // If the page navigates away mid-playback (or the renderer crashes) we
+  // never receive the "paused" message — release the blocker so the display
+  // isn't stuck awake. Crash recovery reloads also pass through here.
+  // (did-navigate = main-frame only; trailer iframes must not release it.)
+  win.webContents.on('did-navigate', () => setPlaybackActive(false))
+  win.webContents.on('render-process-gone', () => setPlaybackActive(false))
 
   // ── Main-window lifecycle guards ─────────────────────────────
   // 1. Closing the main window quits the app (normal desktop behavior).
@@ -1653,6 +1781,18 @@ app.whenReady().then(async () => {
     console.log('[electron] Web-PWA service worker blocked for this session')
   } catch (err) {
     console.warn('[electron] Could not install SW blocker:', err.message)
+  }
+
+  // ── Permission hardening ───────────────────────────────────────
+  // The app needs no device permissions (no camera/mic/geolocation/notifs).
+  // Deny every request instead of ever surfacing an OS prompt. Playback is
+  // unaffected — 'media' here means getUserMedia capture, not <video> playback.
+  try {
+    session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => {
+      callback(false)
+    })
+  } catch (err) {
+    console.warn('[electron] Could not install permission handler:', err.message)
   }
 
   // Start the torrent streaming server

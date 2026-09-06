@@ -39,6 +39,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     node: process.versions.node,
   },
 
+  // ── Playback → system ─────────────────────────────────────────────
+  /** Tell the main process whether video is currently playing. Main uses
+   *  this to keep the display awake via powerSaveBlocker (immune to window
+   *  focus/minimize, unlike the renderer's Screen Wake Lock). */
+  setPlaybackActive: (playing) => ipcRenderer.send('media:playback', !!playing),
+
   // ── Window controls ───────────────────────────────────────────────
   minimizeWindow: () => ipcRenderer.send('window:minimize'),
   maximizeWindow: () => ipcRenderer.send('window:maximize'),

@@ -112,6 +112,9 @@ export interface ElectronAPI {
   backendOrigin?: string
   versions: { electron: string; chrome: string; node: string }
   platform: NodeJS.Platform
+  /** Tell the main process whether video is playing (Electron keeps the
+   *  display awake via powerSaveBlocker while true). */
+  setPlaybackActive?: (playing: boolean) => void
   minimizeWindow: () => void
   maximizeWindow: () => void
   closeWindow: () => void

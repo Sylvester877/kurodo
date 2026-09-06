@@ -1111,6 +1111,10 @@ export default React.memo(function VideoPlayer({
   // Requests a screen wake lock on play, releases on pause/ended/unmount.
   // Re-acquires when the tab becomes visible again while video is playing.
   // Gracefully degrades on browsers that don't support the Wake Lock API.
+  // NOTE: Chromium auto-releases a screen wake lock when the document isn't
+  // "fully active" (minimize / another window focused), so in Electron we
+  // ALSO tell the main process (setPlaybackActive) which holds a
+  // powerSaveBlocker that is immune to document visibility.
   const wakeLockRef = useRef<{ release: () => Promise<void>; addEventListener: (e: string, cb: () => void) => void } | null>(null)
   useEffect(() => {
     const v = videoRef.current
@@ -1118,6 +1122,7 @@ export default React.memo(function VideoPlayer({
 
     const requestWakeLock = async () => {
       if (wakeLockRef.current) return // already held
+      window.electronAPI?.setPlaybackActive?.(true)
       try {
         if ('wakeLock' in navigator) {
           wakeLockRef.current = await (navigator as any).wakeLock.request('screen')
@@ -1131,6 +1136,7 @@ export default React.memo(function VideoPlayer({
     }
 
     const releaseWakeLock = async () => {
+      window.electronAPI?.setPlaybackActive?.(false)
       try {
         if (wakeLockRef.current) {
           await wakeLockRef.current.release()
@@ -1143,8 +1149,14 @@ export default React.memo(function VideoPlayer({
     const onPause = () => releaseWakeLock()
     const onEnded = () => releaseWakeLock()
     const onVis = () => {
-      if (document.visibilityState === 'visible' && !v.paused && v.readyState >= 2) {
-        requestWakeLock()
+      if (document.visibilityState === 'visible') {
+        // Back in view — re-acquire if the video is still going. (Chromium
+        // auto-released the wake lock while we were hidden.)
+        if (!v.paused && v.readyState >= 2) requestWakeLock()
+      } else {
+        // Hidden/minimized — let the display sleep. Mirrors Chromium's
+        // auto-release of the wake lock for the Electron powerSaveBlocker.
+        releaseWakeLock()
       }
     }
 
