@@ -1707,7 +1707,7 @@ ${offset > 0 ? `
     <div
       ref={wrapRef}
       tabIndex={-1}
-      className="group relative w-full overflow-hidden rounded-xl bg-black touch-none select-none outline-none"
+      className="group relative w-full overflow-hidden rounded-2xl bg-black touch-none select-none outline-none"
       style={{ aspectRatio: !fullscreenActive && contentAspect ? `${contentAspect}` : undefined }}
       onPointerDown={onPointerDown}
       onPointerMove={(e) => { onPointerMove(e); setControlsVisible(true) }}

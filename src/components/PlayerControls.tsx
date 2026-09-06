@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   Play, Pause, Volume2, VolumeX, Volume1,
   Maximize, Minimize, Settings, Captions, RotateCcw, RotateCw,
-  PictureInPicture2, Cast, Check, SkipBack, SkipForward, ChevronRight,
-  Type, SlidersHorizontal, ArrowLeft, RectangleHorizontal, Maximize2,
-  Camera, Link, MonitorPlay, 
+  PictureInPicture2, Cast, Check, SkipBack, SkipForward,
+  Type, SlidersHorizontal, ArrowLeft, RectangleHorizontal,
+  Camera, Link,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import SegmentedControl from './SegmentedControl'
@@ -141,6 +141,7 @@ export default function PlayerControls({
   const [menu, setMenu] = useState<'settings' | 'captions' | 'quality' | null>(null)
   const [captionsTab, setCaptionsTab] = useState<'tracks' | 'appearance'>('tracks')
   const [speed, setSpeed] = useState(1)
+  const [showRemaining, setShowRemaining] = useState(false)
 
   // Visual feedback for click / double-tap on the video surface.
   // Each entry is rendered as a fading animation and removed after 600ms.
@@ -619,32 +620,26 @@ export default function PlayerControls({
 
         {/* Button row */}
         <div className="flex items-center gap-1 text-white">
+          {/* Left cluster — transport + volume + time (anikage order) */}
           <CtrlBtn onClick={togglePlay} label={playing ? 'Pause' : 'Play'}>
             {playing ? <Pause className="h-5 w-5 fill-white" /> : <Play className="h-5 w-5 fill-white" />}
           </CtrlBtn>
 
           {hasPrevEpisode && (
             <CtrlBtn onClick={onPrevEpisode} label="Previous episode">
-              <SkipBack className="h-[18px] w-[18px]" />
+              <SkipBack className="h-5 w-5" />
             </CtrlBtn>
           )}
           {hasNextEpisode && (
             <CtrlBtn onClick={onNextEpisode} label="Next episode">
-              <SkipForward className="h-[18px] w-[18px]" />
+              <SkipForward className="h-5 w-5" />
             </CtrlBtn>
           )}
 
-          <CtrlBtn onClick={() => seek(-10)} label="Back 10s">
-            <RotateCcw className="h-[18px] w-[18px]" />
-          </CtrlBtn>
-          <CtrlBtn onClick={() => seek(10)} label="Forward 10s">
-            <RotateCw className="h-[18px] w-[18px]" />
-          </CtrlBtn>
-
-          {/* Volume — hover to reveal slider (Plyr-style) */}
+          {/* Volume — hover to reveal slider */}
           <div className="group/vol relative flex items-center">
             <CtrlBtn onClick={toggleMute} label={muted ? 'Unmute' : 'Mute'}>
-              <VolumeIcon className="h-[18px] w-[18px]" />
+              <VolumeIcon className="h-5 w-5" />
             </CtrlBtn>
             <div className="hidden sm:block w-0 group-hover/vol:w-[80px] transition-all overflow-hidden">
               <input
@@ -660,55 +655,36 @@ export default function PlayerControls({
             </div>
           </div>
 
-          {/* Time — mono pill chip */}
-          <div className="ml-1.5 rounded-full bg-white/[0.07] border border-white/10 px-2.5 py-[5px] text-[11px] font-mono font-semibold tabular-nums text-white/90 tracking-tight">
-            {formatTime(currentTime)}
-            <span className="text-white/35 font-normal mx-1">/</span>
-            {formatTime(duration)}
-          </div>
+          {/* Time — clickable pill, toggles elapsed ↔ remaining (anikage) */}
+          <CtrlBtn
+            label={showRemaining ? 'Show elapsed time' : 'Show remaining time'}
+            onClick={() => setShowRemaining((r) => !r)}
+            className="ml-0.5 px-2.5 text-[11px] font-mono font-semibold tabular-nums tracking-tight"
+          >
+            {showRemaining ? (
+              <>
+                -{formatTime(Math.max(0, duration - currentTime))}
+                <span className="text-white/40 font-normal mx-1">/</span>
+                {formatTime(duration)}
+              </>
+            ) : (
+              <>
+                {formatTime(currentTime)}
+                <span className="text-white/40 font-normal mx-1">/</span>
+                {formatTime(duration)}
+              </>
+            )}
+          </CtrlBtn>
 
           <div className="flex-1" />
 
-          {/* Quality — slider for quick resolution switching */}
-          {levels.length > 1 && (() => {
-            // Build sorted quality options: [Auto, 360p, 480p, 720p, 1080p, ...]
-            const sortedLevels = levels
-              .map((l, i) => ({ l, i }))
-              .sort((a, b) => (a.l.height ?? 0) - (b.l.height ?? 0))
-            const options: Array<{ label: string; levelIndex: number }> = [
-              { label: 'Auto', levelIndex: -1 },
-              ...sortedLevels.map(({ l, i }) => ({
-                label: l.height ? `${l.height}p` : `${Math.round((l.bitrate ?? 0) / 1000)}k`,
-                levelIndex: i,
-              })),
-            ]
-            const sliderVal = currentLevel === -1 ? 0 : options.findIndex((o) => o.levelIndex === currentLevel)
-            return (
-              <div
-                className="group/quality-slider relative flex items-center gap-1.5 ml-1"
-                title={`Quality · ${currentLevel === -1 ? 'Auto' : levelLabel(levels[currentLevel])}`}
-              >
-                <MonitorPlay className="h-[16px] w-[16px] shrink-0 text-white/60" />
-                <span className="text-[10px] font-mono font-bold text-white/80 min-w-[28px] text-center">
-                  {currentLevel === -1 ? 'Auto' : levelLabel(levels[currentLevel])}
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={options.length - 1}
-                  step={1}
-                  value={sliderVal >= 0 ? sliderVal : 0}
-                  onChange={(e) => {
-                    const idx = Number(e.target.value)
-                    const opt = options[idx]
-                    if (opt) onChangeLevel(opt.levelIndex)
-                  }}
-                  aria-label="Quality"
-                  className="w-0 group-hover/quality-slider:w-[72px] sm:w-[72px] transition-all accent-primary cursor-pointer h-1"
-                />
-              </div>
-            )
-          })()}
+          {/* Right cluster — seek ±10, captions, screenshot (anikage order) */}
+          <CtrlBtn onClick={() => seek(-10)} label="Back 10 seconds">
+            <RotateCcw className="h-5 w-5" />
+          </CtrlBtn>
+          <CtrlBtn onClick={() => seek(10)} label="Forward 10 seconds">
+            <RotateCw className="h-5 w-5" />
+          </CtrlBtn>
 
           {/* Captions */}
           {subtitles.length > 0 && (
@@ -718,7 +694,7 @@ export default function PlayerControls({
                 onClick={() => setMenu(menu === 'captions' ? null : 'captions')}
                 active={activeSubIdx >= 0}
               >
-                <Captions className="h-[18px] w-[18px]" />
+                <Captions className="h-5 w-5" />
               </CtrlBtn>
               {menu === 'captions' && (
                 <MenuPanel
@@ -772,31 +748,17 @@ export default function PlayerControls({
             </Menu>
           )}
 
-          {/* PiP */}
-          {typeof document !== 'undefined' && document.pictureInPictureEnabled && (
-            <CtrlBtn
-              onClick={onTogglePiP}
-              label={pipActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
-              active={pipActive}
-            >
-              <PictureInPicture2 className="h-[18px] w-[18px]" />
-            </CtrlBtn>
-          )}
+          {/* Screenshot — anikage keeps it on the bar */}
+          <CtrlBtn onClick={captureScreenshot} label="Take screenshot">
+            <Camera className="h-5 w-5" />
+          </CtrlBtn>
 
-          {/* AirPlay (Safari only) */}
-          {hasAirPlay && (
-            <CtrlBtn onClick={onTriggerAirPlay} label="AirPlay">
-              <Cast className="h-[18px] w-[18px]" />
-            </CtrlBtn>
-          )}
-
-          {/* Settings (speed + quality + more) */}
+          {/* Settings */}
           <Menu open={menu === 'settings'} setOpen={(o) => setMenu(o ? 'settings' : null)}>
             <CtrlBtn
               label="Settings"
               onClick={() => setMenu(menu === 'settings' ? null : 'settings')}
-            >
-              <Settings className="h-[18px] w-[18px]" />
+            >                <Settings className="h-5 w-5" />
             </CtrlBtn>
             {menu === 'settings' && (
               <MenuPanel>
@@ -815,10 +777,60 @@ export default function PlayerControls({
                     size="sm"
                   />
                 </MenuRow>
-                {/* Quality selector is exposed as a dedicated toolbar button
-                    (with its own dropdown) for quick access — see the
-                    right cluster of the control bar. Keeping the same
-                    control here too would be redundant. */}
+                {/* Quality — anikage keeps it inside the gear menu */}
+                {levels.length > 1 && (
+                  <MenuRow
+                    label="Quality"
+                    value={currentLevel === -1 ? 'Auto' : levelLabel(levels[currentLevel])}
+                  >
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {(() => {
+                        // Unique resolutions, descending
+                        const seen = new Set<number>()
+                        const unique = levels
+                          .slice()
+                          .sort((a, b) => (b.height ?? 0) - (a.height ?? 0))
+                          .filter((l) => {
+                            const h = l.height ?? -1
+                            if (seen.has(h)) return false
+                            seen.add(h)
+                            return true
+                          })
+                        return [
+                          <button
+                            key="auto"
+                            onClick={() => onChangeLevel(-1)}
+                            className={cn(
+                              'px-2 py-0.5 rounded text-[10px] font-mono font-bold',
+                              currentLevel === -1
+                                ? 'bg-primary text-white'
+                                : 'bg-white/8 text-white/70 hover:bg-white/15',
+                            )}
+                          >
+                            Auto
+                          </button>,
+                          ...unique.map((l) => {
+                            const lvlIdx = levels.indexOf(l)
+                            return (
+                              <button
+                                key={lvlIdx}
+                                onClick={() => onChangeLevel(lvlIdx)}
+                                className={cn(
+                                  'px-2 py-0.5 rounded text-[10px] font-mono font-bold',
+                                  currentLevel === lvlIdx
+                                    ? 'bg-primary text-white'
+                                    : 'bg-white/8 text-white/70 hover:bg-white/15',
+                                )}
+                              >
+                                {l.height ? `${l.height}p` : `${Math.round((l.bitrate ?? 0) / 1000)}k`}
+                              </button>
+                            )
+                          }),
+                        ]
+                      })()}
+                    </div>
+                  </MenuRow>
+                )}
 
                 {/* Audio track selector (HLS multi-audio) */}
                 {audioTracks.length > 1 && (
@@ -902,17 +914,6 @@ export default function PlayerControls({
                   </button>
                 </MenuRow>
 
-                {/* Screenshot */}
-                <div className="px-3 py-2 border-t border-white/5">
-                  <button
-                    onClick={captureScreenshot}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white border border-white/8 transition-colors"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    Capture screenshot
-                  </button>
-                </div>
-
                 {/* Copy link to this moment */}
                 <div className="px-3 py-2 border-t border-white/5">
                   <button
@@ -950,6 +951,24 @@ export default function PlayerControls({
             )}
           </Menu>
 
+          {/* PiP */}
+          {typeof document !== 'undefined' && document.pictureInPictureEnabled && (
+            <CtrlBtn
+              onClick={onTogglePiP}
+              label={pipActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
+              active={pipActive}
+            >
+              <PictureInPicture2 className="h-5 w-5" />
+            </CtrlBtn>
+          )}
+
+          {/* AirPlay (Safari only) */}
+          {hasAirPlay && (
+            <CtrlBtn onClick={onTriggerAirPlay} label="AirPlay">
+              <Cast className="h-5 w-5" />
+            </CtrlBtn>
+          )}
+
           {/* Theater mode — hidden on small screens (no room for the
               sidebar to begin with). */}
           {onToggleTheaterMode && (
@@ -960,14 +979,14 @@ export default function PlayerControls({
                 active={theaterMode}
               >
                 {/* Rectangle icon — narrower when in theater mode (visual cue). */}
-                <RectangleHorizontal className={cn('h-[18px] w-[18px]', theaterMode && 'rotate-90')} />
+                <RectangleHorizontal className={cn('h-5 w-5', theaterMode && 'rotate-90')} />
               </CtrlBtn>
             </span>
           )}
 
           {/* Fullscreen */}
           <CtrlBtn onClick={toggleFullscreen} label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
-            {fullscreen ? <Minimize className="h-[18px] w-[18px]" /> : <Maximize className="h-[18px] w-[18px]" />}
+            {fullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
           </CtrlBtn>
         </div>
       </div>
@@ -978,13 +997,14 @@ export default function PlayerControls({
 /* ─── Tiny presentational helpers ─────────────────────────────────── */
 
 function CtrlBtn({
-  children, onClick, label, active, hidden,
+  children, onClick, label, active, hidden, className,
 }: {
   children: React.ReactNode
   onClick: () => void
   label: string
   active?: boolean
   hidden?: boolean
+  className?: string
 }) {
   return (
     <button
@@ -993,13 +1013,14 @@ function CtrlBtn({
       title={label}
       tabIndex={hidden ? -1 : 0}
       className={cn(
-        // 36px circular hit targets, evenly spaced, subtle hover — modern
-        // player feel (YouTube/Crunchyroll-grade affordances).
-        'grid place-items-center h-9 w-9 rounded-full text-white/90 transition-all',
-        'hover:bg-white/[0.14] active:scale-90 active:bg-white/[0.2]',
+        // Anikage/Media-Chrome style: soft pill buttons (px-2 py-1, ~40px
+        // wide) with 20px icons and a rounded hover wash.
+        'inline-flex items-center justify-center rounded-full px-2 py-1.5 text-white/95 transition-all',
+        'hover:bg-white/[0.12] active:scale-95 active:bg-white/[0.2]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
         active && 'text-primary',
         hidden && 'opacity-0 pointer-events-none',
+        className,
       )}
     >
       {children}
@@ -1214,8 +1235,3 @@ function Field({
     </div>
   )
 }
-
-// Suppress unused-var warnings for icons re-exported only to give the
-// VideoPlayer a single import surface in the future.
-const _spare = [ChevronRight, Maximize2]
-void _spare
