@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Play, X, RotateCcw } from 'lucide-react'
-import { useEffect } from 'react'
+import { Play, X, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { useWatchListStore } from '../store/useWatchListStore'
 import { getImageUrl, proxifyWithFallback, cn } from '../lib/utils'
 import { preloadHandlers } from '../lib/routePreloaders'
@@ -38,6 +38,14 @@ export default function ContinueWatchingRail() {
   const removeFromContinue = useWatchListStore((s) => s.removeFromContinue)
   const getEpisodeProgress = useWatchListStore((s) => s.getEpisodeProgress)
   const clearEpisodeProgress = useWatchListStore((s) => s.clearEpisodeProgress)
+  const railRef = useRef<HTMLDivElement>(null)
+
+  const nudge = (dir: 1 | -1) => {
+    const el = railRef.current
+    if (!el) return
+    const amount = Math.max(el.clientWidth * 0.85, 320)
+    el.scrollBy({ left: dir * amount, behavior: 'smooth' })
+  }
 
   // Pre-warm AniList episode info for the top 2 continue-watching items.
   // This saves a 200-500ms GraphQL round-trip when the user clicks to watch.
@@ -87,7 +95,30 @@ export default function ContinueWatchingRail() {
         pillTone="accent"
       />
 
+      {/* Rail paging arrows — appear only when the row overflows */}
+      {continueWatching.length > 4 && (
+        <div className="hidden md:flex items-center justify-end gap-1.5 -mt-1 mb-2">
+          <button
+            type="button"
+            onClick={() => nudge(-1)}
+            aria-label="Scroll Continue Watching back"
+            className="grid place-items-center h-7 w-7 rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.1] hover:border-white/[0.16] transition-all duration-150"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => nudge(1)}
+            aria-label="Scroll Continue Watching forward"
+            className="grid place-items-center h-7 w-7 rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.1] hover:border-white/[0.16] transition-all duration-150"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div
+        ref={railRef}
         className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 -mx-1 px-1 contain-auto"
         style={{ scrollSnapType: 'x mandatory' }}
       >
