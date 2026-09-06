@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0a0a0a" />
     <meta name="color-scheme" content="dark" />
+    <!-- Content-Security-Policy — silences Electron's "Insecure CSP" warning
+         and is defense-in-depth against XSS (scraped titles/descriptions are
+         rendered into the DOM). Needs to stay permissive in specific places:
+         • script/style 'unsafe-inline' — the async font-load onload trick and
+           React's inline style attributes (style="…" is how every component
+           is laid out; blocking it blanks the whole UI)
+         • media/connect http(s): — HLS feeds the player via blob: and direct
+           CDN .m3u8/.mp4 URLs are passed straight to <video>
+         • http://127.0.0.1 — the in-app WebTorrent stream + subtitle server
+         • frame-src YouTube — trailer embeds
+         All API/data traffic goes through our own localhost origin, so
+         default-src 'self' still covers the app itself. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob: https: http: http://127.0.0.1:*; connect-src 'self' blob: https: http: ws: wss:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; object-src 'none'; base-uri 'self'; worker-src 'self' blob:"
+    />
 
     <title>Kurōdo · Discover & Stream Anime</title>
     <meta name="description" content="Kurōdo (黒道) — a sleek anime discovery & streaming companion. Browse, search, and track anime with metadata from Jikan, AniList, and AniZip." />
