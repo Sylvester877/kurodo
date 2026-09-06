@@ -384,7 +384,7 @@ export default function Hero(_props: Props = {}) {
                             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                             {/* Hover play disc */}
                             <div className="absolute inset-0 grid place-items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <div className="h-12 w-12 rounded-full bg-primary/95 grid place-items-center shadow-[0_0_30px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.6)]">
+                              <div className="h-12 w-12 rounded-full bg-black/55 backdrop-blur-md border border-white/25 grid place-items-center shadow-[0_0_24px_rgba(0,0,0,0.5)] transition-transform duration-200 group-hover:scale-105">
                                 <Play className="h-5 w-5 text-white fill-white ml-0.5" />
                               </div>
                             </div>

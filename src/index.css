@@ -84,6 +84,8 @@
        smoothWheel option. */
     /* Always show scrollbar gutter to prevent layout shift */
     scrollbar-gutter: stable;
+    /* Anchor jumps land below the fixed navbar instead of underneath it */
+    scroll-padding-top: 88px;
   }
 
   body {

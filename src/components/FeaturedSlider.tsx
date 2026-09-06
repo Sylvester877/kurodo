@@ -140,7 +140,7 @@ export default memo(function FeaturedSlider() {
 
                   {/* Play button */}
                   <div className="absolute inset-0 grid place-items-center opacity-0 group-hover:opacity-100 transition-all duration-200 z-[3]">
-                    <div className="h-12 w-12 rounded-full bg-primary/95 grid place-items-center shadow-[0_0_30px_hsl(245,75%,60%,0.6)] group-hover:scale-105 transition-transform">
+                    <div className="h-12 w-12 rounded-full bg-black/55 backdrop-blur-md border border-white/25 grid place-items-center shadow-[0_0_24px_rgba(0,0,0,0.5)] group-hover:scale-105 transition-transform">
                       <Play className="h-5 w-5 text-white fill-white ml-0.5" />
                     </div>
                   </div>
