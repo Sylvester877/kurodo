@@ -1689,6 +1689,19 @@ ${offset > 0 ? `
   // unaffected (the box already matches the content aspect there, so
   // contain == cover inside it, and the baked-bar crop still runs).
   const effFit = videoFit === 'contain' && fullscreenActive ? 'cover' : videoFit
+  // Fullscreen baked-bar zoom — the missing half of the crop system.
+  // Cinematic encodes (movies, 2.35:1 TV rips) have black bars BAKED into
+  // the pixels, so no object-fit value can remove them: contain/cover/fill
+  // all leave the same black bands, which is why the gap survived every
+  // fit mode in fullscreen. The detector above keeps measuring during
+  // fullscreen; here we zoom the element so the (symmetric) bar margins
+  // fall outside the screen. scale = 1 / smallest content fraction — with
+  // only top/bottom bars the content then fills the screen height exactly.
+  const hasBakedBars = crop.l > 0 || crop.r > 0 || crop.t > 0 || crop.b > 0
+  const fullscreenZoom =
+    fullscreenActive && effFit === 'cover' && hasBakedBars
+      ? 1 / Math.min(1 - crop.l - crop.r, 1 - crop.t - crop.b)
+      : null
   const hasHBar = effCrop.l > 0 || effCrop.r > 0
   const hasVBar = effCrop.t > 0 || effCrop.b > 0
   const contentAspect = (() => {
@@ -1733,6 +1746,9 @@ ${offset > 0 ? `
         className={`h-full w-full bg-black ${captionScopeRef.current}`}
         style={{
           objectFit: effFit,
+          // Fullscreen baked-bar zoom (see above) — scales around the
+          // center so cropped margins stay symmetric; the wrapper clips.
+          transform: fullscreenZoom ? `scale(${fullscreenZoom})` : undefined,
           filter: brightness === 1 ? undefined : `brightness(${brightness})`,
           // Bar-crop geometry: video is oversized by the bar fractions and
           // shifted so the content rect fills the box 1:1 (no scaling, no
