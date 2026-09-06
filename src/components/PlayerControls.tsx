@@ -492,20 +492,24 @@ export default function PlayerControls({
         }}
       />
 
-      {/* Episode info overlay — sleek top-left title card (Netflix-style) */}
-      {episodeNumber != null && visible && (
-        <div className="pointer-events-none absolute top-3 left-3 z-20">
-          <div className="glass-card rounded-xl px-4 py-2.5 border border-white/[0.06] shadow-md animate-[fadeInUp_0.3s_ease]">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full">
-                EP {episodeNumber}
+      {/* Episode info overlay — minimal Netflix-style text, no box. It fades
+          in with the controls and slides down out of the way when idle. */}
+      {episodeNumber != null && (
+        <div
+          className={cn(
+            'pointer-events-none absolute top-4 left-4 z-20 transition-all duration-300',
+            visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1.5',
+          )}
+        >
+          <div className="flex items-center gap-2.5" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.8)' }}>
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary bg-black/45 backdrop-blur-md border border-primary/30 rounded-full px-2.5 py-[3px]">
+              EP {episodeNumber}
+            </span>
+            {episodeTitle && (
+              <span className="text-[13px] font-semibold text-white/90 line-clamp-1 max-w-[260px] sm:max-w-[420px]">
+                {episodeTitle}
               </span>
-              {episodeTitle && (
-                <span className="text-xs text-white/85 font-medium line-clamp-1 max-w-[280px] sm:max-w-[400px]">
-                  {episodeTitle}
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -513,7 +517,12 @@ export default function PlayerControls({
       <div
         onMouseEnter={() => { mouseOnBarRef.current = true }}
         onMouseLeave={() => { mouseOnBarRef.current = false; scheduleHide() }}
-        className="pointer-events-auto absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 pt-1 flex flex-col gap-1.5">
+        className={cn(
+          'absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 pt-1 flex flex-col gap-1.5',
+          // When hidden the bar must not eat clicks — the click-anywhere
+          // surface below should toggle play instead (visible dead-zone fix).
+          visible ? 'pointer-events-auto' : 'pointer-events-none',
+        )}>
         {/* Hovered chapter label — shown above the timeline */}
         {hoveredChapter && (
           <div className="flex items-center justify-center mb-0.5 pointer-events-none">
@@ -651,10 +660,10 @@ export default function PlayerControls({
             </div>
           </div>
 
-          {/* Time */}
-          <div className="ml-1 text-[12px] font-mono tabular-nums text-white/85">
+          {/* Time — mono pill chip */}
+          <div className="ml-1.5 rounded-full bg-white/[0.07] border border-white/10 px-2.5 py-[5px] text-[11px] font-mono font-semibold tabular-nums text-white/90 tracking-tight">
             {formatTime(currentTime)}
-            <span className="text-white/40 mx-1">/</span>
+            <span className="text-white/35 font-normal mx-1">/</span>
             {formatTime(duration)}
           </div>
 
@@ -969,22 +978,28 @@ export default function PlayerControls({
 /* ─── Tiny presentational helpers ─────────────────────────────────── */
 
 function CtrlBtn({
-  children, onClick, label, active,
+  children, onClick, label, active, hidden,
 }: {
   children: React.ReactNode
   onClick: () => void
   label: string
   active?: boolean
+  hidden?: boolean
 }) {
   return (
     <button
       onClick={onClick}
       aria-label={label}
       title={label}
+      tabIndex={hidden ? -1 : 0}
       className={cn(
-        'p-1.5 rounded-md transition-all',
-        'hover:bg-white/10 active:scale-95',
+        // 36px circular hit targets, evenly spaced, subtle hover — modern
+        // player feel (YouTube/Crunchyroll-grade affordances).
+        'grid place-items-center h-9 w-9 rounded-full text-white/90 transition-all',
+        'hover:bg-white/[0.14] active:scale-90 active:bg-white/[0.2]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
         active && 'text-primary',
+        hidden && 'opacity-0 pointer-events-none',
       )}
     >
       {children}
@@ -1010,7 +1025,7 @@ function MenuPanel({
   children: React.ReactNode
 }) {
   return (
-    <div className="absolute bottom-full mb-2 right-0 min-w-[240px] rounded-lg bg-black/92 border border-white/10 shadow-lg overflow-hidden animate-[fadeInUp_0.15s_ease]">
+    <div className="absolute bottom-full mb-2.5 right-0 min-w-[248px] rounded-xl bg-black/90 backdrop-blur-2xl border border-white/[0.09] shadow-[0_18px_50px_-12px_rgba(0,0,0,0.9)] overflow-hidden animate-[fadeInUp_0.16s_ease]">
       {header
         ? header
         : title && (
