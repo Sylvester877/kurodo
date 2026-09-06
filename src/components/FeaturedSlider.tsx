@@ -1,9 +1,10 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Play, Star, Clock, Tv } from 'lucide-react'
 import { getThisSeason, type FeedMedia } from '../api/anilist'
 import SectionHeader from './SectionHeader'
+import { RailArrows, railNudge } from './RailPaging'
 import { proxifyImgUrl } from '../lib/utils'
 
 function pickWide(m: FeedMedia): string {
@@ -22,6 +23,7 @@ const OVERLAY_STYLE: React.CSSProperties = {
 }
 
 export default memo(function FeaturedSlider() {
+  const railRef = useRef<HTMLDivElement>(null)
   const { data, isLoading } = useQuery({
     queryKey: ['featuredSlider'],
     queryFn: () => getThisSeason(20),
@@ -51,10 +53,19 @@ export default memo(function FeaturedSlider() {
         pill="TRENDING"
         pillTone="hot"
         to="/browse?filter=seasonal"
+        actions={
+          items.length > 4 ? (
+            <RailArrows
+              onPrev={() => railNudge(railRef.current, -1)}
+              onNext={() => railNudge(railRef.current, 1)}
+            />
+          ) : undefined
+        }
       />
 
       {/* Lightweight CSS scroll-snap carousel — no Swiper.js dependency */}
       <div
+        ref={railRef}
         className="flex gap-4 overflow-x-auto custom-scrollbar pb-4 -mx-1 px-1 snap-x snap-mandatory contain-auto"
       >
         {items.map((m) => {

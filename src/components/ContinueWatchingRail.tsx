@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
-import { Play, X, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Play, X, RotateCcw } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useWatchListStore } from '../store/useWatchListStore'
 import { getImageUrl, proxifyWithFallback, cn } from '../lib/utils'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { prefetchAnimeEpInfo } from '../lib/prefetch'
 import SectionHeader from './SectionHeader'
+import { RailArrows, railNudge } from './RailPaging'
 import EmptyState from './EmptyState'
 import { Tv } from 'lucide-react'
 
@@ -39,13 +40,6 @@ export default function ContinueWatchingRail() {
   const getEpisodeProgress = useWatchListStore((s) => s.getEpisodeProgress)
   const clearEpisodeProgress = useWatchListStore((s) => s.clearEpisodeProgress)
   const railRef = useRef<HTMLDivElement>(null)
-
-  const nudge = (dir: 1 | -1) => {
-    const el = railRef.current
-    if (!el) return
-    const amount = Math.max(el.clientWidth * 0.85, 320)
-    el.scrollBy({ left: dir * amount, behavior: 'smooth' })
-  }
 
   // Pre-warm AniList episode info for the top 2 continue-watching items.
   // This saves a 200-500ms GraphQL round-trip when the user clicks to watch.
@@ -93,29 +87,15 @@ export default function ContinueWatchingRail() {
         subtitle="Pick up where you left off"
         pill="RESUME"
         pillTone="accent"
+        actions={
+          continueWatching.length > 4 ? (
+            <RailArrows
+              onPrev={() => railNudge(railRef.current, -1)}
+              onNext={() => railNudge(railRef.current, 1)}
+            />
+          ) : undefined
+        }
       />
-
-      {/* Rail paging arrows — appear only when the row overflows */}
-      {continueWatching.length > 4 && (
-        <div className="hidden md:flex items-center justify-end gap-1.5 -mt-1 mb-2">
-          <button
-            type="button"
-            onClick={() => nudge(-1)}
-            aria-label="Scroll Continue Watching back"
-            className="grid place-items-center h-7 w-7 rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.1] hover:border-white/[0.16] transition-all duration-150"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => nudge(1)}
-            aria-label="Scroll Continue Watching forward"
-            className="grid place-items-center h-7 w-7 rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.1] hover:border-white/[0.16] transition-all duration-150"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       <div
         ref={railRef}

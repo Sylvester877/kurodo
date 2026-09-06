@@ -8,6 +8,7 @@ import { getTmdbBackdrop, getAnimeLogo } from '../api/tmdb'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { useWatchListStore } from '../store/useWatchListStore'
 import { useSettings } from '../store/useSettings'
+import { RailArrows, railNudge } from './RailPaging'
 import { useShallow } from 'zustand/react/shallow'
 import { cn, getImageUrl, proxifyImgUrl } from '../lib/utils'
 
@@ -80,6 +81,7 @@ export default function Hero(_props: Props = {}) {
   const [bgFeatured, setBgFeatured] = useState(0)
   const [bgEditors, setBgEditors] = useState(0)
   const [logoFailed, setLogoFailed] = useState(false)
+  const heroRailRef = useRef<HTMLDivElement>(null)
 
   // ── Data queries ───────────────────────────────────────────────
   // Request perPage 18 (same as the Home feed rows) so the underlying
@@ -303,29 +305,37 @@ export default function Hero(_props: Props = {}) {
       {/* ── Foreground content ─────────────────────────────────────── */}
       <div className="relative z-10 h-full flex flex-col pt-8">
         <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-8 lg:px-14 flex flex-col justify-end pb-24 sm:pb-28">
-          {/* ── Tab switcher ────────────────────────────────────── */}
-          <div className="flex items-center gap-1 mb-4">
-            {(
-              [
-                { key: 'continue', label: 'Continue Watching' },
-                { key: 'featured', label: 'Featured' },
-                { key: 'editors', label: "Editor's Pick" },
-              ] as const
-            ).map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setActiveTab(t.key)}
-                className={cn(
-                  'px-3.5 min-h-[32px] inline-flex items-center rounded-full text-xs font-semibold transition-all',
-                  activeTab === t.key
-                    ? 'bg-white text-black'
-                    : 'text-white/50 hover:text-white/80 hover:bg-white/10',
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* ── Tab switcher (+ rail arrows when the continue rail is active) ── */}
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  { key: 'continue', label: 'Continue Watching' },
+                  { key: 'featured', label: 'Featured' },
+                  { key: 'editors', label: "Editor's Pick" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setActiveTab(t.key)}
+                  className={cn(
+                    'px-3.5 min-h-[32px] inline-flex items-center rounded-full text-xs font-semibold transition-all',
+                    activeTab === t.key
+                      ? 'bg-white text-black'
+                      : 'text-white/50 hover:text-white/80 hover:bg-white/10',
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {activeTab === 'continue' && continueWatching.length > 4 && (
+              <RailArrows
+                onPrev={() => railNudge(heroRailRef.current, -1)}
+                onNext={() => railNudge(heroRailRef.current, 1)}
+              />
+            )}
           </div>
 
           {/* ── Continue Watching tab ───────────────────────────── */}
@@ -341,6 +351,7 @@ export default function Hero(_props: Props = {}) {
                 </div>
               ) : (
                 <div
+                  ref={heroRailRef}
                   className="flex gap-4 overflow-x-auto custom-scrollbar pb-6 -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory"
                 >
                   {continueWatching.slice(0, 12).map((c) => {

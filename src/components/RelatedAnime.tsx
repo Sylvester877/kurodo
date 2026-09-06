@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Film, Play, Star } from 'lucide-react'
 import { fetchRelations, type RelationEdge } from '../api/anilistAuth'
 import { cn } from '../lib/utils'
 import { ImageWithBlur } from './ImageWithBlur'
+import SectionHeader from './SectionHeader'
+import { RailArrows, railNudge } from './RailPaging'
 
 interface Props {
   anilistId: number | null
@@ -99,17 +101,17 @@ export default function RelatedAnime({ anilistId, className }: Props) {
     return () => { cancelled = true }
   }, [anilistId])
 
+  const railRef = useRef<HTMLDivElement>(null)
+
   if (!anilistId) return null
   if (loading) {
     return (
       <section className={cn('max-w-[1600px] mx-auto px-4 mt-10', className)}>
         <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent mb-7" />
-        <div className="flex items-center gap-2 mb-5">
-          <span className="kicker-bar" aria-hidden />
-          <h2 className="text-lg sm:text-xl font-display font-bold text-white flex items-center gap-2">
-            Related
-          </h2>
-        </div>
+        <SectionHeader
+          title="Related"
+          subtitle="Sequels · prequels · spin-offs"
+        />
         <RelatedSkeleton />
       </section>
     )
@@ -121,23 +123,22 @@ export default function RelatedAnime({ anilistId, className }: Props) {
   return (
     <section className={cn('max-w-[1600px] mx-auto px-4 mt-10', className)}>
       <div className="h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent mb-7" />
-      <div className="flex items-center justify-between gap-4 mb-5">
-        <div className="flex items-center gap-2">
-          <span className="kicker-bar" aria-hidden />
-          <h2 className="text-lg sm:text-xl font-display font-bold text-white flex items-center gap-2">
-            Related
-          </h2>
-          <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/25">
-            {visible.length}
-          </span>
-        </div>
-        <span className="hidden sm:inline text-[12px] text-white/40">
-          Sequels · prequels · spin-offs
-        </span>
-      </div>
+      <SectionHeader
+        title="Related"
+        subtitle="Sequels · prequels · spin-offs"
+        pill={`${visible.length}`}
+        actions={
+          visible.length > 4 ? (
+            <RailArrows
+              onPrev={() => railNudge(railRef.current, -1)}
+              onNext={() => railNudge(railRef.current, 1)}
+            />
+          ) : undefined
+        }
+      />
 
       {/* Horizontal poster rail — anikoto style */}
-      <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 -mx-1 px-1">
+      <div ref={railRef} className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 -mx-1 px-1">
         {visible.map((e) => {
           const title = e.node.title.english || e.node.title.romaji || 'Untitled'
           const href = e.node.idMal ? `/anime/${e.node.idMal}` : null

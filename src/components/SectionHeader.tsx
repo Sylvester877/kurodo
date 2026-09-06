@@ -15,6 +15,9 @@ interface Props {
   /** "View all" target. Omits the link when not provided. */
   to?: string
   linkLabel?: string
+  /** Extra controls rendered on the right (e.g. rail paging arrows).
+      Shown before the "View all" link when both are provided. */
+  actions?: ReactNode
   className?: string
 }
 
@@ -30,6 +33,7 @@ export default function SectionHeader({
   pillTone = 'primary',
   to,
   linkLabel = 'View all',
+  actions,
   className,
 }: Props) {
   return (
@@ -72,17 +76,20 @@ export default function SectionHeader({
         )}
       </motion.div>
 
-      {to && (
-        <Link
-          to={to}
-          className="group shrink-0 inline-flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] pl-3.5 pr-2 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55 transition-all duration-200 hover:text-white hover:border-white/[0.16] hover:bg-white/[0.07]"
-        >
-          {linkLabel}
-          <span className="grid place-items-center h-6 w-6 rounded-full bg-white/[0.06] text-white/70 transition-all duration-200 group-hover:bg-primary group-hover:text-white group-hover:shadow-[0_0_14px_-2px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.7)]">
-            <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-px group-hover:-translate-y-px" />
-          </span>
-        </Link>
-      )}
+      <div className="shrink-0 flex items-center gap-2">
+        {actions}
+        {to && (
+          <Link
+            to={to}
+            className="group inline-flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] pl-3.5 pr-2 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/55 transition-all duration-200 hover:text-white hover:border-white/[0.16] hover:bg-white/[0.07]"
+          >
+            {linkLabel}
+            <span className="grid place-items-center h-6 w-6 rounded-full bg-white/[0.06] text-white/70 transition-all duration-200 group-hover:bg-primary group-hover:text-white group-hover:shadow-[0_0_14px_-2px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.7)]">
+              <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-px group-hover:-translate-y-px" />
+            </span>
+          </Link>
+        )}
+      </div>
     </div>
   )
 }
