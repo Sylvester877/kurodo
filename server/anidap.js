@@ -358,7 +358,10 @@ let chad429Until = 0
 // upstream only pauses chad for 3 min, then we probe again.
 const CHAD_429_MAX_TTL = 3 * 60 * 1000
 
-function markChad429(retryAfterMs) {
+// fixes: prod crash "markChad429 is not a function" — dynamic importers in
+// cf-harvester (electron.js:394,505,557) destructure this name and got
+// undefined, throwing on every chad 429 path (B0-1).
+export function markChad429(retryAfterMs) {
   // Clamp hard to our cap so a single upstream 429 (even with a bogus
   // multi-hour retry_after) can NEVER lock the whole app out for hours.
   const capped = Math.min(
