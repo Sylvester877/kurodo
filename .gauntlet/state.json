@@ -1,0 +1,25 @@
+{
+  "operation": "ANIME ASCENSION",
+  "protocol": "v2.0 adapted",
+  "note": "Recon found Kurodo already near-canon (~90%); running targeted gap iterations, not a from-scratch reskin.",
+  "phase": "P3/P5 mixed",
+  "minutesElapsedEst": 150,
+  "iteration": 2,
+  "commitsThisRun": [
+    "45a148f feat(parity): Characters & Cast row",
+    "63118cd fix(bug): Jikan outage no longer empties Browse"
+  ],
+  "accentDecision": "KEEP existing theme (hot accent already in use); no token migration needed at this parity",
+  "parityScores": {
+    "home": 92,
+    "detail": 88,
+    "watch": 90,
+    "browse": 78,
+    "search": 85,
+    "schedule": 88,
+    "watchlist": 86,
+    "average": 87
+  },
+  "depsAdded": [],
+  "next": "ghost-numeral trending rail; A-Z mode backlogged (Jikan-dependent); characters hover reuse"
+}
