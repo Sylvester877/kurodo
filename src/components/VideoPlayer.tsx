@@ -1680,9 +1680,15 @@ ${offset > 0 ? `
   // Content-space geometry derived from the crop: the box shows exactly the
   // content rect; the video element inside is oversized/offset to match.
   // Manual fit modes (fill/cover) bypass the crop entirely. In fullscreen
-  // the box MUST fill the screen — the bar-crop reshaping is disabled there
-  // (fullscreen already letterboxes correctly via object-fit).
+  // the box MUST fill the screen — the bar-crop reshaping is disabled there.
   const effCrop = videoFit === 'contain' && !fullscreenActive ? crop : { l: 0, r: 0, t: 0, b: 0 }
+  // Fullscreen fill: when the user hasn't chosen a manual fit, the default
+  // 'contain' would letterbox 16:9 content on wider/narrower screens (e.g.
+  // the 16:10 laptop) with black bars above/below. Cover fills the whole
+  // screen with a small symmetric crop instead. Windowed playback is
+  // unaffected (the box already matches the content aspect there, so
+  // contain == cover inside it, and the baked-bar crop still runs).
+  const effFit = videoFit === 'contain' && fullscreenActive ? 'cover' : videoFit
   const hasHBar = effCrop.l > 0 || effCrop.r > 0
   const hasVBar = effCrop.t > 0 || effCrop.b > 0
   const contentAspect = (() => {
@@ -1726,7 +1732,7 @@ ${offset > 0 ? `
         crossOrigin="anonymous"
         className={`h-full w-full bg-black ${captionScopeRef.current}`}
         style={{
-          objectFit: videoFit,
+          objectFit: effFit,
           filter: brightness === 1 ? undefined : `brightness(${brightness})`,
           // Bar-crop geometry: video is oversized by the bar fractions and
           // shifted so the content rect fills the box 1:1 (no scaling, no
