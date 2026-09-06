@@ -527,7 +527,7 @@ export default function MangaDetails() {
         <div className="space-y-6 min-w-0">
           {/* Title + description */}
           <div>
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
               {resolved?.parentTitle || resolved?.displayTitle || manga?.title || 'Manga'}
             </h1>
             {resolved?.isColoured && resolved.displayTitle !== resolved.parentTitle && (

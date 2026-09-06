@@ -71,7 +71,7 @@ export default function Seasonal() {
               <span className="text-2xl">{meta.emoji}</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">
                 Seasonal Calendar
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">

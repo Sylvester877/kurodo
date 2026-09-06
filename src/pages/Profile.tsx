@@ -318,7 +318,7 @@ export default function Profile() {
 
               {/* Name + meta */}
               <div className="flex-1 min-w-0 pb-1">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight tracking-tight drop-shadow-lg">
+                <h1 className="font-display text-3xl sm:text-4xl font-bold text-white leading-tight tracking-tight drop-shadow-lg">
                   {auth?.user.name ?? 'Your dashboard'}
                 </h1>
 

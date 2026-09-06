@@ -264,7 +264,7 @@ export default function Settings() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="kicker-bar" />
-                  <h1 className="text-2xl font-extrabold text-white leading-tight">Settings</h1>
+                  <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white leading-tight">Settings</h1>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Defaults that apply across the app. Per-session overrides in the player are remembered for that session only.

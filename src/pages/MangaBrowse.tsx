@@ -218,7 +218,7 @@ export default function MangaBrowse() {
             <BookOpen className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Manga</h1>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">Manga</h1>
             <p className="text-xs text-muted-foreground">Discover manga, manhwa & novels · powered by AniList + MangaDex</p>
           </div>
         </div>

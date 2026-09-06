@@ -119,7 +119,7 @@ export default function MangaList() {
             <Bookmark className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Manga List</h1>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">Manga List</h1>
             <p className="text-xs text-muted-foreground">
               {stats.total} manga · {stats.totalChapters} chapters read
             </p>

@@ -1030,7 +1030,7 @@ export default function Watch() {
         <div className="h-20 w-20 rounded-3xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-6">
           <Film className="h-10 w-10 text-muted-foreground opacity-40" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">
+        <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
           {animeQuery.isError ? 'Couldn’t load anime' : 'Anime not found'}
         </h2>
         <p className="text-sm text-white/60 mb-6 leading-relaxed max-w-md">
@@ -2010,7 +2010,7 @@ export default function Watch() {
         <section className="max-w-[2000px] mx-auto px-4 mt-8 pb-8">
           <div className="glass-card rounded-2xl p-5 sm:p-6 relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/80 rounded-r-full" />
-            <h2 className="text-lg sm:text-xl font-bold text-white mb-6 flex items-center gap-2.5">
+            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white mb-6 flex items-center gap-2.5">
               <span className="kicker-bar" /> You Might Also Like
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-x-4 gap-y-6">

@@ -335,7 +335,7 @@ export default function WatchList() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-3xl font-bold text-white">My Watchlist</h1>
+            <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-white">My Watchlist</h1>
             {auth && (
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                 <Cloud className="h-3 w-3" />
