@@ -2,7 +2,7 @@ import { memo, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { Star, Play } from 'lucide-react'
-import { getImageUrl, formatScore, buildPosterSrcSet, pickTitle, getBackendOrigin } from '../lib/utils'
+import { getImageUrl, formatScore, proxifyWithFallback, pickTitle, getBackendOrigin } from '../lib/utils'
 import { useSettings } from '../store/useSettings'
 import { prefetchAnimeDetails, prefetchAnimeEpInfo } from '../lib/prefetch'
 import AnimeHoverCard from './AnimeHoverCard'
@@ -30,6 +30,15 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
   // missing images) — the card then shows a styled gradient + initial
   // instead of a broken "No Image" placeholder.
   const posterSrc = getImageUrl(anime)
+  // Grid posters are ~220px wide — prefer AniList's 460px `large` tier over
+  // a full-size `extraLarge` original, and route through /img so every card
+  // is served from the localhost cache after its first fetch ever.
+  const gridPoster = posterSrc
+    ? proxifyWithFallback(
+        posterSrc.replace(/\/extraLarge\//, '/large/'),
+        anime.title_english || anime.title,
+      )
+    : ''
   const [isHovered, setIsHovered] = useState(false)
   const cardRef = useRef<HTMLAnchorElement>(null)
   const [spotlight, setSpotlight] = useState({ x: 50, y: 50 })
@@ -108,12 +117,10 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
           />
           {posterSrc ? (
           <ImageWithBlur
-            src={posterSrc}
+            src={gridPoster}
             alt={anime.title}
             lazy
             className="relative h-full w-full object-cover bg-zinc-900 transition-transform duration-300 group-hover:scale-103"
-            srcSet={buildPosterSrcSet(posterSrc)}
-            sizes="(min-width: 1280px) 220px, (min-width: 1024px) 20vw, (min-width: 640px) 33vw, 50vw"
             placeholderBlur={12}
             fadeDuration={300}
             onError={(e) => {

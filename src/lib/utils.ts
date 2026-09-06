@@ -211,30 +211,14 @@ export function getBackendOrigin(): string {
     : ''
 }
 
-// ── CDN hosts with CORS headers that don't need the /img proxy ──
-// Pre-computed array from Set so canDirectUrl() doesn't spread on every call.
-const DIRECT_CDN_LIST = [
-  'cdn.myanimelist.net', // MAL CDN — sends CORS *
-  'artworks.thetvdb.com', // TVDB CDN — sends CORS *
-  'image.tmdb.org',      // TMDB images — sends CORS *
-]
-
-function canDirectUrl(url: string): boolean {
-  try {
-    const host = new URL(url).hostname
-    return DIRECT_CDN_LIST.some((h) => host.includes(h))
-  } catch { return false }
-}
-
-/**
- * Wrap an image URL through our /img proxy so it gets 24h browser cache,
- * service-worker caching, and graceful fallback on upstream 403/404.
- * Skips the proxy for known CORS-enabled CDNs (AniList, MAL, TVDB, TMDB)
- * — serving images directly from the CDN eliminates the server round-trip.
- */
+// Every upstream image CDN measures ~1-2s round-trip from typical client
+// networks (MAL 2.0s, AniList 1.2s, TMDB 1.2s on this machine), so ANY
+// direct hotlink makes grids/banners feel slow. The /img proxy fetches each
+// image once server-side, then serves it from localhost in milliseconds via
+// its 48h memory cache + 30d on-disk cache (survives restarts). Proxy
+// everything; there is no "fast-path" CDN anymore.
 export function proxifyImgUrl(url: string): string {
   if (!url) return url
-  if (url.startsWith('http') && canDirectUrl(url)) return url
   if (!url.startsWith('http')) return url
   const origin = getBackendOrigin()
   return `${origin}/img?url=${encodeURIComponent(url)}`
@@ -252,9 +236,6 @@ export function proxifyWithFallback(url: string, label?: string): string {
   if (!url) return `${origin}/img?url=&label=${encodeURIComponent(label || '?')}`
   if (!url.startsWith('http')) return url
   if (url.startsWith('/img')) return url
-
-  // Fast path: known CORS CDNs don't need the proxy at all
-  if (canDirectUrl(url)) return url
 
   // For AniList CDN URLs, build a multi-size fallback chain
   if (url.includes('anilist.co')) {

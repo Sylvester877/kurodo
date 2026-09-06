@@ -15,7 +15,7 @@ import { getSkipTimes, type SkipTimes } from '../api/aniskip'
 import { useWatchListStore } from '../store/useWatchListStore'
 import { useTitle } from '../hooks/useTitle'
 import { useDominantColor } from '../hooks/useDominantColor'
-import { cn, getImageUrl, getHeroImageUrl, formatScore, getBackendOrigin, withTimeout } from '../lib/utils'
+import { cn, getImageUrl, getHeroImageUrl, formatScore, proxifyWithFallback, getBackendOrigin, withTimeout } from '../lib/utils'
 import { buildEpisodeImageUrl } from '../lib/episodeImage'
 import AnimeCard from '../components/AnimeCard'
 import { preloadHandlers } from '../lib/routePreloaders'
@@ -398,7 +398,7 @@ export default function AnimeDetails() {
       {/* Skipped on integrated GPUs — 3 gradient overlays + mixBlendMode cause GPU memory pressure */}
       <div ref={heroRef} className="relative h-[65vh] min-h-[500px] max-h-[750px]">
         <img
-          src={heroBackdrop}
+          src={proxifyWithFallback(heroBackdrop, anime.title)}
           alt={anime.title}
           width={1920}
           height={600}

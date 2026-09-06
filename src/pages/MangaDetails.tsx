@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BookOpen, Hash, Star, Globe, Calendar, Loader2, Search, X, Heart, ChevronDown, ChevronUp, Library, TrendingUp, Palette, Play } from 'lucide-react'
-import { cn } from '../lib/utils'
+import { cn, proxifyImgUrl } from '../lib/utils'
 import { getMangaInfo, getChapterFeed, searchManga as searchMangaDex, type MangaDexManga, type MangaDexChapter } from '../api/mangadex'
 import { resolveManga, type ResolvedManga } from '../api/anilistManga'
 import { searchManga as searchMangaAtsu, getChapterFeed as getChapterFeedAtsu, type AtsuChapter } from '../api/atsu'
@@ -327,7 +327,7 @@ export default function MangaDetails() {
             {manga?.coverUrl ? (
               <img src={manga.coverUrl} alt={manga.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
             ) : detail?.coverImage?.large ? (
-              <img src={detail.coverImage.large} alt={resolved?.displayTitle || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+              <img src={proxifyImgUrl(detail.coverImage.large)} alt={resolved?.displayTitle || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
             ) : (
               <div className="h-full w-full grid place-items-center">
                 <BookOpen className="h-12 w-12 text-white/10" />

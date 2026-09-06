@@ -6,7 +6,7 @@ import {
   Search, BookOpen, TrendingUp, Star, Loader2, Compass,
   ListFilter, Play, SlidersHorizontal, Check, X,
 } from 'lucide-react'
-import { cn } from '../lib/utils'
+import { cn, proxifyImgUrl } from '../lib/utils'
 import MangaContinueReadingRail from '../components/MangaContinueReadingRail'
 import {
   getLatestManga, browseManga, getBrowseTags,
@@ -265,7 +265,7 @@ export default function MangaBrowse() {
                     to={`/manga/${m.id}`}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors border-b border-white/[0.03] last:border-0"
                   >
-                    <img src={m.coverImage?.large || m.coverImage?.extraLarge || ''} alt="" className="w-10 h-14 rounded-md object-cover bg-white/[0.04] shrink-0" loading="lazy" />
+                    <img src={proxifyImgUrl(m.coverImage?.large || m.coverImage?.extraLarge || '')} alt="" className="w-10 h-14 rounded-md object-cover bg-white/[0.04] shrink-0" loading="lazy" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-white font-medium truncate">{m.title.english || m.title.romaji}</p>
                       <div className="flex items-center gap-2 mt-0.5">

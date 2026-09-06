@@ -20,7 +20,7 @@ import {
 import { getSkipTimes, type SkipTimes } from '../api/aniskip'
 import { useWatchListStore } from '../store/useWatchListStore'
 import { queryClient } from '../lib/queryClient'
-import { cn, getImageUrl, getHeroImageUrl, formatScore, friendlyError, safeBase64, safeSetItem, proxifyWithFallback, getBackendOrigin, withTimeout } from '../lib/utils'
+import { cn, getImageUrl, getHeroImageUrl, formatScore, friendlyError, safeBase64, safeSetItem, proxifyImgUrl, proxifyWithFallback, getBackendOrigin, withTimeout } from '../lib/utils'
 import { buildEpisodeImageUrl } from '../lib/episodeImage'
 import AnimeCard from '../components/AnimeCard'
 import { lazyWithRetry } from '../lib/lazyWithRetry'
@@ -1199,7 +1199,7 @@ export default function Watch() {
             aria-hidden
             className="pointer-events-none absolute inset-0 -z-10 opacity-30 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]"
             style={{
-              backgroundImage: `url('${getImageUrl(anime)}')`,
+              backgroundImage: `url('${proxifyImgUrl(getImageUrl(anime))}')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center top',
               filter: 'blur(24px) saturate(1.1)',

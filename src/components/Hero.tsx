@@ -8,7 +8,7 @@ import { getTmdbBackdrop, getAnimeLogo } from '../api/tmdb'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { useSettings } from '../store/useSettings'
 import { useShallow } from 'zustand/react/shallow'
-import { cn } from '../lib/utils'
+import { cn, proxifyImgUrl } from '../lib/utils'
 
 const CROSSFADE_MS = 12000 // 12s between auto-advance
 
@@ -196,7 +196,9 @@ export default function Hero() {
       <motion.div className="absolute inset-0 z-0" style={{ y: backdropY, scale: backdropScale }}>
         <AnimatePresence mode="sync">
           {current && (() => {
-            const staticSrc = tmdbBackdrop || current.bannerImage || current.coverImage.extraLarge || current.coverImage.large
+            const staticSrc = proxifyImgUrl(
+              tmdbBackdrop || current.bannerImage || current.coverImage.extraLarge || current.coverImage.large || '',
+            )
             return (
               <motion.div
                 key={current.id}
@@ -467,7 +469,7 @@ export default function Hero() {
                 >
                   {item.media.coverImage?.large && (
                     <img
-                      src={item.media.coverImage.large.replace(/\/large\//, '/medium/')}
+                      src={proxifyImgUrl(item.media.coverImage.large.replace(/\/large\//, '/medium/'))}
                       alt=""
                       className="w-8 h-8 rounded object-cover shadow-sm bg-zinc-900 shrink-0"
                     />

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Star } from 'lucide-react'
 import { getAllTimeTop } from '../api/anilist'
-import { cn } from '../lib/utils'
+import { cn, proxifyImgUrl } from '../lib/utils'
 import SectionHeader from './SectionHeader'
 
 export default function TopHundred() {
@@ -79,7 +79,7 @@ export default function TopHundred() {
                 <div className="shrink-0 h-[68px] w-[48px] sm:h-[80px] sm:w-[56px] rounded-lg overflow-hidden bg-card border border-white/[0.06]">
                   {cover && (
                     <img
-                      src={cover}
+                      src={proxifyImgUrl(cover)}
                       alt=""
                       loading="lazy"
                       decoding="async"

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { getAiringSchedule, type AiringSchedule } from '../api/anilist'
 import { useTitle } from '../hooks/useTitle'
-import { cn } from '../lib/utils'
+import { cn, proxifyImgUrl } from '../lib/utils'
 import StaggerCard from '../components/StaggerCard'
 import { useWatchListStore } from '../store/useWatchListStore'
 
@@ -188,7 +188,7 @@ export default function Schedule() {
                   <div className="h-14 w-10 shrink-0 rounded overflow-hidden bg-black/40">
                     {nextToday.media.coverImage.large && (
                       <img
-                        src={nextToday.media.coverImage.large}
+                        src={proxifyImgUrl(nextToday.media.coverImage.large)}
                         alt=""
                         loading="lazy"
                         decoding="async"
@@ -384,7 +384,7 @@ export default function Schedule() {
                           <div className="relative h-16 w-12 shrink-0 rounded-md overflow-hidden bg-black/40">
                             {entry.media.coverImage.large && (
                               <img
-                                src={entry.media.coverImage.large}
+                                src={proxifyImgUrl(entry.media.coverImage.large)}
                                 alt=""
                                 loading="lazy"
                                 decoding="async"

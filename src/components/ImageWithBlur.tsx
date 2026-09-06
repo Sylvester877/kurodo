@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { cn, getBackendOrigin } from '../lib/utils'
+import { cn, getBackendOrigin, proxifyImgUrl } from '../lib/utils'
 
 interface ImageWithBlurProps {
   src: string
@@ -58,17 +58,35 @@ export function ImageWithBlur({
   const imgRef = useRef<HTMLImageElement>(null)
 
   // ── Self-healing load pipeline ──
-  // Some anime CDN images intermittently hang or fail when a grid fires off
-  // dozens of parallel requests (s4.anilist.co is flaky under load). Rather
-  // than showing a permanent grey box, retry the failed/hung image through
-  // our own /img server proxy (server-side fetch + 48h cache) before giving
-  // up. 0 = direct CDN, 1 = via proxy, 2 = exhausted (parent decides).
+  // Primary src is normally the /img proxy (server fetch + disk cache). If
+  // the proxy itself fails or the upstream inside it dies, retry the RAW CDN
+  // URL directly as the emergency path before giving up. When src is already
+  // a /img?url=… proxy URL we decode the upstream out of it; a plain remote
+  // src is promoted to the proxy on retry (so grid cards can stay direct if
+  // callers opt out). 0 = primary, 1 = emergency, 2 = exhausted (parent
+  // decides).
   const [attempt, setAttempt] = useState(0)
   const notifiedRef = useRef(false) // fire onLoad only once, ever
-  const effectiveSrc =
-    attempt === 0
-      ? src
-      : `${getBackendOrigin()}/img?url=${encodeURIComponent(src)}`
+  const effectiveSrc = (() => {
+    if (attempt === 0) {
+      // Proxy-first: any raw remote URL is served through /img (localhost
+      // disk+memory cache) instead of hotlinking a ~1-2s CDN per view.
+      // Already-proxied URLs pass through untouched.
+      if (typeof src === 'string' && src.startsWith('http') && !src.includes('/img?')) {
+        return proxifyImgUrl(src)
+      }
+      return src
+    }
+    // Emergency retry: undo an /img proxy URL back to its raw upstream.
+    if (typeof src === 'string' && src.includes('/img?url=')) {
+      try {
+        const u = new URL(src, getBackendOrigin() || window.location.origin)
+        const raw = u.searchParams.get('url')
+        if (raw) return raw
+      } catch { /* fall through to proxy promotion */ }
+    }
+    return `${getBackendOrigin()}/img?url=${encodeURIComponent(src)}`
+  })()
 
   // ── Blur placeholder ──
   // If an explicit placeholderSrc is provided, use it. Otherwise we skip

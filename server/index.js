@@ -18,6 +18,7 @@ import axios from 'axios'
 import http from 'node:http'
 import https from 'node:https'
 import path from 'node:path'
+import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
@@ -3155,12 +3156,105 @@ app.get('/api/diag', async (req, res) => {
 // Use:  /img?url=<primary>&url=<fallback1>&url=<fallback2>
 //
 // Returns 200 + image bytes (long-cache headers) or 200 with a styled SVG placeholder.
+//
+// Layered cache (this is what makes catalog art feel instant):
+//   1. In-memory Map — fast path for the current session (48h TTL).
+//   2. Disk cache — <tmpdir>/kurodo-img/<sha1>.bin + .json. Survives
+//      restarts, so a cold boot renders the whole Browse grid from disk in
+//      milliseconds instead of re-fetching every cover from a ~1-2s CDN.
+//   3. Upstream CDN (bounded concurrency) — the ONLY slow path, paid once
+//      per image ever.
 const imgCache = new Map()
 const imgFailCache = new Map()
-const IMG_CACHE_MAX = 200
+const IMG_CACHE_MAX = 800
 const IMG_CACHE_TTL = 48 * 60 * 60 * 1000  // 48h — cover art rarely changes
 const IMG_FAIL_TTL = 5 * 60 * 1000   // remember failures for 5min so retries are instant
-const IMG_FETCH_TIMEOUT = 5000       // 5s — fast fail so the browser falls back to placeholder quickly
+const IMG_FETCH_TIMEOUT = 6000       // 6s — fast fail so the browser falls back to placeholder quickly
+const IMG_DISK_DIR = process.env.KURODO_IMG_CACHE_DIR || path.join(os.tmpdir(), 'kurodo-img')
+const IMG_DISK_TTL = 30 * 24 * 60 * 60 * 1000  // 30d — art is effectively immutable
+const IMG_DISK_MAX_BYTES = 300 * 1024 * 1024   // 300MB cap — thousands of covers/banners
+
+function ensureImgDiskDir() {
+  try { fs.mkdirSync(IMG_DISK_DIR, { recursive: true }) } catch { /* read-only env — memory-only fallback */ }
+}
+
+function imgDiskPaths(key) {
+  const h = crypto.createHash('sha1').update(key).digest('hex')
+  return {
+    bin: path.join(IMG_DISK_DIR, h + '.bin'),
+    meta: path.join(IMG_DISK_DIR, h + '.json'),
+  }
+}
+
+/** Read a disk-cached image (and its content-type). Null on any miss/error. */
+function imgDiskRead(key) {
+  try {
+    const { bin, meta } = imgDiskPaths(key)
+    const m = JSON.parse(fs.readFileSync(meta, 'utf-8'))
+    if (!m || typeof m.ct !== 'string' || Date.now() - m.at > IMG_DISK_TTL) return null
+    const body = fs.readFileSync(bin)
+    if (!body || body.length < 200) return null
+    return { contentType: m.ct, body }
+  } catch { return null }
+}
+
+/** Fire-and-forget disk write; prunes the oldest files when over the byte cap. */
+function imgDiskWrite(key, contentType, body) {
+  try {
+    ensureImgDiskDir()
+    const { bin, meta } = imgDiskPaths(key)
+    fs.writeFileSync(bin, body)
+    fs.writeFileSync(meta, JSON.stringify({ ct: contentType, at: Date.now() }))
+    // Prune when over budget — cheap-enough sweep (only on writes, capped).
+    let total = 0
+    let files = []
+    for (const f of fs.readdirSync(IMG_DISK_DIR)) {
+      if (!f.endsWith('.bin')) continue
+      const p = path.join(IMG_DISK_DIR, f)
+      try {
+        const s = fs.statSync(p)
+        files.push({ p, mtime: s.mtimeMs, size: s.size })
+        total += s.size
+      } catch { /* raced delete */ }
+    }
+    if (total > IMG_DISK_MAX_BYTES) {
+      files.sort((a, b) => a.mtime - b.mtime)
+      for (const f of files) {
+        if (total <= IMG_DISK_MAX_BYTES * 0.85) break
+        try {
+          fs.unlinkSync(f.p)
+          fs.unlinkSync(f.p.replace(/\.bin$/, '.json'))
+          total -= f.size
+        } catch { /* ignore */ }
+      }
+    }
+  } catch { /* disk full / locked — memory cache still serves */ }
+}
+
+// ── Upstream fetch concurrency limiter ──────────────────────────────
+// A 50-card grid previously fired 50 simultaneous upstream CDN fetches,
+// each ~1-2s on slow networks → the whole grid stalled. Cap concurrent
+// upstream image fetches so the queue drains progressively and the CDN
+// never sees a burst. Requests wait their turn (browser <img> just waits).
+const UPSTREAM_MAX = 6
+let upstreamActive = 0
+const upstreamQueue = []
+function runUpstream(fn) {
+  return new Promise((resolve, reject) => {
+    upstreamQueue.push({ fn, resolve, reject })
+    pumpUpstream()
+  })
+}
+function pumpUpstream() {
+  while (upstreamActive < UPSTREAM_MAX && upstreamQueue.length) {
+    const { fn, resolve, reject } = upstreamQueue.shift()
+    upstreamActive++
+    Promise.resolve()
+      .then(fn)
+      .then(resolve, reject)
+      .finally(() => { upstreamActive--; pumpUpstream() })
+  }
+}
 
 function pruneImgCache() {
   if (imgCache.size <= IMG_CACHE_MAX) return
@@ -3327,6 +3421,17 @@ app.get('/img', async (req, res) => {
     return res.send(hit.body)
   }
 
+  // Disk cache second layer — survives restarts, so a cold boot renders
+  // catalog art from local disk in ms instead of re-fetching from the CDN.
+  const diskHit = imgDiskRead(cacheKey)
+  if (diskHit) {
+    imgCache.set(cacheKey, { at: Date.now(), contentType: diskHit.contentType, body: diskHit.body })
+    res.set('content-type', diskHit.contentType)
+    res.set('cache-control', 'public, max-age=86400, immutable')
+    res.set('access-control-allow-origin', '*')
+    return res.send(diskHit.body)
+  }
+
   // Check negative cache — if this exact URL chain failed recently, skip instantly
   const failHit = imgFailCache.get(cacheKey)
   if (failHit && Date.now() - failHit.at < IMG_FAIL_TTL) {
@@ -3367,13 +3472,15 @@ app.get('/img', async (req, res) => {
       imgHeaders['sec-fetch-site'] = 'cross-site'
     }
     try {
-      const r = await axios.get(url, {
+      // Bounded upstream concurrency — a fresh grid queues here instead of
+      // firing 50 simultaneous slow CDN fetches (see runUpstream above).
+      const r = await runUpstream(() => axios.get(url, {
         timeout: IMG_FETCH_TIMEOUT,
         responseType: 'arraybuffer',
         validateStatus: (s) => s >= 200 && s < 300,
         headers: imgHeaders,
         maxRedirects: 3,
-      })
+      }))
       const ct = r.headers['content-type'] || ''
       // Some upstreams return XML error pages with 200 — reject those
       if (!ct.startsWith('image/') || r.data.length < 200) {
@@ -3384,6 +3491,8 @@ app.get('/img', async (req, res) => {
       const body = Buffer.from(r.data)
       imgCache.set(cacheKey, { at: Date.now(), contentType: ct, body })
       pruneImgCache()
+      // Persist to disk (fire-and-forget) so restarts don't re-fetch this
+      imgDiskWrite(cacheKey, ct, body)
       res.set('content-type', ct)
       res.set('cache-control', 'public, max-age=86400, immutable')
       res.set('access-control-allow-origin', '*')

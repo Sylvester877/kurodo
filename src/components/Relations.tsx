@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, GitBranch, Star } from 'lucide-react'
 import { fetchRelations, type RelationEdge } from '../api/anilistAuth'
-import { cn } from '../lib/utils'
+import { cn, proxifyImgUrl } from '../lib/utils'
 
 interface Props {
   anilistId: number | null
@@ -107,7 +107,7 @@ export default function Relations({ anilistId, className }: Props) {
               <div className="relative h-20 w-14 lg:h-[76px] lg:w-[56px] shrink-0 rounded-lg overflow-hidden bg-black/40 shadow-md">
                 {e.node.coverImage.large && (
                   <img
-                    src={e.node.coverImage.large}
+                    src={proxifyImgUrl(e.node.coverImage.large)}
                     alt=""
                     loading="lazy"
                     className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-250"
