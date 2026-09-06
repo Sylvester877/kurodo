@@ -84,25 +84,50 @@ export default function Hero() {
   )
   const current = backdrops[bgIndex] ?? null
 
-  // ── TMDB logo prefetch for the first 2 slides ──────────────────
+  // Kick a background download so a logo is cache-warm before it renders.
+  const warmImage = (url: string) => {
+    if (typeof window === 'undefined' || !url) return
+    const im = new Image()
+    im.fetchPriority = 'high'
+    im.src = url
+  }
+
+  // ── TMDB logo resolve + prewarm for EVERY slide ─────────────────
+  // Each slide's transparent title logo is resolved through react-query
+  // (6h localStorage persistence = instant on re-visits) AND its image
+  // bytes are warmed the moment the URL is known. That way the carousel
+  // crossfade never waits: by the time a slide is on screen its logo is
+  // already sitting in the browser + server cache.
   const queryClient = useQueryClient()
   useEffect(() => {
-    const titles = backdrops.slice(0, 2).map((m) => ({
-      english: m.title.english ?? null,
-      romaji: m.title.romaji ?? '',
-    }))
-    titles.forEach((t, i) => {
-      const key = ['tmdbLogo', t.english || t.romaji]
-      if (!queryClient.getQueryData(key)) {
-        setTimeout(() => {
-          queryClient.prefetchQuery({
+    const slides = backdrops.slice(0, 6)
+    slides.forEach((m, i) => {
+      const key = ['tmdbLogo', m.title.english || m.title.romaji]
+      const cached = queryClient.getQueryData<string | null>(key)
+      if (cached != null) {
+        // Already resolved (this session or persisted) — just warm the bytes.
+        if (cached) warmImage(cached)
+        return
+      }
+      // Small stagger keeps the TMDB burst polite, but slide 0 starts
+      // immediately and the crossfade interval is far longer than this.
+      const delay = i * 350
+      setTimeout(() => {
+        void queryClient
+          .prefetchQuery({
             queryKey: key,
-            queryFn: () => getAnimeLogo(t),
+            queryFn: () =>
+              getAnimeLogo({
+                english: m.title.english ?? null,
+                romaji: m.title.romaji ?? '',
+              }),
             staleTime: 24 * 60 * 60 * 1000,
             meta: { persist: true },
           })
-        }, i * 500)
-      }
+          .then((url) => {
+            if (typeof url === 'string' && url) warmImage(url)
+          })
+      }, delay)
     })
   }, [backdrops, queryClient])
 

@@ -462,7 +462,7 @@ export default function AnimeDetails() {
                   <motion.img
                     key="logo"
                     src={getTmdbLogoUrl(tmdbLogo)}
-                    srcSet={`${getTmdbLogoUrl(tmdbLogo, 'w300')} 300w, ${getTmdbLogoUrl(tmdbLogo, 'w500')} 500w, ${getTmdbLogoUrl(tmdbLogo, 'original')} 1000w`}
+                    srcSet={`${getTmdbLogoUrl(tmdbLogo, 'w300')} 300w, ${getTmdbLogoUrl(tmdbLogo, 'w500')} 500w`}
                     sizes="(max-width: 768px) 80vw, 420px"
                     alt={anime.title_english || anime.title}
                     loading="eager"

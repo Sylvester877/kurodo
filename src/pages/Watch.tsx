@@ -1565,7 +1565,7 @@ export default function Watch() {
                   {tmdbLogo ? (
                     <img
                       src={getTmdbLogoUrl(tmdbLogo)}
-                      srcSet={`${getTmdbLogoUrl(tmdbLogo, 'w300')} 300w, ${getTmdbLogoUrl(tmdbLogo, 'w500')} 500w, ${getTmdbLogoUrl(tmdbLogo, 'original')} 1000w`}
+                      srcSet={`${getTmdbLogoUrl(tmdbLogo, 'w300')} 300w, ${getTmdbLogoUrl(tmdbLogo, 'w500')} 500w`}
                       sizes="(max-width: 640px) 220px, 280px"
                       alt={anime.title_english || anime.title}
                       loading="eager"

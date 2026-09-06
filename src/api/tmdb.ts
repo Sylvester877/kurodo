@@ -73,7 +73,16 @@ interface TmdbImagesResponse {
  * override with `/original` (slower).
  */
 export function getTmdbLogoUrl(logo: TmdbLogo, size: 'w300' | 'w500' | 'original' = 'w500'): string {
-  return `${IMG}/${size}${logo.file_path}`
+  const remote = `${IMG}/${size}${logo.file_path}`
+  // Serve logo PNGs through the app's own /img proxy instead of hitting
+  // image.tmdb.org directly: the proxy memory-caches the bytes (48h) and
+  // sends long-lived `immutable` browser headers, so repeat logo renders
+  // resolve from localhost in milliseconds instead of a ~1s CDN round trip.
+  // (The proxy preserves content-type, so transparent PNGs stay transparent.)
+  if (typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol)) {
+    return `/img?url=${encodeURIComponent(remote)}`
+  }
+  return remote
 }
 
 /**

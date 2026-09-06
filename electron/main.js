@@ -1787,9 +1787,14 @@ app.whenReady().then(async () => {
   // The app needs no device permissions (no camera/mic/geolocation/notifs).
   // Deny every request instead of ever surfacing an OS prompt. Playback is
   // unaffected — 'media' here means getUserMedia capture, not <video> playback.
+  //
+  // EXCEPTION — 'fullscreen' MUST be allowed: Chromium routes HTML element
+  // fullscreen (the player's fullscreen button) through this permission
+  // handler, and denying it leaves requestFullscreen() pending forever, so
+  // the button silently does nothing (electron/electron#37719).
   try {
-    session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => {
-      callback(false)
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+      callback(permission === 'fullscreen')
     })
   } catch (err) {
     console.warn('[electron] Could not install permission handler:', err.message)
