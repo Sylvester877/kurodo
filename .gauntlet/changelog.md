@@ -46,3 +46,8 @@
   by-design SW block (Electron refuses SW registration).
 - Shots: gauntlet-verify-home.png, gauntlet-verify-details.png,
   gauntlet-final-home.png.
+
+### ITER-5 — perf TMDB hero backdrops → w1280   e82c07c
+- PLAN: hero fetched multi-MB /original backdrops via /img.
+- EDIT: getTmdbBackdrop returns w1280 tier (5-10x smaller, same look).
+- VERIFY: tsc + 71/71 tests; only consumer is Hero.tsx.
