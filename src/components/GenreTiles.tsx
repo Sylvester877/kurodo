@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import {
   Swords, Heart, Drama, Smile, Sparkles, Ghost, Rocket, Zap, Music2, BookOpen,
 } from 'lucide-react'
+import SectionHeader from './SectionHeader'
 
 // Hand-picked common Jikan genre IDs (https://docs.api.jikan.moe/)
 const GENRES: Array<{
@@ -22,16 +23,11 @@ const GENRES: Array<{
 
 export default function GenreTiles() {
   return (
-    <section className="mt-8 mx-4">
-      <div className="flex items-end justify-between mb-5">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-5 w-5 text-accent" />
-            <h2 className="text-xl font-bold text-white">Explore by Genre</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">Find something that matches your mood</p>
-        </div>
-      </div>
+    <section className="mt-7 mx-3 sm:mx-4">
+      <SectionHeader
+        title="Explore by Genre"
+        subtitle="Find something that matches your mood"
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {GENRES.map(({ id, name, icon: Icon, color, glowColor }) => (

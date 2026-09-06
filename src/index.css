@@ -60,8 +60,11 @@
   --radius-md: 0.75rem;
   --radius-sm: 0.5rem;
 
-  --font-sans: 'Poppins', 'Instrument Sans', system-ui, -apple-system, sans-serif;
-  --font-display: 'Poppins', 'Bricolage Grotesque', system-ui, sans-serif;
+  /* Body reads in Poppins; display type (hero wordmark, section headers)
+     uses Bricolage Grotesque — a distinctive editorial grotesque that gives
+     the app its anikage-modern voice. Both load async via index.html. */
+  --font-sans: 'Poppins', system-ui, -apple-system, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Poppins', system-ui, sans-serif;
   --font-serif-jp: 'Noto Serif JP', serif;
 }
 

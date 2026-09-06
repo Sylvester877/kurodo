@@ -43,18 +43,17 @@
     <!-- Font stylesheet is loaded asynchronously (preload → swap to stylesheet)
          so it never blocks first paint. display=swap in the URL means text
          renders in the fallback font immediately and swaps in — no invisible
-         text. Only the families actually in the CSS stacks are requested:
-         Poppins (sans/display default) + Noto Serif JP (rare .font-jp usage).
-         Instrument Sans / Bricolage Grotesque were dropped — Poppins is first
-         in both stacks, so the fallbacks never rendered a single glyph. -->
+         text. Families map 1:1 to the CSS stacks:
+         Poppins (--font-sans body) · Bricolage Grotesque (--font-display
+         hero wordmark + section headers) · Noto Serif JP (rare .font-jp). -->
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Noto+Serif+JP:wght@500;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Noto+Serif+JP:wght@500;700;900&display=swap"
       onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Noto+Serif+JP:wght@500;700;900&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Noto+Serif+JP:wght@500;700;900&display=swap" />
     </noscript>
 
     <!-- Inline SVG favicon (KURODO K mark) -->

@@ -180,12 +180,34 @@ export default memo(function Navbar() {
 
         {/* ── Right: circular icon cluster ────────────────────────── */}
         <div ref={wrapRef} className="flex items-center gap-2">
+          {/* Always-visible search pill (anidap/aniclover-style) — opens the
+              same ⌘K dropdown. The pill widens while the dropdown is open so
+              the focused input feels like the same surface. */}
           <button
             onClick={() => setSearchOpen((o) => !o)}
             aria-label="Search anime (⌘K)"
             title="Search (⌘K)"
             className={cn(
-              'flex items-center justify-center h-10 w-10 rounded-full border border-white/[0.06] bg-black/80 text-white/55 hover:text-white hover:bg-white/[0.08] hover:border-white/[0.12] transition-all duration-150',
+              'group hidden md:flex items-center gap-2.5 h-10 rounded-full border border-white/[0.06] bg-black/80 text-white/50 hover:text-white/85 hover:bg-white/[0.06] hover:border-white/[0.14] transition-all duration-200 overflow-hidden px-3.5',
+              searchOpen ? 'w-[280px]' : 'w-[196px] lg:w-[216px]',
+            )}
+          >
+            <Search className={cn('h-4 w-4 shrink-0 transition-colors', searchOpen && 'text-primary')} />
+            <span className="text-[13px] font-medium truncate">
+              {searchContentType === 'manga' ? 'Search manga…' : 'Search anime…'}
+            </span>
+            <kbd className="kbd-key ml-auto hidden lg:inline-flex !h-5 !px-1.5 text-[10px] !bg-white/[0.06] text-white/45">
+              ⌘K
+            </kbd>
+          </button>
+
+          {/* Compact icon-only search — mobile + very narrow windows */}
+          <button
+            onClick={() => setSearchOpen((o) => !o)}
+            aria-label="Search anime (⌘K)"
+            title="Search (⌘K)"
+            className={cn(
+              'md:hidden flex items-center justify-center h-10 w-10 rounded-full border border-white/[0.06] bg-black/80 text-white/55 hover:text-white hover:bg-white/[0.08] hover:border-white/[0.12] transition-all duration-150',
               searchOpen && 'text-white bg-white/[0.1] border-white/[0.15]',
             )}
           >

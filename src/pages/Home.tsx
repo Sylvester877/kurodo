@@ -112,7 +112,7 @@ const FeedSection = memo(function FeedSection({ section }: { section: Section })
   }, [])
 
   return (
-    <section ref={ref} className="mt-8 mx-4">
+    <section ref={ref} className="mt-7 mx-3 sm:mx-4">
       <motion.div
         initial={reduceMotion ? {} : { opacity: 0, y: 16 }}
         animate={visible || reduceMotion ? { opacity: 1, y: 0 } : {}}
@@ -143,8 +143,8 @@ const FeedSection = memo(function FeedSection({ section }: { section: Section })
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-x-3 gap-y-5 contain-auto">
-          {animes.slice(0, 14).map((anime, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-x-3 gap-y-5 contain-auto">
+          {animes.slice(0, 16).map((anime, i) => (
             <StaggerCard key={anime.mal_id} index={i}>
               <AnimeCard anime={anime} magnetic quickActions />
             </StaggerCard>

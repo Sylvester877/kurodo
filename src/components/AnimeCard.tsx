@@ -169,21 +169,22 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
             ) : null}
           </div>
 
-          {/* ── Hover: dark overlay + shine sweep + play button + quick actions ── */}
-          <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            {/* Dark overlay with gradient for depth */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/65 to-black/80" />
+          {/* ── Hover: keep the artwork visible (aniclover-style) — soft bottom
+                 vignette + play disc + quick actions; no full-cover blackout ── */}
+          <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            {/* Pointer-catch layer with a gentle bottom vignette only — art stays visible */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
             {/* Shine sweep — diagonal light streak on hover */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12" />
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/[0.07] to-transparent skew-x-12" />
             </div>
-            {/* Play button with pulsing ring */}
-            <div className="relative h-11 w-11 rounded-full bg-primary/90 text-white flex items-center justify-center shadow-[0_0_20px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.6)] scale-75 group-hover:scale-100 transition-transform duration-200">
-              <Play className="h-[18px] w-[18px] ml-0.5 fill-current" />
+            {/* Play disc */}
+            <div className="relative h-11 w-11 rounded-full bg-black/55 backdrop-blur-md border border-white/25 text-white flex items-center justify-center shadow-[0_0_24px_rgba(0,0,0,0.55)] scale-75 group-hover:scale-100 transition-transform duration-200">
+              <Play className="h-[18px] w-[18px] ml-0.5 fill-white text-white drop-shadow-[0_0_6px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.7)]" />
               {/* Pulsing ring — only animates on hover to avoid 50+ silent loops */}
-              <div className="absolute inset-0 rounded-full border border-primary/40 opacity-0 group-hover:opacity-75 group-hover:animate-ping transition-opacity duration-300" />
+              <div className="absolute inset-0 rounded-full border border-primary/50 opacity-0 group-hover:opacity-75 group-hover:animate-ping transition-opacity duration-300" />
             </div>
-            {/* Quick add/remove watchlist button */}
+            {/* Quick add/remove watchlist button (self-positions bottom-center) */}
             {quickActions && !badge && (
               <AnimeCardQuickActions anime={anime} visible={isHovered} />
             )}

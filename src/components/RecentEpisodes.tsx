@@ -142,7 +142,7 @@ export default function RecentEpisodes() {
         <div className="shrink-0 w-2" aria-hidden />
       </div>
 
-      <div className="hidden sm:grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-x-3 gap-y-5 contain-auto">
+      <div className="hidden sm:grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-x-3 gap-y-5 contain-auto">
         {isLoading
           ? Array.from({ length: 14 }).map((_, i) => (
               <div key={i} className="aspect-[16/10] rounded-xl bg-card shimmer" />
