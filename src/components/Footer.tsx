@@ -9,6 +9,19 @@ export default function Footer() {
       <div aria-hidden className="absolute -top-32 -left-32 h-64 w-64 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
       <div aria-hidden className="absolute -bottom-32 -right-32 h-64 w-64 rounded-full bg-accent/5 blur-3xl pointer-events-none" />
 
+      {/* Giant brand watermark — a premium signature mark behind the columns */}
+      <div
+        aria-hidden
+        className="relative max-w-[1600px] mx-auto h-0 pointer-events-none select-none overflow-visible"
+      >
+        <span className="font-display absolute -bottom-8 right-2 sm:right-8 text-[110px] sm:text-[170px] lg:text-[220px] font-extrabold tracking-[-0.03em] leading-none text-white/[0.022] whitespace-nowrap">
+          KURODO
+        </span>
+        <span className="font-jp absolute -bottom-16 right-[6px] sm:right-10 text-[150px] sm:text-[200px] leading-none text-white/[0.03]">
+          黒道
+        </span>
+      </div>
+
       <div className="relative max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-14 py-12">
         {/* ─── 3-column layout ─── */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-8 mb-10">
@@ -24,7 +37,7 @@ export default function Footer() {
                 { to: '/browse?filter=upcoming', label: 'Upcoming' },
               ].map(({ to, label }) => (
                 <li key={to}>
-                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white transition-colors duration-200">
+                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white hover:translate-x-0.5 transition-all duration-200">
                     {label}
                   </Link>
                 </li>
@@ -41,7 +54,7 @@ export default function Footer() {
                 { to: '/music', label: 'Music' },
               ].map(({ to, label }) => (
                 <li key={to}>
-                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white transition-colors duration-200">
+                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white hover:translate-x-0.5 transition-all duration-200">
                     {label}
                   </Link>
                 </li>
@@ -66,7 +79,7 @@ export default function Footer() {
                 { to: '/manga-list', label: 'Manga List' },
               ].map(({ to, label }) => (
                 <li key={to}>
-                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white transition-colors duration-200">
+                  <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white hover:translate-x-0.5 transition-all duration-200">
                     {label}
                   </Link>
                 </li>
