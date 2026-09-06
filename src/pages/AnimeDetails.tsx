@@ -14,6 +14,7 @@ import type { Anime } from '../types'
 import { getSkipTimes, type SkipTimes } from '../api/aniskip'
 import { useWatchListStore } from '../store/useWatchListStore'
 import { useTitle } from '../hooks/useTitle'
+import { useDominantColor } from '../hooks/useDominantColor'
 import { cn, getImageUrl, getHeroImageUrl, formatScore, getBackendOrigin, withTimeout } from '../lib/utils'
 import { buildEpisodeImageUrl } from '../lib/episodeImage'
 import AnimeCard from '../components/AnimeCard'
@@ -230,6 +231,17 @@ export default function AnimeDetails() {
   const serverPref = useSettings((s) => s.server)
   const reduceMotion = useSettings((s) => s.reduceMotion)
   const reduceQuality = useSettings((s) => s.reduceQuality)
+
+  // ── Cover-keyed ambient glow (must sit above the loading early returns) ──
+  // Samples the poster's dominant colour and feeds it into the hero scrim +
+  // poster shadow so every details page is tinted by its own art. Skipped on
+  // iGPU / reduce-quality machines (canvas sampling cost).
+  const posterColorUrl =
+    anime?.images?.webp?.large_image_url ||
+    anime?.images?.jpg?.large_image_url ||
+    null
+  const dominantColor = useDominantColor(posterColorUrl, !reduceQuality && !!anime)
+
   useEffect(() => {
     if (!anilistId || !malId) return
     let cancelled = false
@@ -401,6 +413,16 @@ export default function AnimeDetails() {
           style={{
             background: 'linear-gradient(180deg, rgba(4,4,8,0.25) 0%, rgba(4,4,8,0.55) 40%, rgba(4,4,8,0.95) 100%)',
           }} />
+        {/* Cover-keyed ambient glow — tints the scrim with the show's own art */}
+        {dominantColor && (
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: `radial-gradient(ellipse 72% 60% at 14% 80%, rgb(${dominantColor} / 0.28), transparent 72%)`,
+            }}
+          />
+        )}
 
         <div className="relative z-10 h-full flex flex-col justify-end max-w-[1600px] mx-auto px-4 pb-10">
           <Link
@@ -424,6 +446,9 @@ export default function AnimeDetails() {
               <img
                 src={getImageUrl(anime)} alt={anime.title}
                 className="w-full rounded-xl shadow-2xl border border-white/10"
+                style={dominantColor
+                  ? { boxShadow: `0 30px 90px -18px rgb(${dominantColor} / 0.55), 0 10px 36px -14px rgb(${dominantColor} / 0.4)` }
+                  : undefined}
               />
             </motion.div>
             <div className="space-y-3 max-w-2xl min-h-[80px] md:min-h-[120px]">

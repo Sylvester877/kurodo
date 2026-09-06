@@ -193,12 +193,18 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
 
         {/* ── Caption ── */}
         <div className="mt-2 px-0.5">
-          <h3 className="text-[12px] font-semibold text-white/90 leading-snug line-clamp-2 transition-colors group-hover:text-white">
+          <h3 className="text-[13px] font-semibold text-white leading-snug tracking-[-0.01em] line-clamp-2 transition-colors duration-200 group-hover:text-white">
             {displayTitle}
           </h3>
           {metaParts.length > 0 && (
-            <p className="text-[10px] text-white/30 uppercase tracking-[0.06em] font-medium truncate mt-0.5">
-              {metaParts.join(' · ')}
+            <p className="text-[10px] text-white/35 uppercase tracking-[0.05em] font-semibold truncate mt-1 flex items-center gap-1">
+              {metaParts.map((part, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  {i > 0 && <span aria-hidden className="h-0.5 w-0.5 rounded-full bg-white/20" />}
+                  <span className={part.includes('★') ? 'text-amber-400/90' : undefined}>{part.replace(' ★', '')}</span>
+                  {part.includes('★') && <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />}
+                </span>
+              ))}
             </p>
           )}
         </div>

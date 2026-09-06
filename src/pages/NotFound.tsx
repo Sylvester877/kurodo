@@ -58,14 +58,14 @@ export default function NotFound() {
           {/* Stacked glitch layers */}
           <h1
             key={glitchKey}
-            className="text-[120px] sm:text-[180px] md:text-[220px] font-black leading-none tracking-tighter text-gradient relative"
+            className="font-display text-[120px] sm:text-[180px] md:text-[220px] font-extrabold leading-none tracking-tighter text-gradient relative"
             style={{ animation: 'glitch-shake 0.4s ease-out' }}
           >
             404
           </h1>
           <h1
             aria-hidden
-            className="absolute inset-0 text-[120px] sm:text-[180px] md:text-[220px] font-black leading-none tracking-tighter text-primary opacity-30 mix-blend-screen pointer-events-none"
+            className="absolute inset-0 font-display text-[120px] sm:text-[180px] md:text-[220px] font-extrabold leading-none tracking-tighter text-primary opacity-30 mix-blend-screen pointer-events-none"
             style={{
               animation: 'glitch-offset-1 0.4s ease-out',
               transform: 'translate(2px, -2px)',
@@ -75,7 +75,7 @@ export default function NotFound() {
           </h1>
           <h1
             aria-hidden
-            className="absolute inset-0 text-[120px] sm:text-[180px] md:text-[220px] font-black leading-none tracking-tighter text-accent opacity-30 mix-blend-screen pointer-events-none"
+            className="absolute inset-0 font-display text-[120px] sm:text-[180px] md:text-[220px] font-extrabold leading-none tracking-tighter text-accent opacity-30 mix-blend-screen pointer-events-none"
             style={{
               animation: 'glitch-offset-2 0.4s ease-out',
               transform: 'translate(-2px, 2px)',
@@ -90,7 +90,7 @@ export default function NotFound() {
           ページが 見つかりません
         </p>
 
-        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+        <h2 className="font-display text-2xl md:text-3xl font-bold tracking-tight text-white mb-2">
           {quip}
         </h2>
 

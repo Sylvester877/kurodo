@@ -6,9 +6,8 @@ import { getImageUrl, proxifyWithFallback, cn } from '../lib/utils'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { prefetchAnimeEpInfo } from '../lib/prefetch'
 import SectionHeader from './SectionHeader'
+import ContinueWatchingEmpty from './ContinueWatchingEmpty'
 import { RailArrows, railNudge } from './RailPaging'
-import EmptyState from './EmptyState'
-import { Tv } from 'lucide-react'
 
 /** Format a number of seconds as "MM:SS" or "H:MM:SS". */
 function fmtTime(s: number): string {
@@ -64,19 +63,7 @@ export default function ContinueWatchingRail() {
         pill="RESUME"
         pillTone="accent"
       />
-      <EmptyState
-        icon={<Tv className="h-full w-full" />}
-        title="Nothing to continue"
-        description="Episodes you start watching will appear here so you can pick up right where you left off."
-        className="py-10"
-      >
-        <Link
-          to="/browse"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/20 text-primary border border-primary/30 font-semibold text-xs hover:bg-primary/30 transition-colors"
-        >
-          <Play className="h-3.5 w-3.5" /> Browse Anime
-        </Link>
-      </EmptyState>
+      <ContinueWatchingEmpty />
     </section>
   )
 
