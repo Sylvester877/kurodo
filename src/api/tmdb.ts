@@ -196,7 +196,7 @@ export async function fetchAnimeLogo(
  */
 export async function getTmdbBackdrop(title: string): Promise<string | null> {
   if (!API_KEY) return null
-  const cacheKey = `bd:${title}`
+  const cacheKey = `bd2:${title}` // v2 — w1280 tier (was /original); key bump evicts stale URLs
   const cached = cache.get(cacheKey)
   if (cached && Date.now() - cached.at < TTL) return cached.value as string | null
 

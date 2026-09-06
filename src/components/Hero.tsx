@@ -168,9 +168,10 @@ export default function Hero() {
     },
   }
 
-  // ── TMDB high-quality backdrop ─────────────────────────────────
+  // ── TMDB high-quality backdrop (v2 key — w1280 tier replaces the old
+  // multi-MB /original; the key bump evicts persisted stale URLs) ─────
   const { data: tmdbBackdrop } = useQuery({
-    queryKey: ['tmdbBackdrop', title],
+    queryKey: ['tmdbBackdrop-v2', title],
     queryFn: () => getTmdbBackdrop(title),
     enabled: !!title,
     staleTime: 24 * 60 * 60 * 1000,
