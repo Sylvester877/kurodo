@@ -5,7 +5,7 @@ import { RefreshCw } from 'lucide-react'
 import { cn } from '../lib/utils'
 import HomePageParallax from '../components/HomePageParallax'
 import {
-  getTrending, getThisSeason, getUpcoming, getAllTimeTop,
+  getThisSeason, getUpcoming, getAllTimeTop,
   type FeedMedia,
 } from '../api/anilist'
 import { feedToAnimeList } from '../lib/adapters'
@@ -16,6 +16,7 @@ import RecentEpisodes from '../components/RecentEpisodes'
 import ContinueWatchingRail from '../components/ContinueWatchingRail'
 import MangaContinueReadingRail from '../components/MangaContinueReadingRail'
 import TopHundred from '../components/TopHundred'
+import TrendingRail from '../components/TrendingRail'
 import SubDubToggle, { filterBySubDub } from '../components/SubDubToggle'
 import SectionHeader from '../components/SectionHeader'
 import BackToTop from '../components/BackToTop'
@@ -43,16 +44,6 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
-  {
-    key: 'trending',
-    kicker: 'Trending',
-    title: 'Trending Now',
-    subtitle: 'What the community is watching right now',
-    link: '/browse?filter=top-rated',
-    fetcher: () => getTrending(18),
-    pill: 'HOT',
-    pillTone: 'hot',
-  },
   {
     key: 'thisSeason',
     kicker: 'Seasonal',
@@ -220,6 +211,14 @@ export default function Home() {
       <LazyMount minHeight={380}>
         <ScrollReveal delay={0.14}>
           <MangaContinueReadingRail />
+        </ScrollReveal>
+      </LazyMount>
+
+      {/* Trending Now — ghost-numeral rail (SITE-02 Miruro canon). Kept
+          apart from the grid rows below because it has its own layout. */}
+      <LazyMount minHeight={560}>
+        <ScrollReveal delay={0.16}>
+          <TrendingRail />
         </ScrollReveal>
       </LazyMount>
 

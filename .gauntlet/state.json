@@ -1,17 +1,19 @@
 {
   "operation": "ANIME ASCENSION",
   "protocol": "v2.0 adapted",
-  "note": "Recon found Kurodo already near-canon (~90%); running targeted gap iterations, not a from-scratch reskin.",
+  "note": "Kurodo is near-canon (~87%); running targeted gap iterations. Electron window is being closed externally during long probes — verify fast or rely on build+tests.",
   "phase": "P3/P5 mixed",
-  "minutesElapsedEst": 150,
-  "iteration": 2,
+  "minutesElapsedEst": 165,
+  "iteration": 3,
   "commitsThisRun": [
     "45a148f feat(parity): Characters & Cast row",
-    "63118cd fix(bug): Jikan outage no longer empties Browse"
+    "63118cd fix(bug): Jikan outage no longer empties Browse",
+    "bdf962c chore(gauntlet): persist loop state",
+    "bdf962c feat(parity): ghost-numeral Trending rail"
   ],
-  "accentDecision": "KEEP existing theme (hot accent already in use); no token migration needed at this parity",
+  "accentDecision": "KEEP existing theme; no token migration needed at this parity",
   "parityScores": {
-    "home": 92,
+    "home": 94,
     "detail": 88,
     "watch": 90,
     "browse": 78,
@@ -21,5 +23,5 @@
     "average": 87
   },
   "depsAdded": [],
-  "next": "ghost-numeral trending rail; A-Z mode backlogged (Jikan-dependent); characters hover reuse"
+  "next": "A-Z mode (wait for healthy Jikan); hover-card cast strip; font-link cleanup; re-run error sweep"
 }

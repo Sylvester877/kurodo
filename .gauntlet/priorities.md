@@ -3,8 +3,7 @@
 Ranked by (canon weight × visible impact ÷ risk). Recon shows ~90% parity —
 remaining work is gap-filling, not reskinning.
 
-1. [HIGH] Ghost-numeral Trending rail on Home (SITE-02 steal; rank
-   numerals behind offset cards in the Trending feed row).
+1. [DONE] Ghost-numeral Trending rail (18 numerals verified live).
 2. [HIGH] Browse A–Z letter index mode — BACKLOGGED while Jikan is
    flaky (needs a full-title datasource); revisit when Jikan healthy.
 3. [BONUS] Reuse cast data in AnimeHoverCard (tiny character strip).

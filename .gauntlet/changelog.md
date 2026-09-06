@@ -27,3 +27,12 @@
 - VERIFY: retry after a failed call attempts AniList (observed 2.1s race)
   instead of instant 502. AniList was ALSO rate-limiting at test time, so
   dual-outage still 502s by design. 71/71 tests.
+
+### ITER-3 — feat(parity) Ghost-numeral Trending rail  (this commit)
+- PLAN: SITE-02 Miruro steal — Trending feed row becomes a numbered rail
+  with huge outline rank numerals behind each poster.
+- EDIT: new TrendingRail.tsx (reuses ['feed','trending'] query +
+  feedToAnimeList + filterBySubDub + RailArrows) mounted first in Home's
+  feed area; removed the trending grid entry from SECTIONS.
+- VERIFY: live capture found 18 ghost numerals (01–18) on Home;
+  screenshot screenshots/gauntlet-trending-rail.png. 71/71 tests pass.
