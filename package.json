@@ -36,14 +36,17 @@
     "type": "git",
     "url": "https://github.com/Sylvester877/kurodo.git"
   },
-  "description": "Discover & stream anime — a fast, keyboard-first anime streaming app with AniList integration, multi-provider scraper, PWA and desktop support.",
+  "description": "Cinematic anime & manga desktop app — Netflix-style UI, AniList sync, multi-provider playback, real episode thumbnails, and keyboard-first navigation.",
   "author": "Kurōdo",
   "scripts": {
     "build": "vite build",
     "electron:dev": "vite build && electron .",
     "electron:build": "vite build && electron-builder --win --publish always",
     "electron:build:win": "vite build && electron-builder --win --publish always",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "build": {
     "appId": "com.kurodo.app",
