@@ -3,6 +3,7 @@
 
 import type { Anime, AnimeSearchResponse } from '../types'
 import { anilistRequest } from './anilistClient'
+import { getBackendOrigin } from '../lib/utils'
 
 
 const cache = new Map<string, { at: number; value: unknown }>()
@@ -325,25 +326,71 @@ async function pageQuery(filter: string, perPage = 24): Promise<FeedMedia[]> {
   return data.Page.media
 }
 
+// ── Kitsu outage fallback for the Home feed rows ────────────────────
+// AniList's public API enters a documented SITE-WIDE disabled state from
+// time to time (403 "temporarily disabled due to severe stability issues"
+// for every query) and Jikan 504s whenever MAL is unreachable — the two
+// can overlap, which used to turn the entire Home page into error rows.
+// Kitsu.app keeps serving during those outages, so the headline getters
+// fall back to our /api/kitsu-feed relay (server-translated to FeedMedia
+// with REAL mal ids from Kitsu's mappings table). Only the four getters
+// the home hero + rails consume get the fallback — episode info, cast and
+// schedule queries stay AniList-only (they have their own empty states).
+type FeedKind = 'trending' | 'thisSeason' | 'upcoming' | 'top'
+
+async function feedWithKitsuFallback(
+  kind: FeedKind,
+  perPage: number,
+  primary: () => Promise<FeedMedia[]>,
+): Promise<FeedMedia[]> {
+  try {
+    return await primary()
+  } catch {
+    // AniList failed (site-wide disable, 5xx, or rate-limit). Try Kitsu
+    // through the local relay before surfacing the error.
+    try {
+      const origin = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? getBackendOrigin()
+        : ''
+      const res = await fetch(`${origin}/api/kitsu-feed?kind=${kind}&perPage=${perPage}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json?.ok && Array.isArray(json.media) && json.media.length > 0) {
+          return json.media as FeedMedia[]
+        }
+      }
+    } catch {
+      // Kitsu is down too — fall through to the original error so the row
+      // shows its normal retry state instead of a confusing double failure.
+    }
+    throw new Error(`AniList is unavailable and the ${kind} fallback had no data.`)
+  }
+}
+
 /** Currently trending. Replaces "top rated" as the headline row. */
 export const getTrending = (perPage = 24) =>
-  pageQuery('sort: TRENDING_DESC, status_in: [RELEASING, FINISHED]', perPage)
+  feedWithKitsuFallback('trending', perPage, () =>
+    pageQuery('sort: TRENDING_DESC, status_in: [RELEASING, FINISHED]', perPage))
 
 /** This season's airing shows, ordered by popularity. */
 export const getThisSeason = (perPage = 24) =>
-  pageQuery('status: RELEASING, sort: POPULARITY_DESC', perPage)
+  feedWithKitsuFallback('thisSeason', perPage, () =>
+    pageQuery('status: RELEASING, sort: POPULARITY_DESC', perPage))
 
 /** Anime that air this week, ordered by score (the "current hits"). */
 export const getPopularAiring = (perPage = 24) =>
-  pageQuery('status: RELEASING, sort: SCORE_DESC', perPage)
+  feedWithKitsuFallback('thisSeason', perPage, () =>
+    pageQuery('status: RELEASING, sort: SCORE_DESC', perPage))
 
 /** Upcoming next season. */
 export const getUpcoming = (perPage = 24) =>
-  pageQuery('status: NOT_YET_RELEASED, sort: POPULARITY_DESC', perPage)
+  feedWithKitsuFallback('upcoming', perPage, () =>
+    pageQuery('status: NOT_YET_RELEASED, sort: POPULARITY_DESC', perPage))
 
 /** All-time top rated (the classics). */
 export const getAllTimeTop = (perPage = 24) =>
-  pageQuery('sort: SCORE_DESC, status_in: [FINISHED, RELEASING]', perPage)
+  feedWithKitsuFallback('top', perPage, () =>
+    pageQuery('sort: SCORE_DESC, status_in: [FINISHED, RELEASING]', perPage))
 
 /**
  * Latest episodes that aired recently — the anidap-style "Recent Episodes" row.

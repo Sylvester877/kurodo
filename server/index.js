@@ -100,6 +100,7 @@ import {
 } from './proxy-config.js'
 import { register as registerAnikageEpisodes } from './anikage-episodes.js'
 import { register as registerAnizipMapping, getAnizipMapping } from './anizip-cache.js'
+import { register as registerKitsuFeed } from './kitsu-feed.js'
 import {
   aflSlugify,
   parseAFLPage,
@@ -3767,6 +3768,7 @@ app.get('/img', async (req, res) => {
 // Register additional API modules
 await registerAnikageEpisodes(app)
 await registerAnizipMapping(app)
+await registerKitsuFeed(app)
 
 const distPath = path.resolve(process.env.DIST_DIR || path.join(__dirname, '..', 'dist'))
 const isProduction = fs.existsSync(distPath)

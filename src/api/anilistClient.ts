@@ -199,8 +199,20 @@ export async function anilistRequest<T>(
     const isTransient =
       isRateLimited || status === 503 || status >= 500 || !!networkError
 
-    // Non-retryable HTTP error (400/401/403/404…) — surface immediately.
+    // Non-retryable HTTP error (400/401/403/404…). AniList's documented
+    // SITE-WIDE outage state returns 403 "temporarily disabled due to severe
+    // stability issues" — not an auth problem. When we have a previous
+    // successful response for this exact query, serve it stale so returning
+    // users keep their home feed during the outage instead of an error row.
+    // (The Kitsu feed fallback covers cold-start users with no cache.)
     if (!isTransient) {
+      if (status === 403 && typeof window !== 'undefined') {
+        const stale = readStaleCache<T>(cacheKey)
+        if (stale != null) {
+          console.warn('[anilistClient] 403 (site-wide outage?) — returning stale cache')
+          return stale
+        }
+      }
       const msg = data?.errors?.[0]?.message || `AniList returned ${status}`
       throw new Error(msg)
     }
