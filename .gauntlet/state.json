@@ -1,30 +1,31 @@
 {
   "phase": "perf-sweep",
-  "iterations": 14,
+  "iterations": 17,
   "parityScores": { "home": 94, "detail": 88, "watch": 90, "search": 85, "schedule": 88, "watchlist": 86, "browse": 82 },
   "accentDecision": "existing (unchanged)",
   "depsAdded": [],
-  "lastSession": "fetch-time decoupling: episodes fire on MAL id alone; AniZip anilist-id races AniList",
+  "lastSession": "fetch-time: router-state hydration on all nav surfaces + slug prewarm on hover",
   "commits": [
     "3fa4143 anizip shared cache",
-    "48ee756 deep-test findings (R-TMDB/NEW-1/2/3/R-PROV/FILL/TITL/HLTH)",
+    "48ee756 deep-test findings",
     "453d629 B0-4/5/6/7",
     "535ac8a B0-9 + S1",
     "d6732b0 chapter-manga resolve + S3",
-    "3ddf6a0 perf: decouple episode + stream from slow AniList",
-    "19f3862 + 11b38a6 gauntlet state"
+    "3ddf6a0 perf: decouple episode + stream chain from slow AniList",
+    "43ededb perf: hydrate details/watch from router state (all surfaces)",
+    "910c33f perf: pre-warm anidap slug on card hover",
+    "state checkpoints x3"
   ],
   "verified": {
     "tests": "81/81",
     "tsc": 0,
-    "build": "ok",
-    "anilistCachedRelay": "200 in 0.2s while AniList direct = 403 (IP-throttled)",
-    "chad429Handling": "chadGet fast-fails during lockout; roster fallback cached 60s",
-    "measured": "info cached 0.07s, servers cached 0.01s, cold servers ~2.65s (one-time slug resolve, cached 12h + prewarmed)"
+    "build": "ok"
   },
-  "perfFindings": [
-    "cold fetch latency is dominated by upstream (chad 429 → 180s window, AniList 403/429 on this IP) — not server code; cached paths all return in ms",
-    "episodesQuery + anilistId now race the fast disk-cached AniZip path against slow AniList GraphQL"
+  "perfWins": [
+    "episodes fire on MAL id alone (AniZip keys MAL only)",
+    "anilistId race: disk-cached AniZip mapping vs throttled AniList GQL",
+    "router-state hydration: ContinueWatchingRail, Hero, FeaturedPicks, CommandPalette, WatchList, Profile now pass anime → dest page renders instantly (no cold Jikan)",
+    "anidap slug (biggest cold cost ~1-3.5s, 12h cache) pre-warmed on card hover, chained off epInfo — dedupes with details-page prefetch via shared queryKey"
   ],
   "remaining": [
     "real-download concurrent test (needs consent + bandwidth)",
