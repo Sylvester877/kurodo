@@ -1,154 +1,179 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/public/icon-256.png" alt="Kurōdo" width="110" />
+<img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/public/icon-256.png" alt="Kurōdo" width="120" />
 
 # 蔵人 · Kurōdo
 
-### **The cinematic anime desktop app Windows deserves.**
+### A cinematic anime experience for Windows.
 
-**Netflix-style UI · 15+ stream servers · real episode thumbnails · sub & dub · manga reader**
+**Netflix-style UI · 15+ stream providers · real episode thumbnails · sub & dub · manga reader**
 
-[![Latest Release](https://img.shields.io/github/v/release/Sylvester877/kurodo?style=flat-square&color=blueviolet&label=%E2%AC%A5%20download)](https://github.com/Sylvester877/kurodo/releases/latest)
-[![Stars](https://img.shields.io/github/stars/Sylvester877/kurodo?style=flat-square&color=yellow&logo=github)](https://github.com/Sylvester877/kurodo/stargazers)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078d6?style=flat-square&logo=windows)](https://github.com/Sylvester877/kurodo/releases/latest)
-[![React](https://img.shields.io/badge/react-19-61dafb?style=flat-square&logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/typescript-5.7-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/Sylvester877/kurodo?style=for-the-badge&color=7c3aed&label=DOWNLOAD)](https://github.com/Sylvester877/kurodo/releases/latest)
+[![Stars](https://img.shields.io/github/stars/Sylvester877/kurodo?style=for-the-badge&logo=github&color=f59e0b)](https://github.com/Sylvester877/kurodo/stargazers)
+[![Forks](https://img.shields.io/github/forks/Sylvester877/kurodo?style=for-the-badge&logo=github)](https://github.com/Sylvester877/kurodo/network/members)
+[![License](https://img.shields.io/github/license/Sylvester877/kurodo?style=for-the-badge)](./LICENSE)
 
-**[⬇ Download the latest installer](https://github.com/Sylvester877/kurodo/releases/latest)** · auto-updates on every launch
+<br />
 
-<img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/ui-home-after.jpg" alt="Kurōdo home — cinematic hero, poster rails, glassmorphism UI" width="100%" />
+**[⬇ Download Kurōdo](https://github.com/Sylvester877/kurodo/releases/latest)** · **[⭐ Star the project](https://github.com/Sylvester877/kurodo)** · **[🐛 Report a bug](https://github.com/Sylvester877/kurodo/issues/new)**
+
+<br />
+
+<img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/ui-home-after.jpg" alt="Kurōdo home screen" width="95%" />
 
 </div>
 
 ---
 
-## ⚡ Why Kurōdo
+## ✦ What is Kurōdo?
 
-Most open-source anime players look like a settings panel. Kurōdo is built like a **product**:
+Kurōdo is an open-source anime desktop app designed to feel like a polished streaming product rather than a basic video player.
 
-| | |
-|---|---|
-| 🎬 **Cinematic UI** | Glassmorphism design system, blurred backdrops, magnetic poster cards, buttery Lenis scrolling, 6 theme presets |
-| 🖼️ **Real episode thumbnails** | Every episode gets an actual TVDB screenshot (366/366 for *Bleach*), not a grey box with a number |
-| 📺 **15+ stream servers** | Sub & dub, per-provider rate-limiting, automatic dead-server skipping, one-click switching mid-episode |
-| ⌨️ **Keyboard-first** | `Space` `J/L` `N` `F` `T` `⌘K` — the whole app is drivable without a mouse |
-| 🧠 **Smart playback** | Resume anywhere, intro/outro auto-skip, next-episode prefetch at 75% so ep N+1 starts instantly |
-| 🔍 **Search that slaps** | Filter rail (season / format / status / score) + genres & sort dropdowns over a poster grid |
-| 📚 **Manga reader** | MangaDex-backed, colour-edition support, reading stats, continue-reading rail |
-| 🔄 **AniList sync** | Watchlist, progress, activity feed — two-way |
+The goal is simple: **open the app, find something to watch, and get straight into the episode.**
+
+## ✨ Highlights
+
+| Feature | What it does |
+| --- | --- |
+| 🎬 **Cinematic UI** | Glassmorphism, blurred backdrops, animated poster cards and smooth scrolling |
+| 🖼️ **Episode thumbnails** | Real episode screenshots instead of generic numbered placeholders |
+| 📺 **15+ stream providers** | Sub & dub support with provider fallback and mid-episode switching |
+| ⚡ **Fast playback** | Smart source resolution, resume progress and next-episode prefetching |
+| 🧠 **Smart controls** | Intro/outro skipping, watch progress and keyboard-first navigation |
+| 🔎 **Powerful search** | Poster grid with filters for season, format, status, score and genres |
+| 📚 **Manga reader** | MangaDex-powered reading with colour editions and continue-reading support |
+| 🔄 **AniList sync** | Two-way watchlist, progress and activity synchronisation |
+| 🎨 **6 themes** | Multiple visual presets to customise the experience |
+
+---
+
+## 🎥 See Kurōdo in action
 
 <div align="center">
 
-| Watch | Search |
-|---|---|
-| <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/watch-playing.jpg" width="100%" /> | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/search-redesign-results.jpg" width="100%" /> |
-| **Servers** | **Schedule** |
-| <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/review-watch-picker.jpg" width="100%" /> | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/loop-after-schedule.jpg" width="100%" /> |
+| Home | Watch |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/ui-home-after.jpg" width="100%" /> | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/watch-playing.jpg" width="100%" /> |
+| **Search** | **Server picker** |
+| <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/search-redesign-results.jpg" width="100%" /> | <img src="https://raw.githubusercontent.com/Sylvester877/kurodo/main/docs/review-watch-picker.jpg" width="100%" /> |
 
 </div>
 
 ---
 
-## 🚀 Quick start
+## 🚀 Get started
 
-> **Node.js ≥ 18** · Windows 10/11
+**Requirements:** Node.js 18+ · Windows 10/11
 
 ```bash
 git clone https://github.com/Sylvester877/kurodo.git
 cd kurodo
 npm install
-
-# Web app — one Express server on http://localhost:5173
 npm start
+```
 
-# Or the full Electron desktop app
+For the full Electron desktop app:
+
+```bash
 npm run electron:dev
 ```
 
-**Just want the app?** → **[Download the installer](https://github.com/Sylvester877/kurodo/releases/latest)** (`Kurodo-Setup-x.y.z.exe`), install, done. Updates arrive automatically via `electron-updater`.
+### 📦 Want the ready-to-use app?
 
-### Build & publish
+You don't need to build anything.
 
-```bash
-npm run electron:build:win        # → release/Kurodo-Setup-<version>.exe
-GH_TOKEN=ghp_xxx npm run electron:build:win   # + publish a GitHub Release
-```
+**[Download the latest Windows installer →](https://github.com/Sylvester877/kurodo/releases/latest)**
+
+Kurōdo uses `electron-updater` so installed versions can receive updates automatically.
 
 ---
 
 ## ⌨️ Keyboard shortcuts
 
 | Key | Action | Key | Action |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `Space` | Play / pause | `F` | Fullscreen |
-| `J` / `L` | Seek ∓10s | `T` | Theater mode |
+| `J` / `L` | Seek ±10s | `T` | Theater mode |
 | `N` | Next episode | `M` | Mute |
-| `⌘/Ctrl K` | Command palette | `/` | Focus search |
+| `Ctrl K` | Command palette | `/` | Focus search |
 
 ---
 
-## 🧰 Tech stack
+## 🧰 Built with
 
-| Layer | Tech |
-|---|---|
-| Frontend | React 19 · TypeScript 5.7 · Tailwind v4 · Framer Motion · Lenis |
-| State | Zustand 5 · TanStack Query 5 · React Virtual |
-| Desktop | Electron 34 · electron-updater (NSIS) |
-| Backend | Express · Node 24 |
-| Scraping | Puppeteer CF-harvester · multi-provider router (megavid / anidap / gogoanime) |
-| Video | HLS.js · WebTorrent · ffmpeg-static |
+**Frontend**  React 19 · TypeScript 5.7 · Tailwind v4 · Framer Motion · Lenis  
+**State**  Zustand 5 · TanStack Query 5 · React Virtual  
+**Desktop**  Electron 34 · electron-updater · NSIS  
+**Backend**  Express · Node 24  
+**Video**  HLS.js · WebTorrent · ffmpeg-static
 
-### Engineering highlights
+### ⚙️ Engineering highlights
 
-- **Multi-provider stream router** — providers race in parallel; a 429 on one never kills playback, and cold source resolution lands in **~1.2s**
-- **Server-side episode enrichment** — TVDB + AniZip + TMDB + Jikan fetched concurrently, capped so a rate-limited upstream can't stall a 500-episode list
-- **Virtualized everything** — episode sidebars render ~15 rows out of 500+, Home rows lazy-mount near the viewport
-- **Compositor-only animations** — reveals are pure opacity/transform (no per-frame blur raster), so scrolling stays at refresh rate
+- **Multi-provider router:** providers race in parallel, allowing failed or rate-limited sources to be skipped.
+- **Concurrent metadata enrichment:** TVDB, AniZip, TMDB and Jikan requests are coordinated to keep large episode lists responsive.
+- **Virtualised lists:** large episode sidebars and content rails render only what is needed on screen.
+- **Smooth rendering:** animations focus on compositor-friendly transforms and opacity for consistent scrolling.
 
 ---
 
-## 📁 Project layout
+## 📁 Project structure
 
-```
+```text
 kurodo/
 ├── src/                  # React frontend
-│   ├── api/              # AniList, Jikan, AniZip, TMDB, TVDB, anidap clients
-│   ├── components/       # Player, cards, rails, search, settings…
-│   ├── pages/            # Home, Watch, AnimeDetails, Search, Manga*, Profile…
-│   ├── lib/ store/ hooks/
-├── server/               # Express backend
-│   ├── index.js          # API + proxies + image proxy
-│   └── providers/        # megavid, anidap, gogoanime scrapers + router
-├── electron/             # Main process (window, auto-update, IPC)
-└── build/                # Icons + NSIS installer config
+│   ├── api/              # API clients
+│   ├── components/       # Player, cards, rails, search, settings...
+│   ├── pages/            # Home, Watch, Search, Manga, Profile...
+│   └── lib/ store/ hooks/
+├── server/               # Express backend and provider router
+├── electron/             # Electron main process and IPC
+└── build/                # App icons and installer configuration
 ```
 
 ---
 
 ## 🗺️ Roadmap
 
-- [ ] Multi-platform packaging (Linux AppImage, macOS dmg)
-- [ ] Torrent streaming UI polish + subtitle auto-match
-- [ ] Watch parties (synced playback + chat)
-- [ ] MAL tracker support alongside AniList
+- [ ] Linux AppImage packaging
+- [ ] macOS `.dmg` packaging
+- [ ] Torrent streaming UI polish
+- [ ] Automatic subtitle matching
+- [ ] Watch parties with synced playback
+- [ ] MAL tracking alongside AniList
+
+Have an idea? **[Open an issue →](https://github.com/Sylvester877/kurodo/issues/new)**
+
+---
+
+## 🤝 Contributing
+
+Found a bug, have a feature idea, or want to improve the UI?
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Open a pull request
+
+Small improvements are welcome. If you like the project, **a star is the easiest way to support it.** ⭐
 
 ---
 
 ## ⚠️ Disclaimer
 
-Kurōdo is a **personal/educational project** and hosts **zero content** — streams are pulled from public third-party APIs at runtime. Please respect each source's terms of service and your local copyright laws. This project is not affiliated with AniList, MyAnimeList, TVDB, or any content provider.
+Kurōdo is a personal/educational open-source project and hosts **zero video or manga content**. Streams and metadata are requested from third-party services at runtime. Please respect the terms of each service and applicable copyright laws. Kurōdo is not affiliated with AniList, MyAnimeList, TVDB, or any content provider.
 
 ## 📄 License
 
-[MIT](./LICENSE) — fork it, remix it, ship it.
-
----
+MIT License. See [LICENSE](./LICENSE).
 
 <div align="center">
 
-**If Kurōdo made your watching better, drop a ⭐ — it genuinely helps.**
+<br />
 
-Made with ❤️ by [Sylvester877](https://github.com/Sylvester877)
+### ⭐ If you like Kurōdo, consider starring the repository
+
+It helps more people discover the project and motivates continued development.
+
+**Made with ❤️ by [Sylvester877](https://github.com/Sylvester877)**
 
 </div>
