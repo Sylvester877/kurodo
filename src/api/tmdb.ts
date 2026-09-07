@@ -230,6 +230,46 @@ export async function getTmdbBackdrop(title: string): Promise<string | null> {
   return url
 }
 
+/** Server-resolved TMDB hybrid art (exact MAL→TMDB mapping, no client search). */
+export interface TmdbArt {
+  /** Hero-quality 16:9 backdrop (w1280) — null when TMDB has none. */
+  backdrop: string | null
+  /** 2:3 grid poster (w500) — null when TMDB has none. */
+  poster: string | null
+}
+
+const artCache = new Map<number, { at: number; art: TmdbArt | null }>()
+const ART_TTL = 24 * 60 * 60 * 1000
+
+/**
+ * Fetch the best TMDB backdrop + poster for a MAL id.
+ *
+ * Server-side /api/tmdb-art/:malId resolves the EXACT TMDB id via the
+ * AniZip mapping (MAL → themoviedb_id) and returns the best images in one
+ * round trip — sequel-safe, no fuzzy title search, and cached 24h on the
+ * server. Returns null when there's no mapping or TMDB has no art; callers
+ * keep their AniList/Jikan art as the primary source and use this as a
+ * high-quality fallback/upgrade.
+ */
+export async function fetchTmdbArt(malId: number): Promise<TmdbArt | null> {
+  if (!Number.isFinite(malId) || malId < 1) return null
+  const hit = artCache.get(malId)
+  if (hit && Date.now() - hit.at < ART_TTL) return hit.art
+  try {
+    const ctrl = new AbortController()
+    const t = window.setTimeout(() => ctrl.abort(), TIMEOUT_MS)
+    const res = await fetch(`/api/tmdb-art/${malId}`, { signal: ctrl.signal })
+    window.clearTimeout(t)
+    if (!res.ok) return null
+    const json = await res.json()
+    const art: TmdbArt | null = json?.ok ? (json.art ?? null) : null
+    artCache.set(malId, { at: Date.now(), art })
+    return art
+  } catch {
+    return null
+  }
+}
+
 /** True when TMDB is usable through the backend relay. */
 export const hasTmdbKey = (): boolean => true
 

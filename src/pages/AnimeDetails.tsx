@@ -29,7 +29,7 @@ import CharactersRow from '../components/CharactersRow'
 import ScrollReveal from '../components/ScrollReveal'
 import Relations from '../components/Relations'
 import WatchOrder from '../components/WatchOrder'
-import { fetchAnimeLogo, getTmdbLogoUrl, type TmdbLogo } from '../api/tmdb'
+import { fetchAnimeLogo, getTmdbLogoUrl, fetchTmdbArt, type TmdbLogo } from '../api/tmdb'
 
 export default function AnimeDetails() {
   const { id } = useParams<{ id: string }>()
@@ -122,6 +122,19 @@ export default function AnimeDetails() {
     meta: { persist: true },
   })
   const anilistId = epInfoQuery.data?.anilistId ?? null
+
+  // ── TMDB hybrid art (exact MAL→TMDB mapping, one server round trip) ──
+  // Many anime have NO AniList banner — they currently fall back to a
+  // portrait cover stretched across the hero. TMDB w1280 gives a real
+  // 16:9 backdrop for those titles (sequel-safe mapping, 24h-cached).
+  // Fires in parallel with everything else; only used when banner is absent.
+  const tmdbArtQuery = useQuery({
+    queryKey: ['tmdbArt', malId],
+    queryFn: () => fetchTmdbArt(malId!),
+    enabled: !!malId,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 1,
+  })
 
   // Fetch episodes as soon as we have a MAL id and a Jikan episode count.
   // Don't wait for AniList epInfo — that lookup is only needed for the
@@ -381,10 +394,17 @@ export default function AnimeDetails() {
   const startEp = lastEp ?? 1
   const watchHref = `/watch/${anime.mal_id}?ep=${startEp}`
 
-  // ── Resolve the best hero backdrop: AniList banner (1920×600) → AniList extraLarge cover → Jikan trailer thumbnail
+  // ── Resolve the best hero backdrop: AniList banner (1920×600) → TMDB
+  // w1280 (exact mapping, fills no-banner titles) → AniList extraLarge cover
+  // → Jikan trailer thumbnail
   const heroBackdrop = epInfoQuery.data?.bannerImage
+    || tmdbArtQuery.data?.backdrop
     || epInfoQuery.data?.coverImageLarge
     || getHeroImageUrl(anime)
+  // Poster with the same TMDB fallback — covers the rare title whose MAL
+  // entry ships without artwork (some movies/OVAs). Empty string keeps the
+  // existing gradient+layout intact when neither source has art.
+  const posterSrc = getImageUrl(anime) || tmdbArtQuery.data?.poster || ''
   const hasOp = !!skipSample?.op
   const hasEd = !!skipSample?.ed
   const hasSkip = hasOp || hasEd
@@ -452,7 +472,7 @@ export default function AnimeDetails() {
               style={{ transform: 'translate3d(0,0,0)' }}
             >
               <img
-                src={getImageUrl(anime)} alt={anime.title}
+                src={posterSrc} alt={anime.title}
                 className="w-full rounded-xl shadow-2xl border border-white/10"
                 style={dominantColor
                   ? { boxShadow: `0 30px 90px -18px rgb(${dominantColor} / 0.55), 0 10px 36px -14px rgb(${dominantColor} / 0.4)` }
@@ -684,7 +704,7 @@ export default function AnimeDetails() {
             <div className="max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-3">
               {/* Mini poster */}
               <img
-                src={getImageUrl(anime)}
+                src={posterSrc}
                 alt=""
                 className="h-9 w-6 rounded object-cover shrink-0 border border-white/10"
               />

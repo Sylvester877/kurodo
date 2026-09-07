@@ -12,6 +12,7 @@
 
 import { queryClient } from './queryClient'
 import { getSkipTimes } from '../api/aniskip'
+import { fetchTmdbArt } from '../api/tmdb'
 import {
   fetchAnidapInfo, fetchAnidapServers, fetchAnidapStream,
 } from '../api/anidap'
@@ -274,6 +275,16 @@ export function prefetchAnimeDetails(anime: { mal_id: number; episodes: number |
     queryKey: ['anime', malId],
     queryFn: () => getAnimeById(malId),
     staleTime: 60 * 60 * 1000,
+  })
+
+  // Pre-warm the TMDB hybrid art (backdrop/poster fallback for shows
+  // without an AniList banner). Same queryKey as AnimeDetails/Watch use,
+  // so a hover→click navigation lands on an already-resolved backdrop
+  // instead of showing the stretched-cover fallback for a second.
+  void queryClient.prefetchQuery({
+    queryKey: ['tmdbArt', malId],
+    queryFn: () => fetchTmdbArt(malId),
+    staleTime: 24 * 60 * 60 * 1000,
   })
 
   // Prefetch AniZip episodes using the Jikan episode count as a cap.

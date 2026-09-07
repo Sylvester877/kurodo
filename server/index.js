@@ -2690,6 +2690,99 @@ app.get('/api/tmdb3/*', async (req, res) => {
   }
 })
 
+// ────────── TMDB hybrid art — exact MAL→TMDB mapping, one round trip ──────
+// The Hero + details pages used to enrich art via FUZZY client-side title
+// search (search/tv?query=…), which can match the wrong franchise for
+// sequel titles ("Bleach: TYBW" → the 2004 show). This endpoint keys off
+// the EXACT AniZip mapping (MAL → themoviedb_id, cached in tmdbIdCache) and
+// returns the best backdrop + poster in a single upstream call, so the
+// client never needs to know the TMDB id or do a search.
+//
+//   GET /api/tmdb-art/:malId → { ok:true, art: { backdrop, poster } | null }
+//   backdrop: https://image.tmdb.org/t/p/w1280… (hero-quality 16:9)
+//   poster:   https://image.tmdb.org/t/p/w500…   (2:3 grid)
+//
+// backdrop=null when TMDB has no image for this title or no mapping — the
+// client then keeps its AniList/Jikan art. Both URLs are absolute (the
+// client wraps them in /img for the localhost byte cache, same as it does
+// for AniList CDN URLs). Cached 24h server-side; no-mapping results get a
+// short 1h TTL so a fresh AniZip mapping can surface within the day.
+const tmdbArtCache = new Map() // malId → { at, art, ttl }
+const TMDB_ART_TTL = 24 * 60 * 60 * 1000
+const TMDB_ART_EMPTY_TTL = 60 * 60 * 1000
+
+function pickTmdbBackdrop(backdrops) {
+  if (!Array.isArray(backdrops) || backdrops.length === 0) return null
+  // Prefer the highest-voted image that's wide enough for a 16:9 hero;
+  // otherwise fall back to the best of whatever exists.
+  const wide = backdrops.filter((b) => (b.width || 0) >= 1280)
+  const pool = wide.length ? wide : backdrops
+  return pool.reduce((a, b) => ((b.vote_average || 0) > (a.vote_average || 0) ? b : a))
+}
+
+function pickTmdbPoster(posters) {
+  if (!Array.isArray(posters) || posters.length === 0) return null
+  return posters.reduce((a, b) => ((b.vote_average || 0) > (a.vote_average || 0) ? b : a))
+}
+
+app.get('/api/tmdb-art/:malId', async (req, res) => {
+  try {
+    const malId = Number(req.params.malId)
+    if (!Number.isFinite(malId) || malId < 1) {
+      return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'Invalid MAL id', retryable: false } })
+    }
+    const hit = tmdbArtCache.get(malId)
+    if (hit && Date.now() - hit.at < hit.ttl) return ok(res, { art: hit.art })
+    if (!TMDB_API_KEY) {
+      return res.status(503).json({ ok: false, error: { code: 'NOT_CONFIGURED', message: 'TMDB key missing on server', retryable: false } })
+    }
+
+    // Exact MAL → TMDB id via the shared AniZip mapping (single-flight,
+    // cached 24h). No fuzzy title search — sequel-safe by construction.
+    const tmdbId = await getTmdbIdFromMal(malId)
+    let art = null
+    if (tmdbId) {
+      // A MAL entry can be a TV show OR a movie ("Re:Zero S1" vs "The First
+      // Slam Dunk"). Try the TV endpoint first, then the movie endpoint —
+      // one 404-and-retry is far cheaper than two full /images fetches.
+      for (const kind of ['tv', 'movie']) {
+        try {
+          const r = await axios.get(`https://api.themoviedb.org/3/${kind}/${tmdbId}/images`, {
+            params: {
+              api_key: TMDB_API_KEY,
+              include_image_language: 'en,ja,null',
+            },
+            timeout: 8000,
+            validateStatus: (code) => code >= 200 && code < 300,
+          })
+          const backdrops = r.data?.backdrops ?? []
+          const posters = r.data?.posters ?? []
+          if (backdrops.length === 0 && posters.length === 0) continue // try the other kind
+          const backdrop = pickTmdbBackdrop(backdrops)
+          const poster = pickTmdbPoster(posters)
+          art = {
+            backdrop: backdrop ? `https://image.tmdb.org/t/p/w1280${backdrop.file_path}` : null,
+            poster: poster ? `https://image.tmdb.org/t/p/w500${poster.file_path}` : null,
+          }
+          break
+        } catch {
+          // 404 for this kind — try movie if we haven't, else give up
+        }
+      }
+    }
+
+    const ttl = art ? TMDB_ART_TTL : TMDB_ART_EMPTY_TTL
+    tmdbArtCache.set(malId, { at: Date.now(), art, ttl })
+    if (tmdbArtCache.size > 400) {
+      const n = Date.now()
+      for (const [k, v] of tmdbArtCache) if (n - v.at > TMDB_ART_TTL) tmdbArtCache.delete(k)
+    }
+    return ok(res, { art })
+  } catch (e) {
+    return fail(res, e)
+  }
+})
+
 let _harvesterIsReady = null
 async function getHarvesterIsReady() {
   if (_harvesterIsReady) return _harvesterIsReady()

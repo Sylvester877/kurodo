@@ -40,7 +40,7 @@ import {
 } from '../lib/prefetch'
 import { useSettings } from '../store/useSettings'
 import { getFillerInfo, isFiller, type FillerInfo } from '../api/filler'
-import { fetchAnimeLogo, getTmdbLogoUrl, type TmdbLogo } from '../api/tmdb'
+import { fetchAnimeLogo, getTmdbLogoUrl, fetchTmdbArt, type TmdbLogo } from '../api/tmdb'
 import type { Anime } from '../types'
 import SyncConfirmDialog, { useSyncConfirm } from '../components/SyncConfirmDialog'
 import StarRating from '../components/StarRating'
@@ -254,6 +254,17 @@ export default function Watch() {
   const nextAiring = epInfoQuery.data?.nextAiring ?? null
   const aniListAccent = epInfoQuery.data?.accentColor ?? null
 
+  // ── TMDB hybrid art (exact MAL→TMDB mapping, one server round trip) ──
+  // Same queryKey as AnimeDetails so the two pages share the cached result.
+  // Used as a backdrop fallback for titles AniList ships no banner for.
+  const tmdbArtQuery = useQuery({
+    queryKey: ['tmdbArt', malId],
+    queryFn: () => fetchTmdbArt(malId!),
+    enabled: !!malId,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: 1,
+  })
+
   // ── Cover-keyed ambient colour ────────────────────────────────────
   // Samples the poster's dominant colour (same hook as the details page)
   // and uses it for the player-area glows below. Skipped on iGPU /
@@ -266,17 +277,21 @@ export default function Watch() {
   )
   /** Best available wide background image — immediate cover from router state
    *  (avoids flat gradient during loading), then upgraded to AniList banner
-   *  when epInfo resolves. Priority: AniList banner > AniList coverXL > MAL trailer max > cover. */
+   *  when epInfo resolves, then to TMDB w1280 (exact mapping, covers titles
+   *  with no AniList banner). Priority: AniList banner > TMDB w1280 >
+   *  AniList coverXL > MAL trailer max > cover. */
   const heroBackground = useMemo(() => {
     const banner = epInfoQuery.data?.bannerImage
     if (banner) return banner
+    const tmdbBackdrop = tmdbArtQuery.data?.backdrop
+    if (tmdbBackdrop) return tmdbBackdrop
     const coverXl = epInfoQuery.data?.coverImageLarge
     if (coverXl) return coverXl
     if (anime) return getHeroImageUrl(anime)
     // ── NEW: use router-state cover immediately so the backdrop is never flat
     if (initialAnime) return getHeroImageUrl(initialAnime)
     return null
-  }, [epInfoQuery.data?.bannerImage, epInfoQuery.data?.coverImageLarge, anime, initialAnime])
+  }, [epInfoQuery.data?.bannerImage, tmdbArtQuery.data?.backdrop, epInfoQuery.data?.coverImageLarge, anime, initialAnime])
 
   // Episode list from AniZip.
   //
