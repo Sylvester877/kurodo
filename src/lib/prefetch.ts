@@ -285,4 +285,29 @@ export function prefetchAnimeDetails(anime: { mal_id: number; episodes: number |
       staleTime: 60 * 60 * 1000,
     })
   }
+
+  // Pre-warm the anidap slug resolve (server-side, cached 12h) once the
+  // AniList id is known. Slug resolution is the single biggest COLD cost on
+  // the Watch path (~1-3.5s: GraphQL resolve + fallbacks), and today it only
+  // starts 800ms after the details page mounts — so a fast card→details→
+  // Watch click paid it cold. Chaining it off the hover epInfo prefetch
+  // front-loads that cost into the hover window, making the eventual Watch
+  // click land on a warm slug.
+  void (async () => {
+    try {
+      const epInfo = await queryClient.fetchQuery({
+        queryKey: ['anime', malId, 'episodeInfo'],
+        queryFn: () => getEpisodeInfoFromMal(malId),
+        staleTime: 30 * 60 * 1000,
+      })
+      const anilistId = epInfo?.anilistId
+      if (!anilistId) return
+      const { fetchAnidapInfo } = await import('../api/anidap')
+      await queryClient.fetchQuery({
+        queryKey: ['anidap', 'slug', anilistId],
+        queryFn: () => fetchAnidapInfo(anilistId).then((r) => r.slug ?? 'unavailable'),
+        staleTime: 15 * 60 * 1000,
+      })
+    } catch { /* pre-warm is best-effort */ }
+  })()
 }
