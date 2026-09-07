@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Calendar, Clock, Star, Radio, Bell, CalendarDays,
-  ChevronRight, Tv, Filter, X,
+  ChevronRight, Tv, Filter, X, RefreshCw,
 } from 'lucide-react'
 import { getAiringSchedule, type AiringSchedule } from '../api/anilist'
 import { useTitle } from '../hooks/useTitle'
@@ -81,11 +81,15 @@ export default function Schedule() {
     return () => window.clearInterval(t)
   }, [])
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['schedule', days[0].key],
     queryFn: () => fetchWeek(days),
     staleTime: 10 * 60 * 1000,
     meta: { persist: true },
+    // The AniList schedule query can fail during API outages; a single
+    // silent empty render looked like "no episodes this week" (see the
+    // outage handling below). One retry is harmless and smooths blips.
+    retry: 1,
   })
 
   // Group items by day, filter, sort by time
@@ -134,7 +138,9 @@ export default function Schedule() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {totalThisWeek > 0
                     ? `${totalThisWeek} episodes across 7 days · powered by AniList`
-                    : 'Episodes airing this week · powered by AniList'}
+                    : isError
+                      ? "Couldn't reach the schedule source — outage in progress"
+                      : 'Episodes airing this week · powered by AniList'}
                 </p>
               </div>
             </div>
@@ -180,6 +186,10 @@ export default function Schedule() {
                     <div className="h-2 w-1/2 rounded shimmer" />
                   </div>
                 </div>
+              ) : isError && items.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Schedule unavailable right now.
+                </p>
               ) : nextToday ? (
                 <Link
                   to={nextToday.media.idMal ? `/anime/${nextToday.media.idMal}` : '#'}
@@ -257,9 +267,11 @@ export default function Schedule() {
                       </p>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <p className="text-[10px] text-muted-foreground">
-                          {dayItems.length === 0
-                            ? 'No episodes'
-                            : `${dayItems.length} episode${dayItems.length === 1 ? '' : 's'}`}
+                          {isError && items.length === 0
+                            ? 'Unavailable'
+                            : dayItems.length === 0
+                              ? 'No episodes'
+                              : `${dayItems.length} episode${dayItems.length === 1 ? '' : 's'}`}
                         </p>
                         {myCount > 0 && (
                           <span
@@ -315,6 +327,27 @@ export default function Schedule() {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : isError && items.length === 0 ? (
+              // Honest outage state — AniList's schedule API is down. Never
+              // claim "no episodes scheduled" when the fetch itself failed.
+              <div className="glass-card rounded-2xl py-16 text-center">
+                <Tv className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+                <p className="text-white/80 font-semibold mb-1">
+                  Couldn't load the schedule
+                </p>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
+                  The schedule source (AniList) is having an outage right now.
+                  This is temporary — check back in a bit.
+                </p>
+                <button
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                  className="glass-pill text-xs disabled:opacity-50"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
+                  {isFetching ? 'Retrying…' : 'Retry'}
+                </button>
               </div>
             ) : list.length === 0 ? (
               <div className="glass-card rounded-2xl py-16 text-center">
