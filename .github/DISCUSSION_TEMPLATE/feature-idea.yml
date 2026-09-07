@@ -1,0 +1,48 @@
+name: Feature idea
+description: Suggest an improvement and help shape the next release.
+title: ""
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before posting, check existing discussions and issues for duplicates.
+        Focus on the problem first, then the proposed solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should Kurōdo solve?
+      description: Describe the user experience or limitation that prompted the idea.
+      placeholder: I would like to ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you change?
+      description: Describe the feature or improvement.
+      placeholder: A possible solution would be ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or references
+      description: Add screenshots, mockups, links, or examples when useful.
+      placeholder: Links or images...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this to you?
+      options:
+        - Nice to have
+        - Important
+        - Blocking my use of Kurōdo
+    validations:
+      required: true
