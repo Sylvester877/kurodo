@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Question or idea too small for an issue?
+  - name: 💡 Feature ideas and product feedback
     url: https://github.com/Sylvester877/kurodo/discussions
-    about: Open a discussion — feature ideas and questions live there.
+    about: Start a discussion for ideas, questions, design feedback, and product direction.
+  - name: 🔒 Security vulnerability
+    url: https://github.com/Sylvester877/kurodo/security
+    about: Please report security issues privately and do not post sensitive details publicly.
