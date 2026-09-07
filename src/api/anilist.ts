@@ -336,12 +336,13 @@ async function pageQuery(filter: string, perPage = 24): Promise<FeedMedia[]> {
 // with REAL mal ids from Kitsu's mappings table). Only the four getters
 // the home hero + rails consume get the fallback — episode info, cast and
 // schedule queries stay AniList-only (they have their own empty states).
-type FeedKind = 'trending' | 'thisSeason' | 'upcoming' | 'top'
+type FeedKind = 'trending' | 'thisSeason' | 'upcoming' | 'top' | 'season'
 
 async function feedWithKitsuFallback(
   kind: FeedKind,
   perPage: number,
   primary: () => Promise<FeedMedia[]>,
+  extra = '',
 ): Promise<FeedMedia[]> {
   try {
     return await primary()
@@ -352,7 +353,7 @@ async function feedWithKitsuFallback(
       const origin = typeof window !== 'undefined' && window.location.hostname === 'localhost'
         ? getBackendOrigin()
         : ''
-      const res = await fetch(`${origin}/api/kitsu-feed?kind=${kind}&perPage=${perPage}`)
+      const res = await fetch(`${origin}/api/kitsu-feed?kind=${kind}&perPage=${perPage}${extra ? `&${extra}` : ''}`)
       if (res.ok) {
         const json = await res.json()
         if (json?.ok && Array.isArray(json.media) && json.media.length > 0) {
@@ -649,20 +650,21 @@ export async function getUserAnimeList(userName: string): Promise<PublicAniListE
 // Seasonal timeline — visual calendar grouped by season/year
 // ─────────────────────────────────────────────────────────────────
 
-export async function getSeasonal(
+export const getSeasonal = (
   season: 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL',
   year: number,
   perPage = 30,
-): Promise<FeedMedia[]> {
-  const data = await query<{ Page: { media: FeedMedia[] } }>(
-    `query ($season: MediaSeason, $year: Int, $perPage: Int) {
-      Page(page: 1, perPage: $perPage) {
-        media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC) {
-          ${MEDIA_FIELDS}
+): Promise<FeedMedia[]> =>
+  feedWithKitsuFallback('season', perPage, async () => {
+    const data = await query<{ Page: { media: FeedMedia[] } }>(
+      `query ($season: MediaSeason, $year: Int, $perPage: Int) {
+        Page(page: 1, perPage: $perPage) {
+          media(season: $season, seasonYear: $year, type: ANIME, sort: POPULARITY_DESC) {
+            ${MEDIA_FIELDS}
+          }
         }
-      }
-    }`,
-    { season, year, perPage },
-  )
-  return data.Page.media
-}
+      }`,
+      { season, year, perPage },
+    )
+    return data.Page.media
+  }, `season=${season}&year=${year}`)

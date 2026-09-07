@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, Hash, Star, Globe, Calendar, Loader2, Search, X, Heart, ChevronDown, ChevronUp, Library, TrendingUp, Palette, Play } from 'lucide-react'
+import { ArrowLeft, BookOpen, Hash, Star, Globe, Calendar, Loader2, Search, X, Heart, ChevronDown, ChevronUp, Library, TrendingUp, Palette, Play, RefreshCw } from 'lucide-react'
 import { cn, proxifyImgUrl } from '../lib/utils'
 import { getMangaInfo, getChapterFeed, searchManga as searchMangaDex, type MangaDexManga, type MangaDexChapter } from '../api/mangadex'
 import { resolveManga, type ResolvedManga } from '../api/anilistManga'
@@ -24,6 +24,20 @@ export default function MangaDetails() {
   const isMangaDex = mangaId.includes('-')
   const anilistId = isMangaDex ? null : Number(mangaId)
 
+  // Stored-entry fallback: when this manga id was saved to the user's manga
+  // list we keep title/cover/chapter lookup working even while AniList (the
+  // metadata source resolveManga depends on) is mid-outage — otherwise the
+  // page silently collapses into a misleading "No chapters found" shell.
+  const mangaListEntries = useMangaListStore((s) => s.mangaList)
+  const storedEntry = useMemo(() =>
+    mangaListEntries.find((e) =>
+      isMangaDex
+        ? e.mangaDexId === mangaId
+        : String(e.anilistId) === mangaId || String(e.mal_id) === mangaId,
+    ) ?? null,
+    [mangaListEntries, mangaId, isMangaDex],
+  )
+
   // Resolve manga (handles coloured editions)
   const resolveQuery = useQuery({
     queryKey: ['manga', 'resolve', mangaId],
@@ -36,6 +50,18 @@ export default function MangaDetails() {
 
   const resolved: ResolvedManga | null = resolveQuery.data ?? null
 
+  // Title for MangaDex/atsu title searches — AniList resolve first, then the
+  // saved list entry so saved manga stay readable during an AniList outage.
+  const searchTitle =
+    resolveQuery.data?.parentTitle ||
+    resolveQuery.data?.displayTitle ||
+    storedEntry?.title_english ||
+    storedEntry?.title ||
+    ''
+  // If the saved entry already knows the MangaDex uuid we can skip the
+  // title search entirely (also the most outage-proof path).
+  const directMdId = storedEntry?.mangaDexId || null
+
   // MangaDex detail
   const mdQuery = useQuery({
     queryKey: ['mangadex', 'info', mangaId],
@@ -46,29 +72,31 @@ export default function MangaDetails() {
 
   // When coming from AniList, search MangaDex by title
   const mdSearchQuery = useQuery({
-    queryKey: ['mangadex', 'anisearch', mangaId, resolveQuery.data?.displayTitle],
+    queryKey: ['mangadex', 'anisearch', mangaId, resolveQuery.data?.displayTitle, storedEntry?.title],
     queryFn: async () => {
-      const title = resolveQuery.data?.parentTitle || resolveQuery.data?.displayTitle || ''
+      const title = searchTitle
       if (!title) return null
       const results = await searchMangaDex(title, 1)
       return results.results[0] || null
     },
-    enabled: !isMangaDex && resolveQuery.isSuccess && !!resolveQuery.data?.displayTitle,
+    enabled: !isMangaDex && !directMdId && !!searchTitle,
     staleTime: 30 * 60 * 1000,
   })
 
-  const resolvedMdId: string | null = isMangaDex ? mangaId : (mdSearchQuery.data?.id || null)
+  const resolvedMdId: string | null = isMangaDex
+    ? mangaId
+    : directMdId || mdSearchQuery.data?.id || null
 
   // Atsu.moe parallel search — alternative source with full page data
   const atsuSearchQuery = useQuery({
-    queryKey: ['atsu', 'search', mangaId, resolveQuery.data?.displayTitle],
+    queryKey: ['atsu', 'search', mangaId, resolveQuery.data?.displayTitle, storedEntry?.title],
     queryFn: async () => {
-      const title = resolveQuery.data?.parentTitle || resolveQuery.data?.displayTitle || ''
+      const title = searchTitle
       if (!title) return null
       const results = await searchMangaAtsu(title, 3)
       return results.results[0] || null
     },
-    enabled: !isMangaDex && resolveQuery.isSuccess && !!resolveQuery.data?.displayTitle,
+    enabled: !isMangaDex && !!searchTitle,
     staleTime: 30 * 60 * 1000,
   })
 
@@ -119,7 +147,7 @@ export default function MangaDetails() {
   const readCount = trackMalId ? getReadCount(trackMalId) : 0
   const latestRead = trackMalId ? getLatestChapter(trackMalId) : null
 
-  useTitle(manga?.title || resolved?.displayTitle || 'Manga')
+  useTitle(manga?.title || resolved?.displayTitle || storedEntry?.title_english || storedEntry?.title || 'Manga')
 
   // ── Next unread chapter for Continue Reading ──
   const nextUnreadChapter = useMemo(() => {
@@ -328,6 +356,9 @@ export default function MangaDetails() {
               <img src={manga.coverUrl} alt={manga.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
             ) : detail?.coverImage?.large ? (
               <img src={proxifyImgUrl(detail.coverImage.large)} alt={resolved?.displayTitle || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+            ) : storedEntry?.coverUrl ? (
+              // Saved-list fallback: cover keeps working during an AniList outage
+              <img src={storedEntry.coverUrl} alt={storedEntry.title_english || storedEntry.title || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
             ) : (
               <div className="h-full w-full grid place-items-center">
                 <BookOpen className="h-12 w-12 text-white/10" />
@@ -528,7 +559,7 @@ export default function MangaDetails() {
           {/* Title + description */}
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
-              {resolved?.parentTitle || resolved?.displayTitle || manga?.title || 'Manga'}
+              {resolved?.parentTitle || resolved?.displayTitle || manga?.title || storedEntry?.title_english || storedEntry?.title || 'Manga'}
             </h1>
             {resolved?.isColoured && resolved.displayTitle !== resolved.parentTitle && (
               <p className="text-sm text-primary/70 mb-2">{resolved.displayTitle}</p>
@@ -716,24 +747,44 @@ export default function MangaDetails() {
               <Loader2 className="h-6 w-6 text-primary animate-spin" />
             </div>
           ) : !hasMdChapters && !hasAtsuSource ? (
-            <div className="py-16 text-center glass-card rounded-xl px-8">
-              <BookOpen className="h-10 w-10 text-white/10 mx-auto mb-3" />
-              <p className="text-sm text-white/50 font-medium mb-1">No chapters found</p>
-              <p className="text-xs text-white/30 max-w-sm mx-auto leading-relaxed">
-                We couldn't find chapters for this manga on MangaDex or atsu.moe. This can happen if the manga is licensed or recently added. Try searching on MangaDex directly or check back later.
-              </p>
-              {!isMangaDex && (resolved?.parentTitle || resolved?.displayTitle) && (
-                <a
-                  href={`https://mangadex.org/search?q=${encodeURIComponent(resolved?.parentTitle || resolved?.displayTitle || '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-semibold hover:bg-primary/15 transition-colors"
+            resolveQuery.isError && !searchTitle ? (
+              <div className="py-16 text-center glass-card rounded-xl px-8">
+                <BookOpen className="h-10 w-10 text-white/10 mx-auto mb-3" />
+                <p className="text-sm text-white/50 font-medium mb-1">Couldn't load this manga</p>
+                <p className="text-xs text-white/30 max-w-sm mx-auto leading-relaxed">
+                  The catalog that identifies this manga (AniList) is unreachable right
+                  now, so we couldn't look up its chapters. This is temporary — retry
+                  in a bit.
+                </p>
+                <button
+                  onClick={() => resolveQuery.refetch()}
+                  disabled={resolveQuery.isFetching}
+                  className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-semibold hover:bg-primary/15 transition-colors disabled:opacity-50"
                 >
-                  <Search className="h-3 w-3" />
-                  Search on MangaDex
-                </a>
-              )}
-            </div>
+                  <RefreshCw className={cn('h-3 w-3', resolveQuery.isFetching && 'animate-spin')} />
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div className="py-16 text-center glass-card rounded-xl px-8">
+                <BookOpen className="h-10 w-10 text-white/10 mx-auto mb-3" />
+                <p className="text-sm text-white/50 font-medium mb-1">No chapters found</p>
+                <p className="text-xs text-white/30 max-w-sm mx-auto leading-relaxed">
+                  We couldn't find chapters for this manga on MangaDex or atsu.moe. This can happen if the manga is licensed or recently added. Try searching on MangaDex directly or check back later.
+                </p>
+                {!isMangaDex && (resolved?.parentTitle || resolved?.displayTitle || storedEntry?.title_english || storedEntry?.title) && (
+                  <a
+                    href={`https://mangadex.org/search?q=${encodeURIComponent(resolved?.parentTitle || resolved?.displayTitle || storedEntry?.title_english || storedEntry?.title || '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-semibold hover:bg-primary/15 transition-colors"
+                  >
+                    <Search className="h-3 w-3" />
+                    Search on MangaDex
+                  </a>
+                )}
+              </div>
+            )
           ) : hasMdChapters && chQuery && filteredChapters.length === 0 && !(chQuery && filteredAtsuChapters.length > 0) ? (
             <div className="py-12 text-center">
               <Search className="h-8 w-8 text-white/10 mx-auto mb-2" />

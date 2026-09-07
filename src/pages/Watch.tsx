@@ -5,7 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   Star, Calendar, Heart, Film, Globe, Hash, ArrowLeft,
   AlertCircle, Search, Keyboard, X, CheckCircle2, Eye, EyeOff, Mic, RefreshCw,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Play, PlayCircle,
 } from 'lucide-react'
 import { useTitle } from '../hooks/useTitle'
 import { useDominantColor } from '../hooks/useDominantColor'
@@ -78,6 +78,7 @@ export default function Watch() {
   const [currentEp, setCurrentEp] = useState<number>(1)
   const audio = useSettings((s) => s.audio)
   const defaultTheaterMode = useSettings((s) => s.defaultTheaterMode)
+  const setSettings = useSettings((s) => s.set)
   const autoplayNext = useSettings((s) => s.autoplayNext)
   const autoplayDelay = useSettings((s) => s.autoplayDelay)
   const prefetchNext = useSettings((s) => s.prefetchNext)
@@ -523,6 +524,10 @@ export default function Watch() {
   currentEpRef.current = currentEp
   const autoplayCountdownRef = useRef(autoplayCountdown)
   autoplayCountdownRef.current = autoplayCountdown
+  // End-of-episode "Up Next" card — shown when the episode finishes and
+  // autoplay-next is OFF, so auto-advance is one click (or one toggle) away
+  // instead of feeling like it doesn't exist.
+  const [epEndedCard, setEpEndedCard] = useState(false)
 
   // If the main window was just recreated after a renderer crash, stay PAUSED
   // — the app reopened itself and must wait for the user to press play,
@@ -630,13 +635,26 @@ export default function Watch() {
   // this callback, which updates Zustand, which re-renders Watch.tsx… loop.
   const onVideoEnded = useCallback(() => {
     if (!malId || !anime) return
-    // Don't auto-mark if already watched (toggle behavior)
-    if (isEpisodeWatched(anime.mal_id, currentEp)) return
-    // Add to watchlist if not already there (needed for AniList sync)
-    if (!inList) addToWatchlist(anime)
-    markEpisodeWatched(anime.mal_id, currentEp)
-    toast.success(`✓ EP ${currentEp} marked as watched`, 2000)
-  }, [malId, anime, currentEp, inList, isEpisodeWatched, addToWatchlist, markEpisodeWatched])
+    // Auto-mark as watched (skip the toast for replays of already-watched eps)
+    if (!isEpisodeWatched(anime.mal_id, currentEp)) {
+      // Add to watchlist if not already there (needed for AniList sync)
+      if (!inList) addToWatchlist(anime)
+      markEpisodeWatched(anime.mal_id, currentEp)
+      toast.success(`✓ EP ${currentEp} marked as watched`, 2000)
+    }
+    // ── Auto-next on actual end ──
+    // The near-end countdown normally navigates before 'ended' fires, but a
+    // seek/jump or a short stream can reach the end without it — so if
+    // autoplay-next is ON (and we haven't already navigated) advance here.
+    const total = episodes.length || anime?.episodes || 0
+    const hasNext = currentEp < total
+    if (hasNext && autoplayNext) {
+      if (autoplayCountdownRef.current == null) goToNextEpisode()
+    } else if (hasNext) {
+      // Feature OFF: surface the Up Next card so auto-next is discoverable.
+      setEpEndedCard(true)
+    }
+  }, [malId, anime, currentEp, inList, isEpisodeWatched, addToWatchlist, markEpisodeWatched, autoplayNext, episodes.length, goToNextEpisode])
 
   // ── CRITICAL: must be memoized so VideoPlayer's progress effect doesn't
   // re-run on every render, which triggers save() in cleanup, which calls
@@ -679,6 +697,7 @@ export default function Watch() {
     if (autoplayCountdown == null) return
     if (autoplayCountdown <= 0) {
       goToNextEpisode()
+      setAutoplayCountdown(null) // reset so the next episode's ended-handler can fire cleanly
       return
     }
     const t = window.setTimeout(() => {
@@ -686,6 +705,11 @@ export default function Watch() {
     }, 1000)
     return () => window.clearTimeout(t)
   }, [autoplayCountdown, goToNextEpisode])
+
+  // Reset the end-of-episode card whenever the episode/stream changes.
+  useEffect(() => {
+    setEpEndedCard(false)
+  }, [currentEp, streamType, malId])
 
   // Reset failed providers when episode, type, or slug changes
   useEffect(() => {
@@ -1561,6 +1585,50 @@ export default function Watch() {
                       Play
                     </button>
                   </div>
+                </div>
+              )}
+              {/* End-of-episode Up Next card — appears when autoplay-next is
+                  OFF so the feature is one click away instead of invisible. */}
+              {epEndedCard && currentEp < (totalEpisodes || anime?.episodes || 0) && (
+                <div className="absolute bottom-6 right-6 z-20 glass-card rounded-2xl px-5 py-4 flex flex-col gap-3 shadow-lg border border-primary/30 animate-[fadeInUp_0.3s_ease] max-w-[300px]">
+                  <div className="text-xs">
+                    <p className="font-bold text-white tracking-wide flex items-center gap-1.5">
+                      <Play className="h-3 w-3 text-primary fill-primary" />
+                      Up Next
+                    </p>
+                    <p className="text-[11px] text-white/70 line-clamp-2 mt-1">
+                      EP {currentEp + 1} • {anime?.title_english || anime?.title}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setEpEndedCard(false)
+                        goToNextEpisode()
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+                    >
+                      Play next episode
+                    </button>
+                    <button
+                      onClick={() => setEpEndedCard(false)}
+                      title="Close"
+                      className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-white/10 text-white/80 hover:bg-white/15 border border-white/10 transition-all"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSettings('autoplayNext', true)
+                      setEpEndedCard(false)
+                      setAutoplayCountdown(autoplayDelay)
+                    }}
+                    className="text-[10px] text-white/55 hover:text-primary flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <PlayCircle className="h-3 w-3" />
+                    Always auto-play next episode
+                  </button>
                 </div>
               )}
             </div>

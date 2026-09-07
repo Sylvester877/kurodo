@@ -265,9 +265,18 @@ function MangaRow({
     })?.id ?? null
   }, [chaptersData, latestChapter])
 
+  // Open details with the id-namespace the details page expects: AniList id
+  // first (rich UI, matches the resolve query), then the MangaDex uuid
+  // (works even during an AniList outage), then the legacy MAL/tracking id.
+  const detailsUrl = manga.anilistId
+    ? `/manga/${manga.anilistId}`
+    : manga.mangaDexId
+      ? `/manga/${manga.mangaDexId}`
+      : `/manga/${manga.mal_id}`
+
   const continueUrl = nextChapterId && manga.mangaDexId
     ? `/manga/read/${nextChapterId}?manga=${manga.mangaDexId}&source=mangadex&malId=${manga.mal_id}`
-    : `/manga/${manga.mal_id}`
+    : detailsUrl
 
   const chaptersLoading = !!manga.mangaDexId && !isCompleted && latestChapter != null && !chaptersData && !chaptersError
 
@@ -282,7 +291,7 @@ function MangaRow({
       <div className="flex items-center gap-4 p-3">
         {/* Cover */}
         <Link
-          to={`/manga/${manga.mal_id}`}
+          to={detailsUrl}
           className="shrink-0 w-12 h-16 rounded-lg overflow-hidden bg-white/[0.04] border border-white/5"
         >
           {manga.coverUrl ? (
@@ -297,7 +306,7 @@ function MangaRow({
         {/* Info */}
         <div className="min-w-0 flex-1">
           <Link
-            to={`/manga/${manga.mal_id}`}
+            to={detailsUrl}
             className="text-sm font-semibold text-white hover:text-primary transition-colors line-clamp-1"
           >
             {manga.title_english || manga.title}

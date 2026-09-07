@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Calendar, Star, Play, ChevronLeft, ChevronRight,
-  Sparkles, Film,
+  Sparkles, Film, RefreshCw, WifiOff,
 } from 'lucide-react'
 import { getSeasonal, type FeedMedia } from '../api/anilist'
 import { useTitle } from '../hooks/useTitle'
@@ -46,10 +46,15 @@ export default function Seasonal() {
   const [season, setSeason] = useState<Season>(CURRENT_SEASON)
   const [year, setYear] = useState(CURRENT_YEAR)
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['seasonal', season, year],
     queryFn: () => getSeasonal(season, year, 30),
     staleTime: 30 * 60 * 1000,
+    // AniList's schedule-style queries 403 during its documented site-wide
+    // outages; getSeasonal transparently falls back to Kitsu, but when even
+    // that fails we must NOT claim "No anime listed yet" — show an honest
+    // outage state with a retry instead (see below).
+    retry: 1,
     meta: { persist: true },
   })
 
@@ -75,7 +80,9 @@ export default function Seasonal() {
                 Seasonal Calendar
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Browse anime by season · powered by AniList
+                {isError && items.length === 0
+                  ? "Couldn't reach the catalog — outage in progress"
+                  : 'Browse anime by season · powered by AniList'}
               </p>
             </div>
           </div>
@@ -143,15 +150,38 @@ export default function Seasonal() {
           </div>
         )}
 
-        {/* ───── Results grid ───── */}
+        {/* ───── Outage vs genuinely-empty state ───── */}
         {!isLoading && items.length === 0 && (
-          <div className="glass-card rounded-2xl py-16 text-center">
-            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
-            <p className="text-white/80 font-semibold mb-1">No anime listed yet</p>
-            <p className="text-xs text-muted-foreground">
-              AniList may not have entries for {meta.label} {year} yet — try a past season.
-            </p>
-          </div>
+          isError ? (
+            // Honest outage state — never claim a season is empty when the
+            // catalog fetch itself failed (AniList outage + Kitsu fallback
+            // both down is rare but happens).
+            <div className="glass-card rounded-2xl py-16 text-center">
+              <WifiOff className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p className="text-white/80 font-semibold mb-1">Couldn't load {meta.label} {year}</p>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
+                The catalog source (AniList) is having an outage right now and the
+                Kitsu fallback had no data for this season. This is temporary —
+                check back in a bit.
+              </p>
+              <button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="glass-pill text-xs disabled:opacity-50"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
+                {isFetching ? 'Retrying…' : 'Retry'}
+              </button>
+            </div>
+          ) : (
+            <div className="glass-card rounded-2xl py-16 text-center">
+              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p className="text-white/80 font-semibold mb-1">No anime listed yet</p>
+              <p className="text-xs text-muted-foreground">
+                AniList may not have entries for {meta.label} {year} yet — try a past season.
+              </p>
+            </div>
+          )
         )}
 
         {!isLoading && items.length > 0 && (

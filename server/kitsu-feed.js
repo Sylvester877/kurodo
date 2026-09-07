@@ -18,9 +18,15 @@
 // the SAME response (one round trip), and returns the app's own FeedMedia
 // shape so client fallbacks drop in with zero adapter changes.
 //
-//   GET /api/kitsu-feed?kind=trending|thisSeason|upcoming|top&perPage=18
+//   GET /api/kitsu-feed?kind=trending|thisSeason|upcoming|top|season&perPage=18
+//   GET /api/kitsu-feed?kind=season&season=WINTER&year=2026&perPage=30
 //   → { ok:true, media: FeedMedia[], source:'kitsu' }   (MAL ids resolved)
 //   → { ok:false }                                       (Kitsu itself down)
+//
+// The `season` kind powers the Seasonal Calendar page during outages
+// (kind=season&season=WINTER&year=2026). Kitsu's filter[season]/seasonYear
+// align with AniList's calendar (verified: Winter 2026 → Frieren S2,
+// Jigokuraku S2 — all Jan starts).
 //
 // Only anime WITH a myanimelist mapping are returned — entries without one
 // can't be navigated to in this app (everything keys off mal_id), so they
@@ -147,7 +153,7 @@ function kitsuToFeedMedia(anime, includedById) {
 }
 
 /** Build the Kitsu list URL for a feed kind. */
-function kitsuUrl(kind, perPage) {
+function kitsuUrl(kind, perPage, season = null, year = null) {
   const limit = Math.min(Math.max(Number(perPage) || 18, 6), 50)
   // ⚠️ Do NOT sparsify fields[anime] here: Kitsu DROPS each anime's
   // relationships.mappings.data the moment a fields[anime] filter is
@@ -165,6 +171,8 @@ function kitsuUrl(kind, perPage) {
       return `${KITSU}/anime?filter[status]=current&sort=-userCount&page[limit]=${limit}&${fields}`
     case 'upcoming':
       return `${KITSU}/anime?filter[status]=upcoming&sort=-userCount&page[limit]=${limit}&${fields}`
+    case 'season':
+      return `${KITSU}/anime?filter[seasonYear]=${year}&filter[season]=${season.toLowerCase()}&sort=-userCount&page[limit]=${limit}&${fields}`
     case 'top':
       // All-time top rated (SCORE_DESC equivalent).
       return `${KITSU}/anime?sort=-averageRating&page[limit]=${limit}&${fields}`
@@ -178,12 +186,12 @@ function kitsuUrl(kind, perPage) {
  * Returns [] on any failure (never throws) so the client fallback can
  * simply fall through to its normal error state if even Kitsu is down.
  */
-export async function getKitsuFeed(kind, perPage) {
-  const key = `${kind}:${perPage}`
+export async function getKitsuFeed(kind, perPage, season = null, year = null) {
+  const key = `${kind}:${season ?? ''}:${year ?? ''}:${perPage}`
   const cached = cacheGet(key)
   if (cached !== undefined) return cached
 
-  const url = kitsuUrl(kind, perPage)
+  const url = kitsuUrl(kind, perPage, season, year)
   if (!url) {
     cacheSet(key, [], FAIL_TTL)
     return []
@@ -226,11 +234,21 @@ export async function getKitsuFeed(kind, perPage) {
 export function register(app) {
   app.get('/api/kitsu-feed', async (req, res) => {
     const kind = String(req.query.kind || '')
-    if (!['trending', 'thisSeason', 'upcoming', 'top'].includes(kind)) {
+    const SEASON_KINDS = new Set(['trending', 'thisSeason', 'upcoming', 'top', 'season'])
+    if (!SEASON_KINDS.has(kind)) {
       return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: `Unknown kind: ${kind}`, retryable: false } })
     }
+    let season = null
+    let year = null
+    if (kind === 'season') {
+      season = String(req.query.season || '').toUpperCase()
+      year = Number(req.query.year)
+      if (!['WINTER', 'SPRING', 'SUMMER', 'FALL'].includes(season) || !Number.isInteger(year) || year < 1980 || year > 2100) {
+        return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'season requires valid season + year', retryable: false } })
+      }
+    }
     const perPage = Math.min(Math.max(Number(req.query.perPage) || 18, 1), 50)
-    const media = await getKitsuFeed(kind, perPage)
+    const media = await getKitsuFeed(kind, perPage, season, year)
     return res.json({ ok: true, media, source: 'kitsu' })
   })
 }
