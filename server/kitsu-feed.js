@@ -154,7 +154,11 @@ function kitsuToFeedMedia(anime, includedById) {
 
 /** Build the Kitsu list URL for a feed kind. */
 function kitsuUrl(kind, perPage, season = null, year = null) {
-  const limit = Math.min(Math.max(Number(perPage) || 18, 6), 50)
+  // Kitsu hard-caps page[limit] at 20 (verified 2026-09-07: limit=24 →
+  // HTTP 400 "Limit exceeds maximum page size of 20"). Clamp so Browse's
+  // 24/page and Seasonal's 30/page requests degrade to a full 20-item page
+  // instead of failing the whole fallback.
+  const limit = Math.min(Math.max(Number(perPage) || 18, 6), 20)
   // ⚠️ Do NOT sparsify fields[anime] here: Kitsu DROPS each anime's
   // relationships.mappings.data the moment a fields[anime] filter is
   // present, even when include=mappings is set — which would leave us
@@ -176,6 +180,9 @@ function kitsuUrl(kind, perPage, season = null, year = null) {
     case 'top':
       // All-time top rated (SCORE_DESC equivalent).
       return `${KITSU}/anime?sort=-averageRating&page[limit]=${limit}&${fields}`
+    case 'popular':
+      // All-time most-followed (POPULARITY_DESC equivalent).
+      return `${KITSU}/anime?sort=-userCount&page[limit]=${limit}&${fields}`
     default:
       return null
   }
@@ -234,7 +241,7 @@ export async function getKitsuFeed(kind, perPage, season = null, year = null) {
 export function register(app) {
   app.get('/api/kitsu-feed', async (req, res) => {
     const kind = String(req.query.kind || '')
-    const SEASON_KINDS = new Set(['trending', 'thisSeason', 'upcoming', 'top', 'season'])
+    const SEASON_KINDS = new Set(['trending', 'thisSeason', 'upcoming', 'top', 'popular', 'season'])
     if (!SEASON_KINDS.has(kind)) {
       return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: `Unknown kind: ${kind}`, retryable: false } })
     }
@@ -251,4 +258,108 @@ export function register(app) {
     const media = await getKitsuFeed(kind, perPage, season, year)
     return res.json({ ok: true, media, source: 'kitsu' })
   })
+}
+
+// ── Jikan-shape bridge (final stage of the /api/jikan/* fallback chain) ──
+// When BOTH Jikan (504) and AniList (403 site-wide disable) are down, the
+// Browse catalog still needs to paint. Kitsu stays up, so we translate its
+// FeedMedia list into Jikan's v4 list-item shape — the exact contract the
+// existing /api/jikan/* consumers (Browse grid cards) already understand.
+const JIKAN_STATUS = {
+  RELEASING: 'Currently Airing',
+  FINISHED: 'Finished Airing',
+  NOT_YET_RELEASED: 'Not yet aired',
+  CANCELLED: 'Cancelled',
+  HIATUS: 'On Hiatus',
+}
+
+function feedToJikanList(m) {
+  if (!m || !m.idMal) return null
+  const img = m.coverImage?.extraLarge || m.coverImage?.large || ''
+  const thumb = m.coverImage?.large || m.coverImage?.extraLarge || ''
+  return {
+    mal_id: m.idMal,
+    url: `https://myanimelist.net/anime/${m.idMal}`,
+    images: {
+      jpg: { image_url: img, large_image_url: img, small_image_url: thumb },
+      webp: { image_url: img, large_image_url: img, small_image_url: thumb },
+    },
+    trailer: m.trailer?.id && m.trailer?.site === 'youtube'
+      ? { youtube_id: m.trailer.id, url: `https://www.youtube.com/watch?v=${m.trailer.id}`, embed_url: `https://www.youtube.com/embed/${m.trailer.id}` }
+      : null,
+    title: m.title?.romaji || '',
+    title_english: m.title?.english || null,
+    title_japanese: m.title?.native || null,
+    type: m.format === 'TV' ? 'TV' : m.format === 'MOVIE' ? 'Movie' : m.format || null,
+    source: null,
+    episodes: m.episodes,
+    status: JIKAN_STATUS[m.status] || m.status || null,
+    airing: m.status === 'RELEASING',
+    aired: { from: null, to: null, string: m.seasonYear ? `${m.season} ${m.seasonYear}` : null },
+    duration: m.duration ? `${m.duration} min per ep` : null,
+    rating: null,
+    score: m.averageScore ?? null,
+    scored_by: null,
+    rank: null,
+    popularity: m.popularity ?? null,
+    members: null,
+    favorites: null,
+    synopsis: m.description || null,
+    background: null,
+    season: m.season || null,
+    year: m.seasonYear ?? null,
+    genres: (m.genres || []).map((g) => ({ mal_id: 0, type: 'genre', name: g })),
+  }
+}
+
+/**
+ * Final-stage fallback for /api/jikan/* when Jikan AND AniList both fail:
+ * serve list endpoints (top / popular / upcoming / this-season / explicit
+ * season) from Kitsu in Jikan's v4 shape so Browse keeps painting cards.
+ * Page 1 only (no offset paging here); A–Z letters, genres and details
+ * return null → those keep their normal 502 (they have honest error UIs).
+ */
+export async function getKitsuFeedAsJikan(targetPath, query) {
+  const page = Math.max(1, Number.isFinite(Number(query?.page)) ? Number(query.page) : 1)
+  if (page > 1) return null
+  const limit = Math.min(Math.max(Number(query?.limit) || 24, 1), 50)
+
+  let kind = null
+  let season = null
+  let year = null
+  if (targetPath === '/top/anime') {
+    const rawFilter = Array.isArray(query?.filter) ? query.filter[0] : query?.filter
+    kind = rawFilter === 'bypopularity' ? 'popular' : 'top'
+  } else if (targetPath === '/seasons/upcoming') {
+    kind = 'upcoming'
+  } else if (targetPath === '/seasons/now') {
+    kind = 'thisSeason'
+  } else {
+    const seasonMatch = targetPath.match(/^\/seasons\/(\d{4})\/(winter|spring|summer|fall)$/i)
+    if (seasonMatch) {
+      kind = 'season'
+      year = Number(seasonMatch[1])
+      season = String(seasonMatch[2]).toUpperCase()
+    }
+  }
+  if (!kind) return null
+
+  try {
+    const media = await getKitsuFeed(kind, limit, season, year)
+    if (!media || media.length === 0) return null
+    const data = media.map(feedToJikanList).filter(Boolean)
+    if (data.length === 0) return null
+    return {
+      data,
+      pagination: {
+        last_visible_page: 1,
+        has_next_page: false,
+        current_page: 1,
+        items: { count: data.length, total: data.length, per_page: limit, pages: 1 },
+      },
+    }
+  } catch (e) {
+    console.warn('[kitsu-feed] jikan-shape fallback failed:', targetPath, e?.message || e)
+    return null
+  }
 }

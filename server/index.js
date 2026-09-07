@@ -100,7 +100,7 @@ import {
 } from './proxy-config.js'
 import { register as registerAnikageEpisodes } from './anikage-episodes.js'
 import { register as registerAnizipMapping, getAnizipMapping } from './anizip-cache.js'
-import { register as registerKitsuFeed } from './kitsu-feed.js'
+import { register as registerKitsuFeed, getKitsuFeedAsJikan } from './kitsu-feed.js'
 import {
   aflSlugify,
   parseAFLPage,
@@ -2138,6 +2138,18 @@ app.get('/api/jikan/*', async (req, res) => {
         if (jikanCache.size % 50 === 0) pruneJikanCache()
         return res.status(200).json(filterNsfwJikanResponse(negFallback))
       }
+      // Kitsu stage: Jikan AND AniList both down → serve catalog lists
+      // (top/popular/upcoming/season) from Kitsu in Jikan's v4 shape.
+      const kitsuList = await Promise.race([
+        getKitsuFeedAsJikan(targetPath, req.query),
+        new Promise((r) => setTimeout(() => r(null), 6000)),
+      ])
+      if (kitsuList) {
+        console.log(`[jikan-proxy] negative-cache ${targetPath}: Kitsu fallback served`)
+        jikanCache.set(cacheKey, { at: Date.now(), data: kitsuList })
+        if (jikanCache.size % 50 === 0) pruneJikanCache()
+        return res.status(200).json(filterNsfwJikanResponse(kitsuList))
+      }
       return res.status(502).json({ status: 502, type: 'BadGateway', message: failed.message })
     }
 
@@ -2208,6 +2220,20 @@ app.get('/api/jikan/*', async (req, res) => {
       } catch (liteErr) {
         // fall through to failure handling
       }
+    }
+
+    // ── Kitsu stage (dual-outage) ──
+    // Jikan + AniList both failed. For catalog LISTS, serve Kitsu in Jikan's
+    // shape so the Browse grid still paints instead of "No anime found".
+    const kitsuList = await Promise.race([
+      getKitsuFeedAsJikan(targetPath, req.query),
+      new Promise((r) => setTimeout(() => r(null), 6000)),
+    ])
+    if (kitsuList) {
+      console.log(`[jikan-proxy] ${targetPath}: Kitsu fallback served (dual outage)`)
+      jikanCache.set(cacheKey, { at: Date.now(), data: kitsuList })
+      if (jikanCache.size % 50 === 0) pruneJikanCache()
+      return res.status(200).json(filterNsfwJikanResponse(kitsuList))
     }
 
     jikanFailCache.set(cacheKey, { at: Date.now(), message: 'Jikan and AniList both unavailable' })

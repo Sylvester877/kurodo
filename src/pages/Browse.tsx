@@ -3,7 +3,7 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Filter, ChevronDown, SlidersHorizontal, Compass, Loader2, Check,
-  Flame, TrendingUp, Rocket, Star, BookOpen, ALargeSmall,
+  Flame, TrendingUp, Rocket, Star, BookOpen, ALargeSmall, RefreshCw, WifiOff,
 } from 'lucide-react'
 import {
   getAnimeGenres, getAnimeByGenre, getTopAnime, getSeasonalAnime,
@@ -459,6 +459,26 @@ export default function Browse() {
           <>
         {loading && browseAnime.length === 0 ? (
           <SkeletonRow count={18} />
+        ) : browseAnime.length === 0 && listQuery.isError ? (
+          // Honest outage state — never claim "No anime found" when the
+          // fetch itself failed (Jikan + AniList dual outage; A–Z and genre
+          // views have no Kitsu fallback so they land here).
+          <div className="glass-card rounded-2xl py-20 text-center">
+            <WifiOff className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-40" />
+            <p className="text-white/80 font-semibold mb-1">Couldn't load results</p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
+              The catalog sources are unreachable right now. This is temporary —
+              try again in a moment.
+            </p>
+            <button
+              onClick={() => listQuery.refetch()}
+              disabled={listQuery.isFetching}
+              className="glass-pill text-xs disabled:opacity-50"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', listQuery.isFetching && 'animate-spin')} />
+              {listQuery.isFetching ? 'Retrying…' : 'Retry'}
+            </button>
+          </div>
         ) : browseAnime.length === 0 ? (
           <div className="glass-card rounded-2xl py-20 text-center">
             <Filter className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
