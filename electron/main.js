@@ -18,6 +18,7 @@
 
 import { app, BrowserWindow, ipcMain, session, shell, screen, powerSaveBlocker } from 'electron'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import http from 'node:http'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -818,19 +819,42 @@ function checkLocalUpdate() {
         return
       }
 
-      // Find the installer .exe in the same directory
+      // Find the installer .exe in the same directory. B0-9: pre-checks —
+      // name must match Kurodo-Setup-*.exe and the file must be a real
+      // installer (>10MB; a corrupt/partial download is tiny). A stray
+      // unrelated .exe in the folder must never be treated as an update.
       let installer = null
       try {
         const files = fs.readdirSync(dir)
-        installer = files.find((f) => f.endsWith('.exe') && f.includes('Setup'))
+        installer = files.find((f) =>
+          f.startsWith('Kurodo-Setup-') && f.endsWith('.exe')
+        )
+        if (installer) {
+          const st = fs.statSync(path.join(dir, installer))
+          if (!st.isFile() || st.size <= 10 * 1024 * 1024) {
+            log('[local-update] Installer looks partial/corrupt (<10MB), skipping:', installer)
+            installer = null
+          }
+        }
       } catch { /* ignore */ }
 
       if (!installer) {
-        log('[local-update] latest.yml found but no installer .exe in', dir)
+        log('[local-update] latest.yml found but no valid Kurodo-Setup-*.exe in', dir)
         continue
       }
 
       const installerPath = path.join(dir, installer)
+      // Log the sha256 for the record (no checksum source to hard-fail
+      // against — informational only). Streamed so the update check isn't
+      // blocked on hashing a ~100MB file.
+      try {
+        const sha = createHash('sha256')
+        const fh = fs.createReadStream(installerPath)
+        fh.on('data', (d) => sha.update(d))
+        fh.on('end', () => log('[local-update] installer sha256:', sha.digest('hex')))
+        fh.on('error', () => {})
+      } catch { /* ignore */ }
+
       pendingLocalUpdate = { version: newVersion, installerPath }
 
       log('[local-update] ✓ New version found:', newVersion, '→', installerPath)

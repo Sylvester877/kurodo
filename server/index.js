@@ -3872,7 +3872,15 @@ server.on('error', (err) => {
         process.exit(1)
       })
     })
+    // S1: on ANY terminal path (error / timeout / response end), destroy the
+    // probe socket. http.get keeps the socket in the keep-alive pool; if the
+    // occupant hangs without answering, the timed-out probe would otherwise
+    // leak a socket forever (and a later process.exit path never runs the
+    // request's own cleanup). Destroy on timeout + error + after the response
+    // body is consumed.
+    const destroyProbe = () => { try { probe.destroy() } catch { /* already gone */ } }
     probe.on('error', () => {
+      destroyProbe()
       if (insideElectron) {
         console.error(`[server] Port ${PORT} in use and unresponsive — main process will show the error page.`)
         return
@@ -3881,6 +3889,7 @@ server.on('error', (err) => {
       process.exit(1)
     })
     probe.setTimeout(3000, () => {
+      destroyProbe()
       if (insideElectron) {
         console.error(`[server] Port ${PORT} in use and unresponsive — main process will show the error page.`)
         return
