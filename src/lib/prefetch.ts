@@ -284,7 +284,7 @@ export function prefetchAnimeDetails(anime: { mal_id: number; episodes: number |
   void queryClient.prefetchQuery({
     queryKey: ['tmdbArt', malId],
     queryFn: () => fetchTmdbArt(malId),
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: 60 * 60 * 1000,
   })
 
   // Prefetch AniZip episodes using the Jikan episode count as a cap.

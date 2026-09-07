@@ -262,7 +262,9 @@ export default function Watch() {
     queryKey: ['tmdbArt', malId],
     queryFn: () => fetchTmdbArt(malId!),
     enabled: !!malId,
-    staleTime: 24 * 60 * 60 * 1000,
+    // 1h (was 24h): null art re-resolves quickly so a logo/backdrop that
+    // appears on TMDB shows up the same day instead of a day later.
+    staleTime: 60 * 60 * 1000,
     retry: 1,
   })
 

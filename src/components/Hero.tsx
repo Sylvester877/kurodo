@@ -122,7 +122,9 @@ export default function Hero() {
                 english: m.title.english ?? null,
                 romaji: m.title.romaji ?? '',
               }),
-            staleTime: 24 * 60 * 60 * 1000,
+            // 30 min: a null resolution (no logo yet on TMDB) re-checks
+            // quickly once the asset appears upstream.
+            staleTime: 30 * 60 * 1000,
             meta: { persist: true },
           })
           .then((url) => {
@@ -175,7 +177,8 @@ export default function Hero() {
     queryKey: ['tmdbBackdrop-v2', title],
     queryFn: () => getTmdbBackdrop(title),
     enabled: !!title,
-    staleTime: 24 * 60 * 60 * 1000,
+    // 30 min (was 24h) — see tmdbLogo below: new-show art appears quickly
+    staleTime: 30 * 60 * 1000,
     meta: { persist: true },
   })
 
@@ -184,7 +187,10 @@ export default function Hero() {
     queryKey: ['tmdbLogo', title],
     queryFn: () => getAnimeLogo({ english: current?.title.english ?? null, romaji: current?.title.romaji ?? '' }),
     enabled: !!title,
-    staleTime: 24 * 60 * 60 * 1000,
+    // 30 min (was 24h): TMDB logos for brand-new seasons often upload within
+    // days of airing. A persisted null used to pin the wordmark fallback for
+    // a full day after the real logo appeared upstream.
+    staleTime: 30 * 60 * 1000,
     meta: { persist: true },
   })
 

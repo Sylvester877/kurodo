@@ -63,6 +63,10 @@ export function loadPersistedCache(): void {
       return
     }
     for (const [key, data] of snap.entries) {
+      // Never hydrate a stale persisted null for logo/backdrop/art — it
+      // would sit as "fresh" (24h staleTime) and hide the real logo that
+      // appeared on TMDB since the last session.
+      if (isNullArtKey(key, data)) continue
       try {
         queryClient.setQueryData(key as readonly unknown[], data)
       } catch {
@@ -85,6 +89,20 @@ export function clearPersistedCache(): void {
 }
 
 let saveTimer: number | undefined
+
+/**
+ * TMDB logo/backdrop/art lookups resolve to null for shows TMDB doesn't
+ * have yet (or didn't when first asked — e.g. a brand-new 2026 season whose
+ * clear-logo gets uploaded a week later). Persisting those nulls and
+ * hydrating them as "fresh" (24h staleTime) is what made the hero show a
+ * wordmark instead of the real logo after the asset appeared upstream.
+ * Nulls are cheap to re-resolve — never persist them for art keys.
+ */
+function isNullArtKey(key: readonly unknown[], data: unknown): boolean {
+  if (data != null) return false
+  return key.some((el) => typeof el === 'string' && /tmdb|logo|backdrop|(^|-)art(-|$)/i.test(el))
+}
+
 export function startPersistence(): void {
   if (typeof window === 'undefined') return
 
@@ -93,7 +111,8 @@ export function startPersistence(): void {
       const entries: Array<[unknown[], unknown]> = []
       for (const q of queryClient.getQueryCache().getAll()) {
         // Only persist queries flagged with persist:true in their meta
-        if (q.meta?.persist && q.state.data !== undefined) {
+        if (q.meta?.persist && q.state.data !== undefined &&
+            !isNullArtKey(q.queryKey, q.state.data)) {
           entries.push([q.queryKey as unknown[], q.state.data])
         }
       }

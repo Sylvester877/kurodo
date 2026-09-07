@@ -15,6 +15,10 @@ import type { Anime } from '../types'
 const RELAY = '/api/tmdb3'
 const IMG = 'https://image.tmdb.org/t/p'
 const TTL = 24 * 60 * 60 * 1000 // 24h — titles & logos change rarely
+// Negative (not-found) results must NOT outlive upstream changes: a show
+// that has no TMDB logo today often gains one within days/weeks. Re-check
+// misses every 30 min instead of pinning them for 24h.
+const NEG_TTL = 30 * 60 * 1000
 const TIMEOUT_MS = 3000
 
 interface CacheEntry {
@@ -110,7 +114,7 @@ function pickBestLogo(logos: TmdbLogo[]): TmdbLogo | null {
 async function searchTvId(title: string): Promise<number | null> {
   const cacheKey = `s:${title}`
   const cached = cache.get(cacheKey)
-  if (cached && Date.now() - cached.at < TTL) return cached.value as number | null
+  if (cached && Date.now() - cached.at < (cached.value == null ? NEG_TTL : TTL)) return cached.value as number | null
 
   const q = encodeURIComponent(title)
   const data = await get<TmdbSearchResponse>(`/search/tv?query=${q}&include_adult=false&language=en-US`)
@@ -144,7 +148,7 @@ export async function getAnimeLogo(anilistTitle: {
 
   const cacheKey = `logo:${title}`
   const cached = cache.get(cacheKey)
-  if (cached && Date.now() - cached.at < TTL) return cached.value as string | null
+  if (cached && Date.now() - cached.at < entryTtl(cached)) return cached.value as string | null
 
   const tvId = await searchTvId(title)
   if (!tvId) {
@@ -161,6 +165,12 @@ export async function getAnimeLogo(anilistTitle: {
   return url
 }
 
+/** Effective per-entry TTL — nulls re-check sooner than real hits. */
+function entryTtl(entry: CacheEntry | undefined): number {
+  if (!entry) return 0
+  return entry.value == null ? NEG_TTL : TTL
+}
+
 /**
  * Object-returning variant used by AnimeDetails.tsx so the page can pick
  * its own logo size and still cache the underlying object.
@@ -174,7 +184,7 @@ export async function fetchAnimeLogo(
 
   const cacheKey = `logoobj:${title}`
   const cached = cache.get(cacheKey)
-  if (cached && Date.now() - cached.at < TTL) return { logo: cached.value as TmdbLogo | null }
+  if (cached && Date.now() - cached.at < entryTtl(cached)) return { logo: cached.value as TmdbLogo | null }
 
   const tvId = await searchTvId(title)
   if (!tvId) {
@@ -199,7 +209,7 @@ export async function fetchAnimeLogo(
 export async function getTmdbBackdrop(title: string): Promise<string | null> {
   const cacheKey = `bd2:${title}` // v2 — w1280 tier (was /original); key bump evicts stale URLs
   const cached = cache.get(cacheKey)
-  if (cached && Date.now() - cached.at < TTL) return cached.value as string | null
+  if (cached && Date.now() - cached.at < entryTtl(cached)) return cached.value as string | null
 
   const tvId = await searchTvId(title)
   if (!tvId) {
@@ -254,7 +264,7 @@ const ART_TTL = 24 * 60 * 60 * 1000
 export async function fetchTmdbArt(malId: number): Promise<TmdbArt | null> {
   if (!Number.isFinite(malId) || malId < 1) return null
   const hit = artCache.get(malId)
-  if (hit && Date.now() - hit.at < ART_TTL) return hit.art
+  if (hit && Date.now() - hit.at < (hit.art == null ? NEG_TTL : ART_TTL)) return hit.art
   try {
     const ctrl = new AbortController()
     const t = window.setTimeout(() => ctrl.abort(), TIMEOUT_MS)
