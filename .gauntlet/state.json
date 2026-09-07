@@ -1,32 +1,37 @@
 {
-  "phase": "perf-sweep",
-  "iterations": 17,
+  "phase": "perf-bench",
+  "iterations": 18,
   "parityScores": { "home": 94, "detail": 88, "watch": 90, "search": 85, "schedule": 88, "watchlist": 86, "browse": 82 },
   "accentDecision": "existing (unchanged)",
   "depsAdded": [],
-  "lastSession": "fetch-time: router-state hydration on all nav surfaces + slug prewarm on hover",
-  "commits": [
-    "3fa4143 anizip shared cache",
-    "48ee756 deep-test findings",
-    "453d629 B0-4/5/6/7",
-    "535ac8a B0-9 + S1",
-    "d6732b0 chapter-manga resolve + S3",
-    "3ddf6a0 perf: decouple episode + stream chain from slow AniList",
-    "43ededb perf: hydrate details/watch from router state (all surfaces)",
-    "910c33f perf: pre-warm anidap slug on card hover",
-    "state checkpoints x3"
-  ],
-  "verified": {
-    "tests": "81/81",
-    "tsc": 0,
-    "build": "ok"
+  "benchmarkDate": "2026-09-07",
+  "benchmarkOrigin": "http://127.0.0.1:5199 (newest server code)",
+  "benchmarkNotes": "Jikan DOWN (504), AniList IP-throttled (403), chad site-wide 429 (180s) during run — measured the degraded path",
+  "fetchBench": {
+    "apiLatency": {
+      "health": "0.11s",
+      "anizip mapping cold": "0.56-0.70s",
+      "anizip mapping warm": "instant",
+      "episode-thumbs cold": "1.2-3.1s (TVDB/TMDB upstream, one-time)",
+      "episode-thumbs warm": "0.01-0.10s",
+      "servers list cold": "2.63s (slug resolve one-time, 12h cache)",
+      "servers list warm": "0.00s",
+      "img cold (first CDN fetch)": "0.74-3.62s",
+      "img warm": "0.01s",
+      "jikan anime (down)": "502 in 3.2s (race budget fail-fast)",
+      "search (down)": "502 in 2.15-4.5s",
+      "anilist feeds (throttled)": "403 fast-fail 0.07-0.08s"
+    },
+    "pageLoad": {
+      "/": "dcl 0.27s (bg: TMDB logos 2.4-2.9s first-time)",
+      "/browse": "dcl 0.08-0.10s (bg: Jikan genres 2.3s when down)",
+      "/anime/1": "dcl 0.04-0.05s",
+      "/watch/1": "dcl 0.05s (sources 4.8s = megavid+gogoanime both failing under chad 429)",
+      "/search?q=bleach": "dcl 0.05s (results 4.5s when Jikan down)",
+      "/schedule": "dcl 0.04s"
+    }
   },
-  "perfWins": [
-    "episodes fire on MAL id alone (AniZip keys MAL only)",
-    "anilistId race: disk-cached AniZip mapping vs throttled AniList GQL",
-    "router-state hydration: ContinueWatchingRail, Hero, FeaturedPicks, CommandPalette, WatchList, Profile now pass anime → dest page renders instantly (no cold Jikan)",
-    "anidap slug (biggest cold cost ~1-3.5s, 12h cache) pre-warmed on card hover, chained off epInfo — dedupes with details-page prefetch via shared queryKey"
-  ],
+  "perfConclusion": "All pages paint in <0.3s. Cold API costs are one-time upstream payments (cached after: servers 0s, thumbs 0.01-0.1s, img 0.01s, anizip instant). Multi-second waits only occur when upstreams are simultaneously down/throttled, and the code degrades gracefully (fast-fail + fallbacks + countdown). Benchmark scripts: scripts-perf/fetch_bench.mjs + page_load_bench.mjs",
   "remaining": [
     "real-download concurrent test (needs consent + bandwidth)",
     "push stacked commits to GitHub when user re-auths",
