@@ -82,7 +82,7 @@ if (!gotLock) {
   console.log('[electron] Another instance is already running — quitting.')
   app.quit()
   // app.quit() is async; force exit after a short delay if still alive.
-  setTimeout(() => process.exit(0), 2000)
+  setTimeout(() => quitApp('duplicate instance — force exit after app.quit()'), 2000)
 }
 
 app.on('second-instance', () => {
@@ -157,7 +157,7 @@ app.on('render-process-gone', (_event, webContents, details) => {
     console.error('[electron] Renderer keeps crashing — relaunching with --disable-gpu (self-heal)')
     markGpuSelfHeal()
     app.relaunch({ args: process.argv.slice(1).concat(['--disable-gpu']) })
-    app.exit(0)
+    quitApp('self-heal relaunch with --disable-gpu after repeated renderer crashes')
     return
   }
   renderCrashReloadCount++
@@ -439,53 +439,81 @@ function createMainWindow() {
       // seconds so the app never lingers silently playing audio in the
       // background after the user closed it.
       setTimeout(() => {
-        if (quitting) app.exit(0)
+        if (quitting) quitApp('forced quit after window close (belt-and-braces)')
       }, 4000)
     }
   })
   win.on('closed', () => {
-    if (!quitting) recreateMainWindow()
+    if (!quitting) scheduleMainWindowRecovery('window closed unexpectedly')
   })
   win.webContents.on('destroyed', () => {
-    if (!quitting) recreateMainWindow()
+    if (!quitting) scheduleMainWindowRecovery('webContents destroyed unexpectedly')
   })
 
   return win
 }
 
-/** Recreate the main window after it died unexpectedly (crash / GPU death). */
-function recreateMainWindow() {
+// ── Crash-recovery budget ──
+// A window that dies in a loop (persistent GPU/driver fault) must not turn
+// into an infinite respawn hammering the CPU. Allow 5 in-process recoveries
+// per 60s; past that, log loudly and STOP respawning (the app stays alive,
+// user can relaunch the window from the tray/icon or restart). The backend
+// server keeps running either way — never kill the process over a window.
+let windowRecoveries = [] // timestamps of recent in-process recoveries
+function scheduleMainWindowRecovery(reason) {
   if (quitting) return
   if (mainWindow && !mainWindow.isDestroyed()) return
-  // If the window died within the first moments of its life it was almost
-  // certainly a user close (or a close/quit race), not a crash we can heal.
-  // Recreating it would resurrect the app after the user tried to quit — the
-  // "closes the app but it comes back / keeps playing in the background" bug.
-  // (A user X-click always fires 'close' → sets quitting, so this guard only
-  // protects against unknown destroy paths; 2s keeps early real-crash
-  // recovery intact.)
+  // A window dying within its first 2s of life is almost certainly a user
+  // close (or a close/quit race), not a crash we can heal — resurrecting it
+  // would bring the app back after the user tried to quit. (A user X-click
+  // always fires 'close' → sets quitting, so this guard only protects
+  // against unknown destroy paths.)
   if (Date.now() - mainWinCreatedAt < 2000) {
     console.error('[electron] Main window died <2s after creation — not recreating (user close).')
-    writeDiag('Main window died <2s after creation — not recreating')
+    writeDiag(`Main window died <2s after creation — not recreating (${reason})`)
     return
   }
-  console.error('[electron] Main window destroyed unexpectedly — recreating...')
-  writeDiag('Main window destroyed unexpectedly — recreating')
-  try {
-    const w = createMainWindow()
-    mainWindow = w
-    w.loadURL(SERVER_URL).catch(() => {})
-    w.show()
-    w.focus()
-    // Signal the freshly-booted page that this was a crash recovery, NOT a
-    // normal launch — the Watch page uses this to stay paused instead of
-    // auto-playing (fixes "the app opens an anime by itself").
-    w.webContents.once('did-finish-load', () => {
-      if (!w.isDestroyed()) w.webContents.send('app:recovered')
-    })
-  } catch (e) {
-    console.error('[electron] Failed to recreate main window:', e.message)
+  const now = Date.now()
+  windowRecoveries = windowRecoveries.filter((t) => now - t < 60_000)
+  if (windowRecoveries.length >= 5) {
+    console.error('[electron] Main window keeps dying — giving up on auto-recreate (5 in 60s). Backend stays alive.')
+    writeDiag('Main window keeps dying — auto-recreate paused (5 in 60s)')
+    return
   }
+  windowRecoveries.push(now)
+  console.error(`[electron] Main window lost (${reason}) — recreating in-process (recovery ${windowRecoveries.length})...`)
+  writeDiag(`Main window lost (${reason}) — recreating (recovery ${windowRecoveries.length})`)
+  // Defer so a crash that tears down several windows at once settles first.
+  setTimeout(() => {
+    if (quitting) return
+    if (mainWindow && !mainWindow.isDestroyed()) return
+    try {
+      const w = createMainWindow()
+      mainWindow = w
+      w.loadURL(SERVER_URL).catch(() => {})
+      w.show()
+      w.focus()
+      // Signal the freshly-booted page that this was a crash recovery, NOT a
+      // normal launch — the Watch page uses this to stay paused instead of
+      // auto-playing (fixes "the app opens an anime by itself").
+      w.webContents.once('did-finish-load', () => {
+        if (!w.isDestroyed()) w.webContents.send('app:recovered')
+      })
+    } catch (e) {
+      console.error('[electron] Failed to recreate main window:', e.message)
+      writeDiag('Failed to recreate main window: ' + e.message)
+    }
+  }, 1500)
+}
+
+/** Log + persist every process-exit decision so a "silent death" is never
+ *  unattributable again (the backend server lives in this process, so any
+ *  exit without a logged reason is a bug worth chasing). */
+function quitApp(reason) {
+  const msg = `[electron] EXIT — ${reason}`
+  console.error(msg)
+  writeDiag(msg)
+  app.exit(0)
 }
 
 // ── Create the splash window (frameless overlay with the animation) ──
@@ -902,7 +930,7 @@ function compareVersions(a, b) {
 ipcMain.on('app:restart', () => {
   console.log('[electron] Restart requested — relaunching app')
   app.relaunch()
-  app.exit(0)
+  quitApp('user-triggered restart (app:restart)')
 })
 
 // ── Clear renderer cache and storage (error page hard reload) ───────
@@ -1155,7 +1183,7 @@ ipcMain.on('update:install', () => {
     if (!update.installerPath) {
       console.log('[local-update] No installer — relaunching app')
       app.relaunch()
-      app.exit(0)
+      quitApp('local update relaunch (no installer)')
       return
     }
 
@@ -2234,9 +2262,25 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  // Clean up torrent progress interval to prevent leaks
+  // ── Window-loss resilience ──
+  // The embedded backend (all of /api/*, the SPA, stream proxy) runs INSIDE
+  // this process. Every time a crash silently tears windows down (GPU
+  // process death, renderer OOM, network-service teardown — paths that do
+  // NOT always fire 'close'/'closed'/'render-process-gone'), the old code
+  // hit `app.quit()` here and took the whole server down with it → users
+  // saw ERR_CONNECTION_REFUSED until a manual restart. Only quit when the
+  // user actually asked to quit (the window 'close' handler sets `quitting`);
+  // any other all-windows-gone state is treated as a crash and the main
+  // window is recreated in-process instead of killing the process.
+  if (!quitting) {
+    console.error('[electron] window-all-closed fired while NOT quitting — recreating main window (crash recovery)')
+    writeDiag('window-all-closed fired while not quitting — recreating main window')
+    scheduleMainWindowRecovery('all windows lost')
+    return
+  }
+
+  // User-initiated quit — clean up torrent progress interval + stream server.
   if (torrentProgressInterval) clearInterval(torrentProgressInterval)
-  // Close torrent stream server
   torrentStreamServer.close(() => console.log('[torrent] Stream server closed'))
   // Clean up extracted subtitle cache
   try {
