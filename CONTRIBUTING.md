@@ -1,32 +1,82 @@
 # Contributing to Kurōdo
 
-PRs are welcome — bug fixes, providers, UI polish, docs, all of it.
+Thanks for taking the time to contribute.
 
-## Quick dev loop
+Kurōdo is developed around a simple principle: **ship improvements that make the app faster, clearer, and nicer to use.**
+
+## Start here
+
+New to the codebase? Check the open issues tagged `good first issue` or `help wanted`.
+
+- [Open issues](https://github.com/Sylvester877/kurodo/issues)
+- [Discussions](https://github.com/Sylvester877/kurodo/discussions)
+- [Roadmap](https://github.com/Sylvester877/kurodo#roadmap)
+
+## Local development
 
 ```bash
 npm install
-npm start            # web app on :5173
-npm run electron:dev # desktop app
-npx tsc --noEmit     # typecheck
-npx vitest run       # tests
+npm start
+npm run electron:dev
 ```
 
-## Ground rules
+## Before opening a PR
 
-- **Typecheck + tests must pass** before your PR (`npx tsc --noEmit && npx vitest run`).
-- **Match the existing style** — the codebase uses functional React, Zustand stores, TanStack Query, and Tailwind utility classes.
-- **No provider spam** — new stream providers must handle failure gracefully (timeouts, negative caching) and never block the rest of the router.
-- **Keep the UI dark, glassy, and fast** — animations must be compositor-only (opacity/transform), no per-frame blur/filters.
-- One feature or fix per PR. Keep diffs reviewable.
+Run the same checks used by CI:
 
-## Areas that especially need help
+```bash
+npm run typecheck
+npm test
+npm run build
+```
 
-- Linux/macOS packaging
-- Tracker integrations (MAL, Simkl)
-- Accessibility passes (focus rings, screen-reader labels)
-- Translations / i18n
+Or run everything in one command:
+
+```bash
+npm run check
+```
+
+## What makes a good contribution?
+
+### UI
+Keep the visual language dark, cinematic, glassy, and fast. Prefer compositor-friendly animations such as `opacity` and `transform`. Avoid expensive per-frame effects that make scrolling or playback feel heavy.
+
+### Performance
+Large episode lists and content rails should remain responsive. Prefer virtualisation, lazy rendering, caching, and targeted network requests over mounting or fetching everything at once.
+
+### Providers and external services
+New integrations should fail gracefully. Timeouts, rate limits, bad responses, and temporary outages should not bring down unrelated parts of the app.
+
+### Tests
+Add or update tests for behavior that could regress, especially playback logic, caching, provider routing, and shared UI components.
+
+### Pull requests
+Keep PRs focused. One feature or fix per PR makes review much easier.
+
+For UI changes, include screenshots or a short recording in the PR description.
 
 ## Reporting bugs
 
-Open a [bug report](https://github.com/Sylvester877/kurodo/issues/new?template=bug_report.md) with your Kurōdo version, steps to reproduce, and screenshots. DevTools console output (Ctrl+Shift+I) makes fixes dramatically faster.
+Use the [bug report template](https://github.com/Sylvester877/kurodo/issues/new?template=bug_report.md). Include:
+
+- Kurōdo version
+- Operating system
+- Steps to reproduce
+- Expected vs actual behavior
+- Screenshots or a short recording when useful
+- Relevant console output when available
+
+## Security
+
+Do not publish security vulnerabilities in a normal issue. See [SECURITY.md](./SECURITY.md) for the private reporting process.
+
+## Areas where help is especially useful
+
+- Linux and macOS packaging
+- Accessibility
+- Internationalisation
+- Tracker integrations
+- UI polish and performance
+- Documentation
+
+Every useful contribution helps make Kurōdo a stronger project. Thank you.
