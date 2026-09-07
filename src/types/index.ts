@@ -124,7 +124,7 @@ export interface ElectronAPI {
   openExternal: (url: string) => void
   onUpdateAvailable: (callback: (info: { version: string; releaseDate: string }) => void) => (() => void)
   onUpdateProgress: (callback: (data: { percent: number; transferred: number; total: number; bytesPerSecond: number }) => void) => (() => void)
-  onUpdateReady: (callback: (info: { version: string; releaseDate: string }) => void) => void
+  onUpdateReady: (callback: (info: { version: string; releaseDate: string }) => void) => (() => void)
   removeUpdateReadyListener: () => void
   installUpdate: () => void
   getAppVersion: () => string

@@ -82,7 +82,7 @@ export default function UpdateNotification() {
     }
 
     // Update ready to install
-    api.onUpdateReady((info: UpdateInfo) => {
+    const removeUpdateReady = api.onUpdateReady((info: UpdateInfo) => {
       setUpdate(info)
       setPhase('ready')
       setProgress(null)
@@ -95,7 +95,7 @@ export default function UpdateNotification() {
     })
 
     return () => {
-      api.removeUpdateReadyListener()
+      removeUpdateReady()
       cleanupRefs.current.forEach((fn) => fn())
       if (pendingTimeout.current) {
         clearTimeout(pendingTimeout.current)

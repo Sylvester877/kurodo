@@ -371,8 +371,22 @@ function createMainWindow() {
 
   // Purge any service-worker registration/caches left over from previous
   // versions (they preload a stale SPA shell → blank window after update).
-  // Idempotent and cheap once clean.
+  // B0-6: version-gated — only run ONCE per installed version instead of on
+  // every single page load (a real cost: SW unregister + cache clear + GC
+  // every navigation). The marker file records the last version we purged
+  // for, so a same-version reload is a no-op and an upgrade re-purges once.
+  const swPurgeMarkerPath = () => path.join(app.getPath('userData'), 'last-sw-purge-version')
+  const needsSwPurge = () => {
+    try {
+      const last = fs.readFileSync(swPurgeMarkerPath(), 'utf8').trim()
+      return last !== app.getVersion()
+    } catch { return true } // no marker yet → first run of this install
+  }
+  const markSwPurged = () => {
+    try { fs.writeFileSync(swPurgeMarkerPath(), app.getVersion(), 'utf8') } catch { /* best-effort */ }
+  }
   win.webContents.on('did-finish-load', () => {
+    if (!needsSwPurge()) return
     win.webContents
       .executeJavaScript(`(async () => { try {
         const regs = await navigator.serviceWorker?.getRegistrations?.() || []
@@ -380,6 +394,7 @@ function createMainWindow() {
         for (const n of await caches.keys()) await caches.delete(n)
         return regs.length
       } catch { return -1 } })()`)
+      .then((n) => { if (n !== -1) markSwPurged() })
       .catch(() => {})
   })
 
@@ -1283,7 +1298,10 @@ const torrentStreamServer = http.createServer((req, res) => {
     return res.end()
   }
 
-  const match = req.url?.match(/^\/stream\/([a-fA-F0-9]+)\/(\d+)\/(.+)$/)
+  // B0-7: infoHash must be exactly 40 hex chars (torrent SHA-1). The old
+  // `[a-fA-F0-9]+` accepted 39/41-char junk, which then failed as "torrent
+  // not found" or worse matched a wrong torrent prefix.
+  const match = req.url?.match(/^\/stream\/([a-fA-F0-9]{40})\/(\d+)\/(.+)$/)
 
   // ── Wyzie subtitle serving ─────────────────────────────────────
   const wyzieSubMatch = req.url?.match(/^\/subtitles\/wyzie\/([\w-]+)\.vtt$/)
@@ -1316,7 +1334,7 @@ const torrentStreamServer = http.createServer((req, res) => {
   }
 
   // ── Embedded subtitle serving ──────────────────────────────────
-  const subMatch = req.url?.match(/^\/subtitles\/([a-fA-F0-9]+)\/(\d+)\.vtt$/)
+  const subMatch = req.url?.match(/^\/subtitles\/([a-fA-F0-9]{40})\/(\d+)\.vtt$/)
   if (subMatch) {
     const [, subInfoHash, subStreamIdx] = subMatch
     const subFile = path.join(subtitleCachePath, `${subInfoHash}_${subStreamIdx}.vtt`)
@@ -1373,6 +1391,33 @@ const torrentStreamServer = http.createServer((req, res) => {
 
   const fileSize = file.length
   const rangeHeader = req.headers.range
+  // Stable ETag so If-Range can decide between a 206 and a fresh 200.
+  const etag = `"${infoHash}-${fileIndex}-${fileSize}"`
+
+  const pipeFileStream = (stream) => {
+    stream.pipe(res)
+    stream.on('error', (err) => {
+      console.error('[torrent-stream] Error:', err.message)
+      if (!res.headersSent) res.writeHead(500)
+      res.end()
+    })
+    req.on('close', () => stream.destroy())
+  }
+
+  // If-Range: when the client cached a partial response under an ETag that
+  // no longer matches (file changed / re-added), it expects a fresh 200 of
+  // the WHOLE resource — never a mismatched 206.
+  const ifRange = req.headers['if-range']
+  if (ifRange && ifRange !== etag) {
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+      'ETag': etag,
+      'Transfer-Encoding': 'chunked',
+    })
+    pipeFileStream(file.createReadStream())
+    return
+  }
 
   if (!rangeHeader) {
     // No Range — stream whatever is available so far (chunked transfer).
@@ -1381,40 +1426,82 @@ const torrentStreamServer = http.createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': contentType,
       'Accept-Ranges': 'bytes',
+      'ETag': etag,
       'Transfer-Encoding': 'chunked',
     })
-    const stream = file.createReadStream()
-    stream.pipe(res)
-    stream.on('error', (err) => {
-      console.error('[torrent-stream] Error:', err.message)
-      if (!res.headersSent) res.writeHead(500)
-      res.end()
-    })
-    req.on('close', () => stream.destroy())
+    pipeFileStream(file.createReadStream())
     return
   }
 
-  // Byte-range request — allow seeking within partially downloaded data
-  const positions = rangeHeader.replace(/bytes=/, '').split('-')
-  const start = parseInt(positions[0], 10) || 0
-  const end = positions[1] ? parseInt(positions[1], 10) : fileSize - 1
-  const chunkSize = end - start + 1
+  // ── Byte-range request (B0-4) ──
+  // Strict RFC 7233 parsing. Old code did `parseInt(x)||0` which silently
+  // treated garbage, negatives, AND byte 0 as 0 (seek-to-start on malformed
+  // input) and never 416'd. Grammar handled here:
+  //   bytes=START-END   (bounded)   bytes=START-   (open-ended)
+  //   bytes=-N          (suffix: last N bytes)
+  // Anything else → 416 with Content-Range: bytes */SIZE.
+  const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader).trim())
+  if (!rangeMatch || (!rangeMatch[1] && !rangeMatch[2])) {
+    // Malformed or "bytes=-" (no digits at all) — unsatisfiable.
+    res.writeHead(416, {
+      'Content-Range': `bytes */${fileSize}`,
+      'Accept-Ranges': 'bytes',
+    })
+    return res.end()
+  }
 
+  const rawStart = rangeMatch[1]
+  const rawEnd = rangeMatch[2]
+  let start, end
+  if (rawStart === '') {
+    // Suffix range bytes=-N — the last N bytes of the file.
+    const suffixLen = Number(rawEnd)
+    if (!Number.isFinite(suffixLen) || suffixLen <= 0) {
+      res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` })
+      return res.end()
+    }
+    end = fileSize - 1
+    start = Math.max(0, fileSize - suffixLen)
+  } else {
+    start = Number(rawStart)
+    if (!Number.isFinite(start) || start < 0) {
+      res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` })
+      return res.end()
+    }
+    if (rawEnd === '') {
+      // Open-ended bytes=START- — through the last available byte.
+      end = fileSize - 1
+    } else {
+      end = Number(rawEnd)
+      if (!Number.isFinite(end)) {
+        res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` })
+        return res.end()
+      }
+    }
+  }
+
+  // Clamp: end past EOF is legal — serve through the actual last byte.
+  if (end >= fileSize) end = fileSize - 1
+
+  // Unsatisfiable: start beyond EOF, or inverted range after clamping
+  // (file is empty, or START-END with END < START).
+  if (start >= fileSize || end < start || fileSize === 0) {
+    res.writeHead(416, {
+      'Content-Range': `bytes */${fileSize}`,
+      'Accept-Ranges': 'bytes',
+    })
+    return res.end()
+  }
+
+  const chunkSize = end - start + 1
   res.writeHead(206, {
     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
     'Accept-Ranges': 'bytes',
     'Content-Length': chunkSize,
     'Content-Type': contentType,
+    'ETag': etag,
   })
-
-  const stream = file.createReadStream({ start, end })
-  stream.pipe(res)
-  stream.on('error', (err) => {
-    console.error('[torrent-stream] Error:', err.message)
-    if (!res.headersSent) res.writeHead(500)
-    res.end()
-  })
-  req.on('close', () => stream.destroy())
+  pipeFileStream(file.createReadStream({ start, end }))
 })
 
 // listen() moved inside app.whenReady() to avoid port binding before Electron init

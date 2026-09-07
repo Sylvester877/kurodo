@@ -81,11 +81,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update-download-progress', handler)
     return () => ipcRenderer.removeListener('update-download-progress', handler)
   },
-  /** Listen for 'update-ready' events from main process. */
+  /** Listen for 'update-ready' events from main process. Returns an
+   *  unsubscribe function (B0-5) — old code only offered the blunt
+   *  removeAllListeners, which also nuked any OTHER listener on the same
+   *  channel. Per-subscription removal keeps the Settings page's
+   *  mount/unmount cycles leak-free without cross-talk. */
   onUpdateReady: (callback) => {
-    ipcRenderer.on('update-ready', (_event, info) => callback(info))
+    const handler = (_event, info) => callback(info)
+    ipcRenderer.on('update-ready', handler)
+    return () => ipcRenderer.removeListener('update-ready', handler)
   },
-  /** Remove update-ready listener. */
+  /** Remove update-ready listener. Deprecated — prefer the remover
+   *  returned by onUpdateReady. Kept for backward compat. */
   removeUpdateReadyListener: () => {
     ipcRenderer.removeAllListeners('update-ready')
   },

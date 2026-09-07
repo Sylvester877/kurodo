@@ -82,15 +82,14 @@ export default function Settings() {
       }))
     }
 
-    // onUpdateReady doesn't return a cleanup function
-    api.onUpdateReady?.((info) => {
+    const removeUpdateReady = api.onUpdateReady?.((info) => {
       setUpdateVersion(info.version)
       setUpdatePhase('ready')
       setUpdateProgress(null)
     })
 
     return () => {
-      api.removeUpdateReadyListener?.()
+      removeUpdateReady?.()
       updateCleanup.current.forEach((fn) => fn())
       if (resetTimeout.current) {
         clearTimeout(resetTimeout.current)
