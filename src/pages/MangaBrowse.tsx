@@ -4,12 +4,12 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, BookOpen, TrendingUp, Star, Loader2, Compass,
-  ListFilter, Play, SlidersHorizontal, Check, X,
+  ListFilter, Play, SlidersHorizontal, Check, X, RefreshCw,
 } from 'lucide-react'
 import { cn, proxifyImgUrl } from '../lib/utils'
 import MangaContinueReadingRail from '../components/MangaContinueReadingRail'
 import {
-  getLatestManga, browseManga, getBrowseTags,
+  getLatestManga, browseManga, getBrowseTags, searchManga as searchMangaDex,
   type BrowseTags,
 } from '../api/mangadex'
 import { getTrendingManga, getPopularManga, searchMangaAniList } from '../api/anilistManga'
@@ -55,6 +55,47 @@ const SORT_OPTIONS = [
   { value: 'trending', label: 'Trending' },
 ] as const
 
+// ── Unified search card shape ──
+// Both AniList manga (rich metadata) and MangaDex manga (uuid ids, always
+// up during AniList outages) normalize into this one shape, so search keeps
+// working no matter which source answered.
+type SearchCard = {
+  id: number | string
+  title: string
+  coverUrl: string
+  score: number | null
+  format: string | null
+  chapters: number | null
+  year: number | null
+  isMangaDex: boolean
+}
+
+function anilistToSearchCard(m: any): SearchCard {
+  return {
+    id: m.id,
+    title: m.title?.english || m.title?.romaji || 'Untitled',
+    coverUrl: m.coverImage?.large || m.coverImage?.extraLarge || '',
+    score: m.averageScore ? m.averageScore / 10 : null,
+    format: m.format || null,
+    chapters: m.chapters ?? null,
+    year: m.startDate?.year || null,
+    isMangaDex: false,
+  }
+}
+
+function mangadexToSearchCard(m: any): SearchCard {
+  return {
+    id: m.id,
+    title: m.title || 'Untitled',
+    coverUrl: m.coverUrl || '',
+    score: null,
+    format: null,
+    chapters: null,
+    year: m.year || null,
+    isMangaDex: true,
+  }
+}
+
 export default function MangaBrowse() {
   useTitle('Manga')
   const [tab, setTab] = useState<Tab>('trending')
@@ -80,16 +121,36 @@ export default function MangaBrowse() {
   const tags: BrowseTags | undefined = tagsQuery.data
 
   // ── Existing tab queries ──
+  // AniList is the rich source (scores / formats / chapter counts), but it
+  // has site-wide outages (403 on every query) — MangaDex via our own proxy
+  // keeps the feed alive during those. Each feed tries AniList first and
+  // falls back to MangaDex; items are tagged `_md` so the renderer can
+  // display them (uuid ids → /manga/:uuid works end-to-end) and honest UI
+  // can say which source answered.
   const trendingQuery = useQuery({
     queryKey: ['manga', 'trending'],
-    queryFn: () => getTrendingManga(40),
+    queryFn: async () => {
+      try {
+        return { source: 'anilist' as const, items: await getTrendingManga(40) }
+      } catch {
+        const md = await browseManga({ sort: 'trending', limit: 40 })
+        return { source: 'mangadex' as const, items: md.results.map((r: any) => ({ ...r, _md: true })) }
+      }
+    },
     staleTime: 10 * 60 * 1000,
     enabled: tab === 'trending',
   })
 
   const popularQuery = useQuery({
     queryKey: ['manga', 'popular'],
-    queryFn: () => getPopularManga(40),
+    queryFn: async () => {
+      try {
+        return { source: 'anilist' as const, items: await getPopularManga(40) }
+      } catch {
+        const md = await browseManga({ sort: 'rating', limit: 40 })
+        return { source: 'mangadex' as const, items: md.results.map((r: any) => ({ ...r, _md: true })) }
+      }
+    },
     staleTime: 10 * 60 * 1000,
     enabled: tab === 'popular',
   })
@@ -123,23 +184,56 @@ export default function MangaBrowse() {
   })
 
   // ── Search ──
+  // Primary: AniList (rich metadata + scores). AniList has site-wide outage
+  // states (403 on every query), so when it fails the search transparently
+  // re-runs against MangaDex (uuid ids → the grid/detail pages handle them).
   const searchQuery = useQuery({
     queryKey: ['manga', 'search', debouncedSearch],
     queryFn: () => searchMangaAniList(debouncedSearch, 24),
     enabled: debouncedSearch.trim().length >= 2,
     staleTime: 2 * 60 * 1000,
+    retry: 1,
+  })
+  const mdSearchQuery = useQuery({
+    queryKey: ['manga', 'search-md', debouncedSearch],
+    queryFn: async () => {
+      const res = await searchMangaDex(debouncedSearch, 24)
+      return res.results
+    },
+    enabled: debouncedSearch.trim().length >= 2 && !!searchQuery.isError,
+    staleTime: 2 * 60 * 1000,
   })
 
-  const searching = searchQuery.isFetching && debouncedSearch.trim().length >= 2
-  const searchResults = searchQuery.data ?? []
+  const searchOnAniList = !searchQuery.isError
+  const searching = (searchQuery.isFetching || mdSearchQuery.isFetching) &&
+    debouncedSearch.trim().length >= 2
+  // Unified list — normalized AniList items, or MangaDex items during an
+  // AniList outage (keeps the dropdown + grid rendering one shape).
+  const searchResults: SearchCard[] = searchOnAniList
+    ? (searchQuery.data ?? []).map(anilistToSearchCard)
+    : (mdSearchQuery.data ?? []).map(mangadexToSearchCard)
   const showSearch = debouncedSearch.trim().length >= 2
 
   // ── Derived data ──
   const rawData =
-    tab === 'trending' ? trendingQuery.data ?? [] :
-    tab === 'popular' ? popularQuery.data ?? [] :
+    tab === 'trending' ? (trendingQuery.data?.items as any[] ?? []) :
+    tab === 'popular' ? (popularQuery.data?.items as any[] ?? []) :
     tab === 'latest' ? latestQuery.data?.results ?? [] :
     []
+
+  // Did the active feed fall back to MangaDex? (source notice + format pill
+  // hiding — MangaDex items carry no AniList `format` field.)
+  const feedOnMangadex =
+    tab === 'trending' ? trendingQuery.data?.source === 'mangadex' :
+    tab === 'popular' ? popularQuery.data?.source === 'mangadex' :
+    false
+
+  // Did the active feed fail on BOTH sources? (honest outage card instead
+  // of a misleading "No manga found".)
+  const feedFailed =
+    tab === 'trending' ? !!trendingQuery.isError :
+    tab === 'popular' ? !!popularQuery.isError :
+    false
 
   // Format filter for AniList tabs (trending/popular)
   const activeData = useMemo(() => {
@@ -240,7 +334,10 @@ export default function MangaBrowse() {
           {searching && <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />}
         </div>
 
-        {showSearch && (
+        {/* Quick dropdown — only while searching or when there ARE results.
+            An empty page-level state (below) already handles the 0-hit case;
+            rendering both duplicated the "No manga found" message. */}
+        {showSearch && (searching || searchResults.length > 0) && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -250,11 +347,6 @@ export default function MangaBrowse() {
               <div className="p-8 text-center">
                 <Loader2 className="h-6 w-6 text-primary animate-spin mx-auto mb-2" />
                 <p className="text-xs text-muted-foreground">Searching...</p>
-              </div>
-            ) : searchResults.length === 0 ? (
-              <div className="p-8 text-center">
-                <Search className="h-6 w-6 text-white/10 mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">No manga found for "{search}"</p>
               </div>
             ) : (
               <div>
@@ -267,17 +359,17 @@ export default function MangaBrowse() {
                     to={`/manga/${m.id}`}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors border-b border-white/[0.03] last:border-0"
                   >
-                    <img src={proxifyImgUrl(m.coverImage?.large || m.coverImage?.extraLarge || '')} alt="" className="w-10 h-14 rounded-md object-cover bg-white/[0.04] shrink-0" loading="lazy" />
+                    <img src={proxifyImgUrl(m.coverUrl)} alt="" className="w-10 h-14 rounded-md object-cover bg-white/[0.04] shrink-0" loading="lazy" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-white font-medium truncate">{m.title.english || m.title.romaji}</p>
+                      <p className="text-sm text-white font-medium truncate">{m.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {m.averageScore && (
+                        {m.score != null && (
                           <span className="flex items-center gap-0.5 text-[10px] text-yellow-400">
-                            <Star className="h-2.5 w-2.5 fill-yellow-400" />{(m.averageScore / 10).toFixed(1)}
+                            <Star className="h-2.5 w-2.5 fill-yellow-400" />{m.score.toFixed(1)}
                           </span>
                         )}
                         <span className="text-[10px] text-muted-foreground">{m.format || 'Manga'}</span>
-                        {m.chapters && <span className="text-[10px] text-muted-foreground">{m.chapters} ch</span>}
+                        {m.chapters != null && <span className="text-[10px] text-muted-foreground">{m.chapters} ch</span>}
                       </div>
                     </div>
                   </Link>
@@ -313,8 +405,10 @@ export default function MangaBrowse() {
           ))}
         </div>
 
-        {/* Format filter for non-browse, non-latest tabs */}
-        {tab !== 'latest' && tab !== 'browse' && (
+        {/* Format filter for non-browse, non-latest tabs — hidden while the
+            feed is on the MangaDex fallback (MangaDex items carry no AniList
+            `format` field, so filtering would silently empty the grid). */}
+        {tab !== 'latest' && tab !== 'browse' && !feedOnMangadex && (
           <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06]">
             <ListFilter className="h-3 w-3 text-white/30 shrink-0 ml-1 mr-1" />
             {(['all', 'Manga', 'Manhwa', 'Manhua', 'Novel', 'One Shot'] as const).map((f) => (
@@ -467,26 +561,53 @@ export default function MangaBrowse() {
 
       {/* ── Results grid ── */}
       {showSearch ? (
-        searchResults.length === 0 ? (
+        searching ? (
           <div className="py-16 text-center">
-            <Search className="h-10 w-10 text-white/10 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No manga found for "{debouncedSearch}"</p>
+            <Loader2 className="h-8 w-8 text-primary animate-spin mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              Searching {searchOnAniList ? 'AniList' : 'MangaDex'}…
+            </p>
           </div>
+        ) : searchResults.length === 0 ? (
+          searchQuery.isError && mdSearchQuery.isError ? (
+            <OutageCard
+              message="Both the AniList catalog and the MangaDex fallback failed to answer. This is temporary — retry in a bit."
+              onRetry={() => void searchQuery.refetch()}
+              retrying={searchQuery.isFetching}
+            />
+          ) : (
+            <div className="py-16 text-center">
+              <Search className="h-10 w-10 text-white/10 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">
+                No manga found for "{debouncedSearch}"
+                {!searchOnAniList ? ' on MangaDex' : ''}
+              </p>
+            </div>
+          )
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-x-4 gap-y-6">
-            {searchResults.map((m) => (
-              <MangaBrowseCard
-                key={m.id}
-                id={m.id}
-                title={m.title.english || m.title.romaji || 'Untitled'}
-                coverUrl={m.coverImage?.large || m.coverImage?.extraLarge || ''}
-                score={m.averageScore ? m.averageScore / 10 : null}
-                format={m.format || 'Manga'}
-                chapters={m.chapters}
-                year={m.startDate?.year || null}
-              />
-            ))}
-          </div>
+          <>
+            {!searchOnAniList && (
+              <p className="mb-4 text-[10px] font-medium text-amber-400/80 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
+                AniList unreachable — results via MangaDex
+              </p>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-x-4 gap-y-6">
+              {searchResults.map((m) => (
+                <MangaBrowseCard
+                  key={m.id}
+                  id={m.id}
+                  title={m.title}
+                  coverUrl={m.coverUrl}
+                  score={m.score}
+                  format={m.format || undefined}
+                  chapters={m.chapters}
+                  year={m.year}
+                  isMangaDex={m.isMangaDex}
+                />
+              ))}
+            </div>
+          </>
         )
       ) : tab === 'browse' ? (
         /* ── Browse tab: infinite scroll from MangaDex ── */
@@ -538,9 +659,16 @@ export default function MangaBrowse() {
           {Array.from({ length: 12 }).map((_, idx) => (<SkeletonCard key={idx} />))}
         </div>
       ) : activeData.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-x-4 gap-y-6">
+        <>
+          {feedOnMangadex && (
+            <p className="mb-4 text-[10px] font-medium text-amber-400/80 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400/60" />
+              AniList unreachable — showing titles via MangaDex
+            </p>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-x-4 gap-y-6">
           {activeData.map((m: any) => {
-            const isMangaDex = !!m.coverUrl
+            const isMangaDex = !!(m as any)._md || !!m.coverUrl
             return isMangaDex ? (
               <MangaBrowseCard
                 key={m.id || m.coverUrl}
@@ -564,13 +692,44 @@ export default function MangaBrowse() {
               />
             )
           })}
-        </div>
+          </div>
+        </>
+      ) : feedFailed ? (
+        <OutageCard
+          message="The manga catalog (AniList) is unreachable and the MangaDex fallback didn't answer. This is temporary — retry in a bit."
+          onRetry={() => (tab === 'trending' ? trendingQuery : popularQuery).refetch()}
+          retrying={(tab === 'trending' ? trendingQuery : popularQuery).isFetching}
+        />
       ) : (
         <div className="py-16 text-center">
           <BookOpen className="h-12 w-12 text-white/10 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">No manga found.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Honest full-width outage/error card — used when a manga view failed on
+ *  every source so we never silently claim an empty catalog. */
+function OutageCard({ message, onRetry, retrying }: {
+  message: string
+  onRetry: () => void
+  retrying: boolean
+}) {
+  return (
+    <div className="glass-card rounded-2xl py-20 text-center px-8">
+      <BookOpen className="h-10 w-10 text-white/10 mx-auto mb-3" />
+      <p className="text-sm text-white/60 font-medium mb-1">Couldn't load manga</p>
+      <p className="text-xs text-white/30 max-w-sm mx-auto leading-relaxed">{message}</p>
+      <button
+        onClick={onRetry}
+        disabled={retrying}
+        className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-semibold hover:bg-primary/15 transition-colors disabled:opacity-50"
+      >
+        <RefreshCw className={retrying ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} />
+        Retry
+      </button>
     </div>
   )
 }

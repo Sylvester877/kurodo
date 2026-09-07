@@ -319,8 +319,201 @@ function feedToJikanList(m) {
  * Page 1 only (no offset paging here); A–Z letters, genres and details
  * return null → those keep their normal 502 (they have honest error UIs).
  */
+/** Kitsu anime resource → Jikan v4 detail-shape Anime (single-title). */
+function kitsuToJikanDetail(malId, anime) {
+  const attrs = anime?.attributes || {}
+  const poster = attrs.posterImage || {}
+  const extraLarge = poster.original || poster.large || poster.medium || ''
+  const large = poster.large || poster.medium || poster.small || extraLarge
+  const img = extraLarge
+  const thumb = large
+  const { season, seasonYear } = toSeason(attrs.startDate)
+  const typeRaw = toFormat(attrs.subtype)
+  const type = typeRaw === 'TV_SHORT' ? 'TV' : typeRaw || null
+  const trailers = attrs.youtubeVideoId
+    ? {
+        youtube_id: attrs.youtubeVideoId,
+        url: `https://www.youtube.com/watch?v=${attrs.youtubeVideoId}`,
+        embed_url: `https://www.youtube.com/embed/${attrs.youtubeVideoId}`,
+        images: {
+          image_url: null, small_image_url: null, medium_image_url: null,
+          large_image_url: null, maximum_image_url: null,
+        },
+      }
+    : {
+        youtube_id: null, url: null, embed_url: null,
+        images: {
+          image_url: null, small_image_url: null, medium_image_url: null,
+          large_image_url: null, maximum_image_url: null,
+        },
+      }
+  return {
+    mal_id: malId,
+    url: `https://myanimelist.net/anime/${malId}`,
+    images: {
+      jpg: { image_url: img, large_image_url: img, small_image_url: thumb },
+      webp: { image_url: img, large_image_url: img, small_image_url: thumb },
+    },
+    trailer: trailers,
+    title: attrs.titles?.en_jp || attrs.canonicalTitle || '',
+    title_english: attrs.titles?.en || attrs.canonicalTitle || null,
+    title_japanese: attrs.titles?.ja_jp || null,
+    type: type || '',
+    source: null,
+    episodes: attrs.episodeCount ?? null,
+    status: JIKAN_STATUS[toStatus(attrs.status)] || toStatus(attrs.status) || 'Unknown',
+    airing: attrs.status === 'current',
+    aired: {
+      from: attrs.startDate || null,
+      to: attrs.endDate || null,
+      string: seasonYear ? `${season} ${seasonYear}` : attrs.startDate || null,
+    },
+    duration: attrs.episodeLength ? `${attrs.episodeLength} min per ep` : null,
+    rating: attrs.ageRating ? String(attrs.ageRating).replace(/_/g, ' ') : null,
+    score: attrs.averageRating != null ? Math.round(attrs.averageRating * 10) / 10 : null,
+    scored_by: attrs.ratingRank ? attrs.userCount : null,
+    rank: attrs.ratingRank ?? null,
+    popularity: attrs.userCount ?? null,
+    members: attrs.userCount ?? null,
+    favorites: attrs.favoritesCount ?? null,
+    synopsis: attrs.synopsis || attrs.description || null,
+    background: null,
+    season: season || null,
+    year: seasonYear ?? null,
+    genres: [],
+    studios: [],
+    themes: [],
+    demographics: [],
+  }
+}
+
+/**
+ * Kitsu single-title detail in Jikan v4 shape, looked up by MAL id via
+ * Kitsu's mappings table (one round trip: mapping → included subject).
+ * Returns null when Kitsu is down or the MAL id has no Kitsu entry.
+ */
+async function getKitsuAnimeDetailByMal(malId) {
+  const key = `detail:${malId}`
+  const cached = cacheGet(key)
+  if (cached !== undefined) return cached
+  try {
+    // `include=item` — Kitsu's mappings resource names its polymorphic
+    // relationship `item` (verified 2026-09-07; `subject`/`mappingItem` are
+    // both rejected with 400 "not a valid relationship"). The included
+    // resource carries the anime attributes we translate below.
+    const url = `${KITSU}/mappings?filter[externalSite]=myanimelist/anime&filter[externalId]=${malId}&include=item`
+    const { data } = await axios.get(url, {
+      timeout: TIMEOUT_MS,
+      headers: {
+        Accept: 'application/vnd.api+json',
+        'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
+      },
+      validateStatus: (code) => code >= 200 && code < 300,
+    })
+    const mapping = data?.data?.[0]
+    if (!mapping) {
+      cacheSet(key, null, FAIL_TTL)
+      return null
+    }
+    const subjectId = mapping?.relationships?.item?.data?.id
+    const subject = (data?.included || []).find(
+      (inc) => (inc?.type === 'anime' || inc?.type === 'media') && subjectId != null && String(inc.id) === String(subjectId),
+    )
+    if (!subject) {
+      cacheSet(key, null, FAIL_TTL)
+      return null
+    }
+    const anime = kitsuToJikanDetail(malId, subject)
+    cacheSet(key, anime, TTL)
+    return anime
+  } catch (e) {
+    console.warn('[kitsu-feed] detail lookup failed:', malId, e?.message || e)
+    cacheSet(key, null, FAIL_TTL)
+    return null
+  }
+}
+
+/**
+ * Kitsu title search in Jikan v4 list shape (MAL ids resolved via the same
+ * mappings include). Powers the search page + quick search during outages.
+ */
+async function getKitsuSearchAsJikan(q, page, limit) {
+  const lim = Math.min(Math.max(Number(limit) || 20, 1), 20)
+  const offset = (Math.max(1, page) - 1) * lim
+  const key = `search:${q}:${lim}:${offset}`
+  const cached = cacheGet(key)
+  if (cached !== undefined) return cached
+  try {
+    const url = `${KITSU}/anime?filter[text]=${encodeURIComponent(String(q))}&include=mappings&${MAPPING_FIELDS}&page[limit]=${lim}&page[offset]=${offset}`
+    const { data } = await axios.get(url, {
+      timeout: TIMEOUT_MS,
+      headers: {
+        Accept: 'application/vnd.api+json',
+        'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
+      },
+      validateStatus: (code) => code >= 200 && code < 300,
+    })
+    const includedById = new Map()
+    for (const inc of data?.included || []) {
+      if ((inc?.type === 'mappings' || inc?.type === 'mapping') && inc?.id != null) {
+        includedById.set(String(inc.id), inc.attributes || {})
+      }
+    }
+    const total = Number(data?.meta?.count) || 0
+    const rows = (data?.data || [])
+      .map((a) => kitsuToFeedMedia(a, includedById))
+      .filter(Boolean)
+      .map(feedToJikanList)
+      .filter(Boolean)
+    if (rows.length === 0) {
+      cacheSet(key, null, FAIL_TTL)
+      return null
+    }
+    const out = {
+      data: rows,
+      pagination: {
+        last_visible_page: Math.max(1, Math.ceil(total / lim)),
+        has_next_page: offset + rows.length < total,
+        current_page: page,
+        items: { count: total, total, per_page: lim, pages: Math.max(1, Math.ceil(total / lim)) },
+      },
+    }
+    cacheSet(key, out, TTL)
+    return out
+  } catch (e) {
+    console.warn('[kitsu-feed] search fallback failed:', q, e?.message || e)
+    cacheSet(key, null, FAIL_TTL)
+    return null
+  }
+}
+
+/**
+ * Final-stage fallback for /api/jikan/* when Jikan AND AniList both fail:
+ * serve list endpoints (top / popular / upcoming / this-season / explicit
+ * season), title search (/anime?q=…) and single-title details
+ * (/anime/:id[/full]) from Kitsu in Jikan's v4 shape so Browse, Search and
+ * the Anime details page keep working. A–Z letters and genre filters have
+ * no Kitsu equivalent and return null → those keep their honest 502 UIs.
+ */
 export async function getKitsuFeedAsJikan(targetPath, query) {
   const page = Math.max(1, Number.isFinite(Number(query?.page)) ? Number(query.page) : 1)
+
+  // Single-title detail by MAL id (both /anime/:id and /anime/:id/full).
+  const detailMatch = targetPath.match(/^\/anime\/(\d+)(?:\/full)?$/)
+  if (detailMatch) {
+    const anime = await getKitsuAnimeDetailByMal(Number(detailMatch[1]))
+    return anime ? { data: anime } : null
+  }
+
+  // Title search list (/anime?q=…).
+  if (targetPath === '/anime' && query?.q) {
+    const q = Array.isArray(query.q) ? query.q[0] : query.q
+    if (q && String(q).trim()) {
+      const out = await getKitsuSearchAsJikan(String(q).trim(), page, query.limit)
+      return out
+    }
+  }
+
   if (page > 1) return null
   const limit = Math.min(Math.max(Number(query?.limit) || 24, 1), 50)
 

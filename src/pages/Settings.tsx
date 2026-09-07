@@ -739,7 +739,7 @@ export default function Settings() {
               </a>
             </Row>
             <Row label="Version">
-              <span className="text-xs font-mono text-muted-foreground">0.1.0</span>
+              <span className="text-xs font-mono text-muted-foreground">{appVersion || __APP_VERSION__}</span>
             </Row>
             <Row label="Backend">
               <a
