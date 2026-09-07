@@ -167,7 +167,7 @@ export default function CommandPalette() {
           detail: `Resume EP ${c.episode}`,
           poster: getSmallImageUrl(c.anime),
           icon: <PlayCircle className="h-4 w-4 text-primary" />,
-          perform: () => navigate(`/watch/${c.anime.mal_id}?ep=${c.episode}`),
+          perform: () => navigate(`/watch/${c.anime.mal_id}?ep=${c.episode}`, { state: { anime: c.anime } }),
         })
       }
     }
@@ -401,7 +401,7 @@ export default function CommandPalette() {
           detail: 'From your watchlist',
           poster: getSmallImageUrl(a),
           icon: <Heart className="h-4 w-4 text-red-300" />,
-          perform: () => navigate(`/anime/${a.mal_id}`),
+          perform: () => navigate(`/anime/${a.mal_id}`, { state: { anime: a } }),
         })
       }
     }

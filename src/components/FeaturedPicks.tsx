@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Star, Calendar, Tv, Film, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getAllTimeTop } from '../api/anilist'
+import { feedMediaToAnime } from '../lib/adapters'
 import SectionHeader from './SectionHeader'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { proxifyImgUrl, cn } from '../lib/utils'
@@ -128,6 +129,7 @@ export default function FeaturedPicks() {
           {current && (
             <Link
               to={`/anime/${current.idMal}`}
+              state={{ anime: feedMediaToAnime(current) }}
               {...preloadHandlers('/anime/x')}
               className="shrink-0 hidden md:block self-center"
               aria-label={title}
@@ -154,6 +156,7 @@ export default function FeaturedPicks() {
               <h3 className="font-display font-bold text-white leading-tight tracking-tight line-clamp-2 text-[22px] sm:text-3xl lg:text-[34px]">
                 <Link
                   to={`/anime/${current.idMal}`}
+                  state={{ anime: feedMediaToAnime(current) }}
                   {...preloadHandlers('/anime/x')}
                   className="hover:text-primary transition-colors"
                 >
@@ -199,6 +202,7 @@ export default function FeaturedPicks() {
               <div className="flex flex-wrap items-center gap-2.5 mt-3.5">
                 <Link
                   to={`/watch/${current.idMal}?ep=1`}
+                  state={{ anime: feedMediaToAnime(current) }}
                   {...preloadHandlers('/watch/x')}
                   className="group/btn inline-flex items-center gap-2 bg-white hover:bg-white/90 text-black h-9 px-5 rounded-full font-bold text-xs shadow-lg shadow-white/15"
                 >
@@ -207,6 +211,7 @@ export default function FeaturedPicks() {
                 </Link>
                 <Link
                   to={`/anime/${current.idMal}`}
+                  state={{ anime: feedMediaToAnime(current) }}
                   {...preloadHandlers('/anime/x')}
                   className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white h-9 px-4 rounded-full font-semibold text-xs border border-white/15 backdrop-blur-md"
                 >

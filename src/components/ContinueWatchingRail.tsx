@@ -106,6 +106,10 @@ export default function ContinueWatchingRail() {
             >
               <Link
                 to={watchUrl}
+                // Pass the full anime via router state so the Watch page
+                // hydrates its Jikan query instantly (no cold refetch of a
+                // title we already hold). Same pattern as AnimeCard → details.
+                state={{ anime: c.anime }}
                 {...preloadHandlers('/watch/x')}
                 className="block rounded-2xl overflow-hidden border border-white/[0.06] bg-black/50 hover:border-white/[0.12] hover:bg-black/65 transition-all duration-200"
               >

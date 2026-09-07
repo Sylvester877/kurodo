@@ -737,7 +737,13 @@ export default function WatchList() {
                   </div>
                 ) : null}
                 {!selectMode && (
-                  <Link to={`/anime/${anime.mal_id}`} className="block">
+                  <Link
+                    to={`/anime/${anime.mal_id}`}
+                    // Pass the anime so the details page hydrates its Jikan
+                    // query from router state — no cold refetch.
+                    state={{ anime }}
+                    className="block"
+                  >
                     <div className="relative aspect-[3/4] overflow-hidden bg-gradient-to-br from-card to-black/60">
                       <img
                         src={getImageUrl(anime) || getSmallImageUrl(anime)}
@@ -805,6 +811,7 @@ export default function WatchList() {
                 {!selectMode && (
                   <Link
                     to={`/watch/${anime.mal_id}`}
+                    state={{ anime }}
                     className="absolute inset-0 grid place-items-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
                   >
                     <div className="h-10 w-10 rounded-full bg-primary/90 grid place-items-center shadow-lg pointer-events-auto">
@@ -895,7 +902,11 @@ export default function WatchList() {
                   </div>
                 ) : null}
                 {!selectMode && (
-                  <Link to={`/anime/${anime.mal_id}`} className="shrink-0">
+                  <Link
+                    to={`/anime/${anime.mal_id}`}
+                    state={{ anime }}
+                    className="shrink-0"
+                  >
                     <img
                       src={getSmallImageUrl(anime)}
                       alt={anime.title}
@@ -907,6 +918,7 @@ export default function WatchList() {
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/anime/${anime.mal_id}`}
+                    state={{ anime }}
                     onClick={(e) => selectMode && e.preventDefault()}
                     className="font-semibold text-sm text-white hover:text-primary transition-colors line-clamp-1"
                   >
@@ -946,6 +958,7 @@ export default function WatchList() {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <Link
                       to={`/watch/${anime.mal_id}`}
+                      state={{ anime }}
                       className="h-9 w-9 rounded-lg bg-primary/20 flex items-center justify-center text-primary hover:bg-primary/30 transition-colors"
                       title="Watch"
                     >

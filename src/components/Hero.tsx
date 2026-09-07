@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
 import { Play, Clock, Star, ChevronLeft, ChevronRight, Calendar, Film, Tv } from 'lucide-react'
 import { getTrending, getAiringSchedule } from '../api/anilist'
 import { getTmdbBackdrop, getAnimeLogo } from '../api/tmdb'
+import { feedMediaToAnime } from '../lib/adapters'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { useSettings } from '../store/useSettings'
 import { useShallow } from 'zustand/react/shallow'
@@ -363,6 +364,10 @@ export default function Hero() {
                     >
                       <Link
                         to={`/watch/${current.idMal}?ep=1`}
+                        // Hydrate the Watch page's Jikan query from the hero
+                        // item we already hold (FeedMedia → Anime) — no cold
+                        // refetch on "Watch Now".
+                        state={{ anime: feedMediaToAnime(current) }}
                         {...preloadHandlers('/watch/x')}
                         className="group inline-flex items-center justify-center gap-2 bg-white hover:bg-white/90 text-black h-11 px-8 rounded-full font-bold text-sm shadow-lg shadow-white/20"
                       >
@@ -379,6 +384,7 @@ export default function Hero() {
                     >
                       <Link
                         to={`/anime/${current.idMal}`}
+                        state={{ anime: feedMediaToAnime(current) }}
                         {...preloadHandlers('/anime/x')}
                         className="group inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white h-11 px-6 rounded-full font-semibold text-sm border border-white/15 backdrop-blur-md"
                       >

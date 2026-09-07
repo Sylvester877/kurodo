@@ -530,6 +530,7 @@ export default function Profile() {
                     <li key={p.anime.mal_id}>
                       <Link
                         to={`/watch/${p.anime.mal_id}?ep=${p.lastEpisode}`}
+                        state={{ anime: p.anime }}
                         className="group flex items-center gap-3 p-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-transparent hover:border-primary/30 transition-all"
                       >
                         <div className="relative h-14 w-10 shrink-0 rounded overflow-hidden bg-black/40">
