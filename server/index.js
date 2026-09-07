@@ -354,6 +354,26 @@ const fail = (res, err, code) => {
   res.status(status).json({ ok: false, error: msg, upstream: upstream ?? null })
 }
 
+// ── Route-param validation (R-PROV) ──
+// Scraper routes used to accept garbage params (negative/abc/zero ep,
+// 2000-char SQL-ish slugs) and resolve them against upstream as if valid —
+// wasting extraction budget and returning misleading ok:true results.
+// Validate shape up front: clean 400 { ok:false }, never a scraper round
+// trip. Slug charset stays permissive ([A-Za-z0-9._-], ≤200 chars) since
+// real slugs look like one-piece-p8k27; ep must be a positive integer;
+// type must be sub|dub; ids must be plain digits.
+// Slug = normal URL-safe text (anidap romaji slugs like one-piece-p8k27).
+// Blocklist-style: reject separators/whitespace/quotes/SQL-ish junk and
+// absurd length, but keep unicode + dots/dashes legal so real titles pass.
+const SLUG_BAD = /[\s/?&#"'<>\\;=%]/
+const validateIdParam = (v) => /^\d{1,10}$/.test(String(v || ''))
+const validateEpParam = (v) => /^\d{1,5}$/.test(String(v || '')) && Number(v) >= 1
+const validateSlugParam = (v) =>
+  typeof v === 'string' && v.length >= 1 && v.length <= 200 && !SLUG_BAD.test(v)
+const validateTypeParam = (v) => v === 'sub' || v === 'dub' || v === 'hsub'
+const badParam = (res, message) =>
+  res.status(400).json({ ok: false, error: message, upstream: null })
+
 // ---------- Scraper endpoints (multi-provider with auto-failover) ----------
 //
 // The URL prefix stays `/api/anidap/*` for backward compatibility, but each
@@ -365,6 +385,7 @@ const fail = (res, err, code) => {
 app.get('/api/anidap/info/:anilistId', async (req, res) => {
   try {
     const { anilistId } = req.params
+    if (!validateIdParam(anilistId)) return badParam(res, `Invalid anilistId: ${String(anilistId).slice(0, 30)}`)
     // 10s hard cap — info resolution can hang on slow upstreams
     const data = await cached(`info:${anilistId}`, TTL, () =>
       routedGetInfo(Number(anilistId)), { timeoutMs: 10_000 })
@@ -379,10 +400,12 @@ app.get('/api/anidap/info/:anilistId', async (req, res) => {
 // POST /api/anidap/prewarm-slug/:anilistId
 app.post('/api/anidap/prewarm-slug/:anilistId', async (req, res) => {
   try {
+    const { anilistId } = req.params
+    if (!validateIdParam(anilistId)) return badParam(res, `Invalid anilistId: ${String(anilistId).slice(0, 30)}`)
     const { resolveAnidapSlug } = await import('./anidap.js')
     // Fire-and-forget: don't block the response on slug resolution.
     // The cache warms asynchronously; the caller only cares that we started.
-    resolveAnidapSlug(Number(req.params.anilistId)).catch(() => {})
+    resolveAnidapSlug(Number(anilistId)).catch(() => {})
     res.status(204).end()
   } catch { res.status(204).end() }
 })
@@ -393,6 +416,7 @@ app.post('/api/anidap/prewarm-slug/:anilistId', async (req, res) => {
 app.get('/api/anidap/episodes/:slug', async (req, res) => {
   try {
     const { slug } = req.params
+    if (!validateSlugParam(slug)) return badParam(res, `Invalid slug: ${String(slug).slice(0, 30)}`)
     const anilistId = req.query.anilistId ? Number(req.query.anilistId) : null
     const title = { english: req.query.title_english, romaji: req.query.title_romaji }
     const cacheKey = `eps:${slug}:${anilistId || ''}:${title.english || ''}`
@@ -411,6 +435,8 @@ app.get('/api/anidap/episodes/:slug', async (req, res) => {
 app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
   try {
     const { slug, ep } = req.params
+    if (!validateSlugParam(slug)) return badParam(res, `Invalid slug: ${String(slug).slice(0, 30)}`)
+    if (!validateEpParam(ep)) return badParam(res, `Invalid episode number: ${String(ep).slice(0, 30)}`)
     const anilistId = req.query.anilistId ? Number(req.query.anilistId) : null
     const title = { english: req.query.title_english, romaji: req.query.title_romaji }
     const cacheKey = `srv:${slug}:${ep}:${anilistId || ''}:${title.english || ''}`
@@ -543,6 +569,9 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
 // Optional `?title_english=&title_romaji=` for hianime fallback search.
 app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
   const { slug, ep, provider, type } = req.params
+  if (!validateSlugParam(slug)) return badParam(res, `Invalid slug: ${String(slug).slice(0, 30)}`)
+  if (!validateEpParam(ep)) return badParam(res, `Invalid episode number: ${String(ep).slice(0, 30)}`)
+  if (!validateTypeParam(type)) return badParam(res, `Invalid stream type: ${String(type).slice(0, 30)} (expected sub|dub|hsub)`)
   const anilistId = req.query.anilistId ? Number(req.query.anilistId) : null
   const title = { english: req.query.title_english, romaji: req.query.title_romaji }
   // The watch route IS the MAL id — pass it so the megavid fast path can
@@ -1272,6 +1301,20 @@ const subtitleLogOnce = new Set()
 app.get('/proxy', async (req, res) => {
   const targetUrl = req.query.url
   if (!targetUrl) return res.status(400).send('No URL provided')
+
+  // ── Validate early: malformed/unsupported URLs must get a clean 400
+  // JSON error, NOT an Express 500 plaintext "Invalid URL" crash. The URL
+  // is parsed into `new URL()`s below (referer origin derivation), which
+  // throws TypeError synchronously on garbage input. (NEW-1 /proxy fuzz)
+  let parsedTargetUrl
+  try {
+    parsedTargetUrl = new URL(String(targetUrl))
+  } catch {
+    return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'Invalid URL', retryable: false } })
+  }
+  if (!/^https?:$/.test(parsedTargetUrl.protocol)) {
+    return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'Only http(s) URLs are proxied', retryable: false } })
+  }
 
   // Optional per-stream upstream headers (Referer/Origin/User-Agent) that
   // the scraper says the host requires. Passed as base64-encoded JSON in
@@ -2008,13 +2051,32 @@ app.get('/api/jikan/*', async (req, res) => {
   const targetUrl = `https://api.jikan.moe/v4${targetPath}`
   const cacheKey = getJikanCacheKey(targetPath, req.query)
   const isRecommendations = targetPath.endsWith('/recommendations')
+  // A–Z catalog browse (letter param). An empty { data: [] } for a letter is
+  // NEVER truthful — every letter has titles, so an empty result means the
+  // upstream (Jikan OR AniList fallback) throttled or junked mid-flight.
+  // Treating it as a win would cache "No anime found" for 10 minutes (the
+  // sticky A=empty bug). Guard every accept path below.
+  const rawLetterParam = Array.isArray(req.query.letter) ? req.query.letter[0] : req.query.letter
+  const isLetterBrowse = Boolean(rawLetterParam && targetPath === '/anime')
+  const isUsable = (v) => {
+    if (!v || typeof v !== 'object') return false
+    // Non-list shapes (details, recommendations) are usable as-is
+    if (!Array.isArray(v.data)) return true
+    // List shapes must be non-empty for a letter browse
+    return !isLetterBrowse || v.data.length > 0
+  }
 
   try {
     // 1. Check in-memory cache
     const cached = jikanCache.get(cacheKey)
     if (cached && Date.now() - cached.at < JIKAN_CACHE_TTL) {
-      console.log(`[jikan-proxy] cache hit ${targetPath}`)
-      return res.status(200).json(cached.data)
+      if (isUsable(cached.data)) {
+        console.log(`[jikan-proxy] cache hit ${targetPath}`)
+        return res.status(200).json(cached.data)
+      }
+      // Sticky empty for a letter browse — discard and re-fetch
+      jikanCache.delete(cacheKey)
+      console.log(`[jikan-proxy] discarding sticky-empty ${targetPath} (letter browse), refetching`)
     }
 
     // 2. Check in-memory cache — including stale entries.  If the entry
@@ -2022,7 +2084,7 @@ app.get('/api/jikan/*', async (req, res) => {
     // and trigger a background refresh so the next request is fresh.
     const staleEntry = jikanCache.get(cacheKey)
     const staleAge = staleEntry ? Date.now() - staleEntry.at : Infinity
-    if (staleEntry && staleAge < JIKAN_STALE_TTL) {
+    if (staleEntry && staleAge < JIKAN_STALE_TTL && isUsable(staleEntry.data)) {
       if (staleAge < JIKAN_CACHE_TTL) {
         console.log(`[jikan-proxy] cache hit ${targetPath}`)
         return res.status(200).json(staleEntry.data)
@@ -2035,7 +2097,7 @@ app.get('/api/jikan/*', async (req, res) => {
         jikanInFlight.set(cacheKey, refresh)
         refresh
           .then(({ data, status }) => {
-            if (status >= 200 && status < 300) {
+            if (status >= 200 && status < 300 && isUsable(data)) {
               jikanCache.set(cacheKey, { at: Date.now(), data })
               console.log(`[jikan-proxy] refreshed stale cache for ${targetPath}`)
             } else {
@@ -2068,7 +2130,7 @@ app.get('/api/jikan/*', async (req, res) => {
         tryAniListFallback(targetPath, req.query).catch(() => null),
         new Promise((r) => setTimeout(() => r(null), 6000)),
       ])
-      if (negFallback) {
+      if (negFallback && isUsable(negFallback)) {
         console.log(`[jikan-proxy] negative-cache ${targetPath}: AniList fallback served`)
         jikanCache.set(cacheKey, { at: Date.now(), data: negFallback })
         if (jikanCache.size % 50 === 0) pruneJikanCache()
@@ -2104,7 +2166,7 @@ app.get('/api/jikan/*', async (req, res) => {
 
     const winner = await new Promise((resolve) => {
       let done = false
-      const win = (v) => { if (!done && v) { done = true; resolve(v) } }
+      const win = (v) => { if (!done && v && isUsable(v)) { done = true; resolve(v) } }
       jikanReq.then(win)
       fallbackReq.then(win)
       // Once both settle with no winner, resolve null (fail fast).
@@ -2585,6 +2647,48 @@ app.get('/api/aniskip/:malId/:ep', async (req, res) => {
   }
 })
 
+// ────────── TMDB relay — keeps api_key server-side ──────────
+// Security: the renderer used to call api.themoviedb.org directly with
+// VITE_TMDB_API_KEY in the URL (leaks the key to the browser + any
+// upstream logger). Now the renderer asks us for a relative path and we
+// inject the key here. Shape mirrors tmdb.ts's old get():
+//   GET /api/tmdb3/search/tv?query=…  →  raw TMDB JSON (or {ok:false})
+const tmdbRelayCache = new Map() // path → { at, data }
+const TMDB_RELAY_TTL = 24 * 60 * 60 * 1000
+const TMDB_RELAY_FAIL_TTL = 2 * 60 * 1000
+
+app.get('/api/tmdb3/*', async (req, res) => {
+  const suffix = req.path.replace(/^\/api\/tmdb3/, '') // e.g. /search/tv
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''
+  if (!/^\/[\w/-]+$/.test(suffix)) {
+    return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'Invalid TMDB path', retryable: false } })
+  }
+  if (!TMDB_API_KEY) {
+    return res.status(503).json({ ok: false, error: { code: 'NOT_CONFIGURED', message: 'TMDB key missing on server', retryable: false } })
+  }
+  const cacheKey = suffix + qs
+  const hit = tmdbRelayCache.get(cacheKey)
+  if (hit && Date.now() - hit.at < hit.ttl) return res.json(hit.data)
+  try {
+    const sep = qs ? '&' : '?'
+    const upstream = `https://api.themoviedb.org/3${suffix}${qs}${sep}api_key=${encodeURIComponent(TMDB_API_KEY)}`
+    const { data, status } = await axios.get(upstream, {
+      timeout: 8000,
+      validateStatus: () => true,
+      headers: { accept: 'application/json' },
+    })
+    if (status >= 400) {
+      tmdbRelayCache.set(cacheKey, { at: Date.now(), data: { ok: false, status }, ttl: TMDB_RELAY_FAIL_TTL })
+      return res.status(status >= 500 ? 502 : 400).json({ ok: false, status })
+    }
+    tmdbRelayCache.set(cacheKey, { at: Date.now(), data, ttl: TMDB_RELAY_TTL })
+    return res.json(data)
+  } catch (e) {
+    console.warn('[tmdb-relay] upstream error:', e?.message)
+    return res.status(502).json({ ok: false, error: { code: 'UPSTREAM', message: String(e?.message || e), retryable: true } })
+  }
+})
+
 let _harvesterIsReady = null
 async function getHarvesterIsReady() {
   if (_harvesterIsReady) return _harvesterIsReady()
@@ -2834,7 +2938,8 @@ async function fetchFillerFromJikan(malId) {
 app.get('/api/filler/:malId', async (req, res) => {
   const malId = Number(req.params.malId)
   const title = String(req.query.title || '')
-  if (!malId) return res.status(400).json({ error: 'malId required' })
+  if (!validateIdParam(req.params.malId)) return badParam(res, `Invalid malId: ${String(req.params.malId).slice(0, 30)}`)
+  if (!malId) return res.status(400).json({ ok: false, error: 'malId required', upstream: null })
 
   // All decision logic (cache / negative cache / AFL → Jikan → legacy order /
   // title-aware fail-caching) lives in resolveFiller (./filler-lib.js) so it
@@ -2867,8 +2972,10 @@ app.get('/api/filler/:malId', async (req, res) => {
     return res.json(result.data)
   }
   console.warn(`[filler] ${result.negativeHit ? 'negative cache hit' : 'not found'} ${malId}`)
-  // Return empty — the frontend has offline fallback data for popular anime
-  res.status(404).json({ error: result.error })
+  // Return empty — the frontend has offline fallback data for popular anime.
+  // Shape mirrors every other error route ({ ok:false, error }) so client
+  // error handling is uniform. (R-FILL)
+  res.status(404).json({ ok: false, error: result.error, upstream: null })
 })
 
 // ────────── MAL username animelist proxy ──────────────────────────────

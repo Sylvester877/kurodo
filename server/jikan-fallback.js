@@ -379,6 +379,16 @@ export async function getAnimeByLetterFromAniList(letter = '', page = 1, limit =
     if (!pageInfo?.hasNextPage) break
   }
 
+  // An EMPTY result is never truthful for a letter browse on a healthy
+  // upstream — every letter has titles, so zero prefix matches across a
+  // 200-candidate pool means the upstream throttled or returned junk.
+  // Throw instead of returning an empty success: the proxy then fails
+  // this request (502 + short negative cache → retryable) instead of
+  // caching a sticky "No anime found starting with X" for 10 minutes.
+  if (!matched.length) {
+    throw new Error('AniList letter fallback returned no prefix matches — upstream throttled or unavailable')
+  }
+
   matched.sort((a, b) => {
     const ta = (a.title?.english || a.title?.romaji || '').toLowerCase()
     const tb = (b.title?.english || b.title?.romaji || '').toLowerCase()

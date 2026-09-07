@@ -34,7 +34,18 @@ export default function MangaReader() {
   const { chapterId } = useParams<{ chapterId: string }>()
   const [searchParams] = useSearchParams()
   const mangaId = searchParams.get('manga') || ''
-  const source = (searchParams.get('source') || 'atsu') as 'mangadex' | 'atsu'
+  // Source inference: explicit ?source= wins; otherwise a MangaDex UUID
+  // (manga or chapter id) implies MangaDex. Links from MangaList and
+  // shared deep-links omit ?source= but carry MangaDex UUIDs — defaulting
+  // to 'atsu' made them always fail ("No pages found").
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const explicitSource = searchParams.get('source')
+  const inferredSource: 'mangadex' | 'atsu' = explicitSource === 'mangadex' || explicitSource === 'atsu'
+    ? explicitSource
+    : (UUID_RE.test(mangaId) || (!mangaId && chapterId ? UUID_RE.test(chapterId) : false))
+      ? 'mangadex'
+      : 'atsu'
+  const source = inferredSource
   const anilistIdParam = searchParams.get('anilist') || ''
   const malIdParam = searchParams.get('malId') || ''
 

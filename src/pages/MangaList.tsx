@@ -7,11 +7,13 @@ import { cn } from '../lib/utils'
 import { useMangaListStore, type MangaEntry } from '../store/useMangaListStore'
 import { getChapterFeed } from '../api/mangadex'
 import EmptyState from '../components/EmptyState'
+import { useTitle } from '../hooks/useTitle'
 
 type Filter = 'all' | 'reading' | 'completed' | 'planning'
 type Sort = 'title' | 'progress' | 'chapters'
 
 export default function MangaList() {
+  useTitle('My Manga List')
   const mangaList = useMangaListStore((s) => s.mangaList)
   const readChapters = useMangaListStore((s) => s.readChapters)
   const removeFromMangaList = useMangaListStore((s) => s.removeFromMangaList)
@@ -264,7 +266,7 @@ function MangaRow({
   }, [chaptersData, latestChapter])
 
   const continueUrl = nextChapterId && manga.mangaDexId
-    ? `/manga/read/${nextChapterId}?manga=${manga.mangaDexId}&malId=${manga.mal_id}`
+    ? `/manga/read/${nextChapterId}?manga=${manga.mangaDexId}&source=mangadex&malId=${manga.mal_id}`
     : `/manga/${manga.mal_id}`
 
   const chaptersLoading = !!manga.mangaDexId && !isCompleted && latestChapter != null && !chaptersData && !chaptersError

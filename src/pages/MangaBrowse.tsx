@@ -14,6 +14,7 @@ import {
 } from '../api/mangadex'
 import { getTrendingManga, getPopularManga, searchMangaAniList } from '../api/anilistManga'
 import { useDebounce } from '../hooks/useDebounce'
+import { useTitle } from '../hooks/useTitle'
 import { SkeletonCard } from '../components/Skeleton'
 
 type Tab = 'trending' | 'popular' | 'latest' | 'browse'
@@ -55,6 +56,7 @@ const SORT_OPTIONS = [
 ] as const
 
 export default function MangaBrowse() {
+  useTitle('Manga')
   const [tab, setTab] = useState<Tab>('trending')
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 350)

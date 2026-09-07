@@ -34,6 +34,7 @@ interface ProbeDef {
 // ──────────────────────────────────────────────────────────────────
 
 const DEMON_SLAYER_ANILIST = 101922
+const DEMON_SLAYER_MAL = 38000 // Demon Slayer's MAL id — aniskip keys off MAL, not AniList
 const DEMON_SLAYER_SLUG = 'demon-slayer-kimetsu-no-yaiba-j2hzd'
 
 async function timed<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }> {
@@ -238,18 +239,27 @@ async function probeJikan(): Promise<ProbeResult> {
 }
 
 // ── 10. AniSkip ──
+// Probes api.aniskip.com directly for a REAL liveness check. The old probe
+// sent the ANILIST id (101922) as if it were a MAL id + episodeLength=0 —
+// upstream 404s on unknown ids, so the probe always showed "warn" (R-HLTH).
+// MAL id 38000 (Demon Slayer S1) + realistic ~24min length answers 200 with
+// real skip data. AniSkip has no CORS preflight need for a GET; failures
+// surface as status codes below.
 async function probeAniSkip(): Promise<ProbeResult> {
   try {
     const { value, ms } = await timed(() =>
-      axios.get(`https://api.aniskip.com/v2/skip-times/${DEMON_SLAYER_ANILIST}/1?types[]=op&types[]=ed&episodeLength=0`,
+      axios.get(`https://api.aniskip.com/v2/skip-times/${DEMON_SLAYER_MAL}/1?types[]=op&types[]=ed&episodeLength=1420`,
         { timeout: 8000, validateStatus: () => true }),
     )
     const ok = value.status === 200
+    const hasData = ok && value.data?.found === true
     return {
       status: ok ? (ms < 1200 ? 'ok' : 'warn') : 'warn',
       ms,
-      detail: ok ? 'API alive' : `HTTP ${value.status} (still OK, just no skip data)`,
-      data: value.data,
+      detail: ok
+        ? (hasData ? 'API alive — skip data returned' : 'API alive (no skip data for this ep)')
+        : `HTTP ${value.status} — API reported an error`,
+      data: hasData ? value.data : null,
     }
   } catch (e) { return failProbe(e) }
 }

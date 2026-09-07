@@ -8,8 +8,11 @@
 
 import type { Anime } from '../types'
 
-const API_KEY = (import.meta.env.VITE_TMDB_API_KEY as string | undefined)?.trim()
-const BASE = 'https://api.themoviedb.org/3'
+// TMDB calls go through the backend relay (/api/tmdb3) which injects the
+// api_key server-side — the renderer never sees or sends the key.
+// (Security fix: key used to ship in VITE_TMDB_API_KEY and ride in the
+// browser URL to api.themoviedb.org.)
+const RELAY = '/api/tmdb3'
 const IMG = 'https://image.tmdb.org/t/p'
 const TTL = 24 * 60 * 60 * 1000 // 24h — titles & logos change rarely
 const TIMEOUT_MS = 3000
@@ -21,8 +24,7 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>()
 
 async function get<T>(path: string): Promise<T | null> {
-  if (!API_KEY) return null
-  const url = `${BASE}${path}${path.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(API_KEY)}`
+  const url = `${RELAY}${path}`
   try {
     const ctrl = new AbortController()
     const t = window.setTimeout(() => ctrl.abort(), TIMEOUT_MS)
@@ -195,7 +197,6 @@ export async function fetchAnimeLogo(
  * call repeatedly in React Query.
  */
 export async function getTmdbBackdrop(title: string): Promise<string | null> {
-  if (!API_KEY) return null
   const cacheKey = `bd2:${title}` // v2 — w1280 tier (was /original); key bump evicts stale URLs
   const cached = cache.get(cacheKey)
   if (cached && Date.now() - cached.at < TTL) return cached.value as string | null
@@ -229,8 +230,8 @@ export async function getTmdbBackdrop(title: string): Promise<string | null> {
   return url
 }
 
-/** True when a TMDB key is configured. Use to gate UI affordances. */
-export const hasTmdbKey = (): boolean => Boolean(API_KEY)
+/** True when TMDB is usable through the backend relay. */
+export const hasTmdbKey = (): boolean => true
 
 // Re-export Anime for the in-line cast below
 export type { Anime }
