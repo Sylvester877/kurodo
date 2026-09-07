@@ -191,6 +191,26 @@ export async function getChapterPages(chapterId) {
 }
 
 /**
+ * Resolve the parent manga id for a chapter — used by MangaReader so
+ * shared chapter-only deep links (/manga/read/:chapterId with no ?manga=)
+ * can still show title/nav/progress. GET /chapter/{id}?includes[]=manga.
+ * Returns the manga UUID or null.
+ */
+export async function getChapterMangaId(chapterId) {
+  if (!chapterId || !/^[0-9a-f-]{36}$/i.test(String(chapterId))) return null
+  const key = `chapter-manga:${chapterId}`
+  return cached(key, 24 * 60 * 60 * 1000, async () => {
+    try {
+      const { data } = await api.get(`/chapter/${chapterId}?includes[]=manga`)
+      const mangaRel = (data?.data?.relationships || []).find((r) => r.type === 'manga')
+      return mangaRel?.id || null
+    } catch {
+      return null
+    }
+  })
+}
+
+/**
  * Browse latest manga updates.
  * GET /manga?limit=24&order[latestUploadedChapter]=desc&includes[]=cover_art
  */

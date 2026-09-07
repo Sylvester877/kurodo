@@ -115,6 +115,16 @@ export async function getChapterPages(chapterId: string): Promise<MangaDexPages>
   return data.data
 }
 
+/** Resolve the parent MangaDex manga id from a chapter id (for shared
+ *  chapter-only deep links missing ?manga=). Returns null when unknown. */
+export async function getChapterMangaId(chapterId: string): Promise<string | null> {
+  const { data } = await axios.get<{ ok: boolean; data: string | null }>(
+    `${BASE()}/chapter-manga/${chapterId}`,
+    { timeout: 8000 },
+  )
+  return data?.data ?? null
+}
+
 /** Get available browse filter tags (genres, formats, statuses, sorts). */
 export async function getBrowseTags(): Promise<BrowseTags> {
   const { data } = await axios.get(`${BASE()}/tags`)

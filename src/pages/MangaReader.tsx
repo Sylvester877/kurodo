@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, ChevronDown, Loader2, AlertTriangle, Settings2, Play, Pause, SkipForward, Maximize, Minimize, Sun, Columns, AlignJustify, Bookmark } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { getChapterPages, getChapterFeed, getMangaInfo, type MangaDexPage } from '../api/mangadex'
+import { getChapterPages, getChapterFeed, getMangaInfo, getChapterMangaId, type MangaDexPage } from '../api/mangadex'
 import { getChapterPages as getChapterPagesAtsu, getChapterFeed as getChapterFeedAtsu, getMangaInfo as getMangaInfoAtsu } from '../api/atsu'
 import { useTitle } from '../hooks/useTitle'
 import { useMangaListStore } from '../store/useMangaListStore'
@@ -51,6 +51,29 @@ export default function MangaReader() {
 
   const isAtsu = source === 'atsu'
   const navigate = useNavigate()
+
+  // ── Chapter-only deep-link fix-up ──
+  // Shared links like /manga/read/:chapterId (no ?manga=) can't show the
+  // title / chapter nav / progress until we know the parent manga. Resolve
+  // it from the MangaDex chapter and rewrite the URL (replace, so Back
+  // still leaves the reader). Only fires when mangaId is genuinely absent
+  // and the chapter is a MangaDex UUID.
+  const [mangaResolveDone, setMangaResolveDone] = useState(false)
+  useEffect(() => {
+    if (mangaId || mangaResolveDone || !chapterId || source !== 'mangadex') return
+    let cancelled = false
+    setMangaResolveDone(true) // at most one attempt per mount
+    getChapterMangaId(chapterId)
+      .then((resolvedId) => {
+        if (cancelled || !resolvedId) return
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('manga', resolvedId)
+        navigate(`/manga/read/${chapterId}?${params.toString()}`, { replace: true })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mangaId, chapterId, source])
 
   // ── Reader store ──
   // ═══ PERFORMANCE: useShallow to batch-check all reader-store values.

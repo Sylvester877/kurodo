@@ -72,6 +72,7 @@ import {
   getMangaInfo,
   getChapterFeed,
   getChapterPages,
+  getChapterMangaId,
   getLatestManga,
   getMangaByTag,
   browseManga,
@@ -3208,6 +3209,16 @@ app.get('/api/manga/pages/:chapterId', async (req, res) => {
   } catch (e) { fail(res, e) }
 })
 
+app.get('/api/manga/chapter-manga/:chapterId', async (req, res) => {
+  try {
+    const { chapterId } = req.params
+    const data = await cachedManga(`manga:chapter-manga:${chapterId}`, MANGA_DETAIL_TTL, () =>
+      getChapterMangaId(chapterId),
+    )
+    ok(res, data)
+  } catch (e) { fail(res, e) }
+})
+
 // ────────── Atsu.moe manga routes — alternative manga source ──────────
 app.get('/api/atsu/search', async (req, res) => {
   try {
@@ -3853,6 +3864,18 @@ server.on('error', (err) => {
         try {
           const health = JSON.parse(body)
           if (health && health.ok && health.service === 'kurodo-backend') {
+            // S3: log version skew. When this duplicate ships NEW code but
+            // the occupant is an OLD build, "reuse" silently serves stale
+            // routes (the A–Z / tmdb3 fixes wouldn't exist on the old one).
+            // Never kill a healthy occupant, but surface the skew loudly so
+            // a dev restarting the server knows their new code isn't live.
+            const occupantVersion = health.version || 'unknown'
+            const myVersion = APP_VERSION
+            if (occupantVersion !== myVersion) {
+              console.warn(`[server] ⚠ Version skew: occupant on :${PORT} is v${occupantVersion}, this build is v${myVersion} — reusing the occupant serves STALE code. Restart the occupant to pick up changes.`)
+            } else {
+              console.log(`[server] Port ${PORT} occupant v${occupantVersion} matches this build — clean reuse.`)
+            }
             if (insideElectron) {
               // Reuse the healthy backend already on the port. The main
               // process's waitForServer() already got a 200 from it, so the
