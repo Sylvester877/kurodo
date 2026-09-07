@@ -139,7 +139,14 @@ export default function AnimeDetails() {
       cap: episodesCap,
       airedThrough: epInfoQuery.data?.airedThrough ?? null,
     }), 'Episodes'),
-    enabled: !!malId && (anime?.episodes != null || epInfoQuery.isSuccess),
+    // Fire as soon as the MAL id is known — AniZip keys off MAL only, so
+    // waiting for Jikan (animeQuery) or AniList (epInfoQuery) serialized the
+    // episode list behind two upstream round-trips on every cold load. The
+    // queryKey already includes cap/airedThrough: when those resolve later
+    // the query refetches with the stricter cap, and placeholderData keeps
+    // the already-shown list on screen meanwhile. (AniZip only contains
+    // aired episodes, so the uncapped first pass is never misleading.)
+    enabled: !!malId,
     placeholderData: (previousData) => previousData,
     staleTime: 60 * 60 * 1000,
     meta: { persist: true },

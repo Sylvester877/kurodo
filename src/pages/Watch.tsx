@@ -235,12 +235,16 @@ export default function Watch() {
     staleTime: 30 * 60 * 1000,
     meta: { persist: true },
   })
-  // AniList id from AniList GraphQL; fallback to AniZip's MAL→AniList mapping
-  // so the Watch page can still resolve streams when the AniList proxy is slow/down.
+  // AniList id: fired in PARALLEL from AniList GraphQL (rich: total, banner,
+  // airedThrough) AND AniZip's MAL→AniList mapping (server disk-cached, not
+  // rate-limited). The stream chain (servers → sources) only needs the id,
+  // so whichever resolves first unblocks playback — previously the AniZip
+  // lookup only STARTED after AniList failed, serializing the whole watch
+  // page behind AniList's rate-limit window.
   const anizipAnilistIdQuery = useQuery({
     queryKey: ['anizip', 'anilistId', malId],
     queryFn: () => getAniListIdFromMal(malId!),
-    enabled: !!malId && epInfoQuery.data?.anilistId == null,
+    enabled: !!malId,
     staleTime: 24 * 60 * 60 * 1000,
     meta: { persist: true },
   })
