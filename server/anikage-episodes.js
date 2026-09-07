@@ -9,6 +9,10 @@
 // making TVDB wait for the shared AniZip would add ~3s to cold load.
 import axios from 'axios'
 import { getTvdbEpisodes } from './tvdb-episodes.js'
+// Shared AniZip mapping layer (mem + disk + single-flight). TVDB's internal
+// series-id resolution now reads from the SAME store, so a cold request no
+// longer fires two identical ani.zip round-trips in parallel.
+import { getAnizipMapping } from './anizip-cache.js'
 
 const cache = new Map()
 const TTL = 60 * 60 * 1000; // 1 hour
@@ -50,13 +54,11 @@ export async function register(app) {
         })(),
 
         // AniZip episodes (metadata + fallback images). Also supplies
-        // the themoviedb_id for Phase 2's TMDB fetch.
+        // the themoviedb_id for Phase 2's TMDB fetch. Via the shared cache:
+        // single-flight dedupes against TVDB's internal series-id lookup and
+        // the client mapping endpoint, and disk keeps it across restarts.
         (async () => {
-          const { data } = await axios.get(`https://api.ani.zip/mappings?mal_id=${malId}`, {
-            timeout: 12000,
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-          });
-          return data;
+          return (await getAnizipMapping({ malId })) || null;
         })(),
 
         // Jikan filler/recap flags — hard-capped at ~3.5s TOTAL. Filler
@@ -117,24 +119,36 @@ export async function register(app) {
       const tmdbKey = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '';
       let tmdbEps = {};
       if (tmdbKey && tmdbSeriesId) {
-        try {
-          let running = 0;
-          for (let s = 1; s <= 4; s++) {
-            try {
-              const { data } = await axios.get(`https://api.themoviedb.org/3/tv/${tmdbSeriesId}/season/${s}`, {
+        // Phase 2 was SEQUENTIAL — worst case 4 × 10s timeout = ~40s holding
+        // up the episode list. Fire all four season fetches in parallel
+        // instead: each response is tagged with its season number, so the
+        // absolute numbering (running offset) is computed from the resolved
+        // counts afterwards — order-independent. Worst case now ~10s, and
+        // typical is ~1-3s on a warm TMDB edge.
+        const settled = await Promise.allSettled(
+          Array.from({ length: 4 }, (_, s) =>
+            axios
+              .get(`https://api.themoviedb.org/3/tv/${tmdbSeriesId}/season/${s + 1}`, {
                 params: { api_key: tmdbKey },
                 timeout: 10000,
-              });
-              if (!Array.isArray(data?.episodes) || data.episodes.length === 0) break;
-              for (const e of data.episodes) {
-                if (e?.still_path && e.episode_number) {
-                  tmdbEps[running + e.episode_number] = `https://image.tmdb.org/t/p/w1280${e.still_path}`;
-                }
-              }
-              running += data.episodes.length;
-            } catch { break; }
+              })
+              .then((r) => ({ season: s + 1, data: r.data })),
+          ),
+        );
+        const seasons = settled
+          .filter((s) => s.status === 'fulfilled')
+          .map((s) => s.value)
+          .filter((s) => Array.isArray(s.data?.episodes) && s.data.episodes.length > 0)
+          .sort((a, b) => a.season - b.season);
+        let running = 0;
+        for (const { data } of seasons) {
+          for (const e of data.episodes) {
+            if (e?.still_path && e.episode_number) {
+              tmdbEps[running + e.episode_number] = `https://image.tmdb.org/t/p/w1280${e.still_path}`;
+            }
           }
-        } catch { /* TMDB unavailable — non-critical */ }
+          running += data.episodes.length;
+        }
       }
 
       let episodes = [];

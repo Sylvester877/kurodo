@@ -18,6 +18,10 @@
 // Resolution chain: MAL id → AniZip (tvdbShowId) → TVDB v4 login → extended
 // episodes → map by absolute episode number. Cached in-memory 24h.
 import axios from 'axios'
+// Shared AniZip mapping layer (mem + disk + single-flight) — the mapping
+// for this MAL id may already be cached by anikage-episodes or the client
+// mapping endpoint, so TVDB never pays a duplicate upstream round-trip.
+import { getAnizipMapping } from './anizip-cache.js'
 
 const API_BASE = 'https://api4.thetvdb.com/v4'
 const ARTWORKS_BASE = 'https://artworks.thetvdb.com'
@@ -65,10 +69,7 @@ async function getSeriesIdFromMal(malId) {
   const hit = seriesIdCache.get(malId)
   if (hit && Date.now() - hit.at < SERIES_ID_TTL) return hit.id
   try {
-    const { data } = await axios.get(
-      `https://api.ani.zip/mappings?mal_id=${malId}`,
-      { timeout: 10_000, headers: { 'User-Agent': 'Mozilla/5.0' } },
-    )
+    const data = await getAnizipMapping({ malId })
     // AniZip returns tvdbShowId at top level (and thetvdb_id inside mappings)
     const id = data?.tvdbShowId || data?.mappings?.thetvdb_id || null
     if (id) seriesIdCache.set(malId, { at: Date.now(), id })

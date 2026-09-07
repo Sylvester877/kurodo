@@ -12,11 +12,21 @@ import axios from 'axios'
 import { getBackendOrigin } from '../lib/utils'
 
 const BASE = 'https://api.ani.zip'
+// Mappings go through the server's shared AniZip layer (/api/anizip/mapping):
+// disk-cached for 14d + single-flight, so the SAME mapping the anikage
+// enrichment and TVDB lookups already fetched is reused instead of a second
+// cold round-trip to api.ani.zip. Falls back to a direct call when the
+// server is unreachable.
+const PROXY = `${getBackendOrigin()}/api/anizip/mapping`
 
 const cache = new Map<string, { at: number; value: unknown }>()
 const TTL = 60 * 60 * 1000 // 1 hour
 const PERSIST_TTL = 24 * 60 * 60 * 1000 // 24 hours
 const STORAGE_PREFIX = 'kurodo-anizip:'
+// Failed lookups are remembered briefly in-memory only (never persisted) so
+// a burst of page loads can't re-fire the upstream for a dead mapping.
+const NEG_TTL = 30 * 1000
+const negativeCache = new Map<string, number>()
 
 function loadFromStorage<T>(key: string): T | null {
   try {
@@ -44,6 +54,59 @@ function saveToStorage<T>(key: string, data: T): void {
       localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify({ at: Date.now(), data }))
     } catch { /* give up */ }
   }
+}
+
+type MappingParams = { mal_id?: number; anilist_id?: number }
+
+/** Fetch a mapping through the server proxy, falling back to a direct call. */
+async function fetchMapping(params: MappingParams): Promise<AniZipMapping | null> {
+  const qs = new URLSearchParams()
+  if (params.mal_id) qs.set('mal_id', String(params.mal_id))
+  if (params.anilist_id) qs.set('anilist_id', String(params.anilist_id))
+  try {
+    const res = await fetch(`${PROXY}?${qs.toString()}`, {
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) throw new Error(`mapping proxy ${res.status}`)
+    const json = await res.json().catch(() => null)
+    if (json?.ok && json?.data && typeof json.data === 'object') return json.data as AniZipMapping
+    return null
+  } catch {
+    // Server restarting / unreachable — direct ani.zip call (same upstream,
+    // but keeps the page functional when only the proxy is down).
+    try {
+      const { data } = await axios.get<AniZipMapping>(`${BASE}/mappings`, {
+        params,
+        timeout: 8000,
+      })
+      return data ?? null
+    } catch {
+      return null
+    }
+  }
+}
+
+/** Mem + localStorage + shared-server-store mapping lookup. */
+async function getMapping(key: string, params: MappingParams): Promise<AniZipMapping | null> {
+  const memHit = cache.get(key)
+  if (memHit && Date.now() - memHit.at < TTL) return memHit.value as AniZipMapping
+  const neg = negativeCache.get(key)
+  if (neg && Date.now() - neg < NEG_TTL) return null
+
+  const persisted = loadFromStorage<AniZipMapping>(key)
+  if (persisted) {
+    cache.set(key, { at: Date.now(), value: persisted })
+    return persisted
+  }
+
+  const data = await fetchMapping(params)
+  if (data) {
+    cache.set(key, { at: Date.now(), value: data })
+    saveToStorage(key, data)
+    return data
+  }
+  negativeCache.set(key, Date.now())
+  return null
 }
 
 export interface AniZipEpisode {
@@ -75,22 +138,6 @@ export interface AniZipMapping {
     thetvdb_id?: number
     themoviedb_id?: string
   }
-}
-
-async function cachedGet<T>(url: string): Promise<T> {
-  const hit = cache.get(url)
-  if (hit && Date.now() - hit.at < TTL) return hit.value as T
-
-  const persisted = loadFromStorage<T>(url)
-  if (persisted) {
-    cache.set(url, { at: Date.now(), value: persisted })
-    return persisted
-  }
-
-  const { data } = await axios.get<T>(url)
-  cache.set(url, { at: Date.now(), value: data })
-  saveToStorage(url, data)
-  return data
 }
 
 interface CleanOptions {
@@ -166,17 +213,12 @@ export async function getEpisodesByAniListId(
   anilistId: number,
   opts?: CleanOptions,
 ): Promise<AniZipEpisode[]> {
-  try {
-    const data = await cachedGet<AniZipMapping>(
-      `${BASE}/mappings?anilist_id=${anilistId}`,
-    )
-    return cleanEpisodes(
-      data.episodes ? Object.values(data.episodes) : [],
-      opts,
-    )
-  } catch {
-    return []
-  }
+  const data = await getMapping(`a:${anilistId}`, { anilist_id: anilistId })
+  if (!data) return []
+  return cleanEpisodes(
+    data.episodes ? Object.values(data.episodes) : [],
+    opts,
+  )
 }
 
 /** Convenience: episodes via MAL id (does the MAL→AniList map server-side). */
@@ -184,17 +226,12 @@ export async function getEpisodesByMalId(
   malId: number,
   opts?: CleanOptions,
 ): Promise<AniZipEpisode[]> {
-  try {
-    const data = await cachedGet<AniZipMapping>(
-      `${BASE}/mappings?mal_id=${malId}`,
-    )
-    return cleanEpisodes(
-      data.episodes ? Object.values(data.episodes) : [],
-      opts,
-    )
-  } catch {
-    return []
-  }
+  const data = await getMapping(`m:${malId}`, { mal_id: malId })
+  if (!data) return []
+  return cleanEpisodes(
+    data.episodes ? Object.values(data.episodes) : [],
+    opts,
+  )
 }
 
 // ── Jikan (MAL) episode metadata — real per-episode screencaps ─────────
@@ -317,13 +354,6 @@ export function mergeJikanEpisodeMeta(
 /** Resolve MAL id → AniList id using AniZip's mapping endpoint.
  *  Falls back to null if the mapping is unavailable. */
 export async function getAniListIdFromMal(malId: number): Promise<number | null> {
-  try {
-    const { data } = await axios.get<AniZipMapping>(
-      `${BASE}/mappings?mal_id=${malId}`,
-      { timeout: 5000 },
-    )
-    return data.mappings?.anilist_id ?? null
-  } catch {
-    return null
-  }
+  const data = await getMapping(`m:${malId}`, { mal_id: malId })
+  return data?.mappings?.anilist_id ?? null
 }

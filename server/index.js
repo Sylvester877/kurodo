@@ -98,6 +98,7 @@ import {
   initGogoProxyPool,
 } from './proxy-config.js'
 import { register as registerAnikageEpisodes } from './anikage-episodes.js'
+import { register as registerAnizipMapping, getAnizipMapping } from './anizip-cache.js'
 import {
   aflSlugify,
   parseAFLPage,
@@ -1002,13 +1003,12 @@ async function getTmdbIdFromMal(malId) {
   const hit = tmdbIdCache.get(malId)
   if (hit && Date.now() - hit.at < TMDB_ID_TTL) return hit.id
   try {
-    const r = await axios.get(`https://api.ani.zip/mappings?mal_id=${malId}`, {
-      timeout: 10_000,
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      validateStatus: (s) => s >= 200 && s < 300,
-    })
-    const id = r.data?.mappings?.themoviedb_id || null
-    tmdbIdCache.set(malId, { at: Date.now(), id })
+    // Via the shared AniZip layer — single-flight dedupes against the
+    // episode-thumbs remap fetch below + anikage-episodes + the client
+    // mapping endpoint, so one upstream mapping fetch serves them all.
+    const data = await getAnizipMapping({ malId })
+    const id = data?.mappings?.themoviedb_id || null
+    if (id) tmdbIdCache.set(malId, { at: Date.now(), id })
     return id
   } catch {
     return null
@@ -1079,12 +1079,8 @@ app.get('/api/episode-thumbs/:malId', async (req, res) => {
         // ITS OWN thumbnails instead of the prequel's.
         let anizipEps = null
         try {
-          const r = await axios.get(`https://api.ani.zip/mappings?mal_id=${malId}`, {
-            timeout: 10_000,
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            validateStatus: (s) => s >= 200 && s < 300,
-          })
-          anizipEps = r.data?.episodes || null
+          const mapping = await getAnizipMapping({ malId })
+          anizipEps = mapping?.episodes || null
         } catch { /* AniZip unavailable — keep absolute keys as a fallback */ }
         anizipCount = anizipEps ? Object.keys(anizipEps).length : 0
         if (anizipCount > 0) {
@@ -3559,6 +3555,7 @@ app.get('/img', async (req, res) => {
 
 // Register additional API modules
 await registerAnikageEpisodes(app)
+await registerAnizipMapping(app)
 
 const distPath = path.resolve(process.env.DIST_DIR || path.join(__dirname, '..', 'dist'))
 const isProduction = fs.existsSync(distPath)
