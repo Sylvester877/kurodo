@@ -359,6 +359,21 @@ function stripNsfw(res: AnimeSearchResponse): AnimeSearchResponse {
   return res
 }
 
+/**
+ * Kitsu title search — the outage leg of searchAnime. Hits the local
+ * /api/kitsu-search relay (Jikan v4 list shape, already SFW-filterable
+ * server-side) so results keep flowing when AniList (403 site-wide
+ * outage) and Jikan (504) are both down. Throws on failure so callers
+ * keep their normal error handling.
+ */
+async function searchKitsu(query: string, page = 1, limit = 24): Promise<AnimeSearchResponse> {
+  const origin = getBackendOrigin()
+  const url = `${origin}/api/kitsu-search?q=${encodeURIComponent(query.trim())}&page=${page}&limit=${Math.min(limit, 20)}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`kitsu-search ${res.status}`)
+  return (await res.json()) as AnimeSearchResponse
+}
+
 export async function searchAnime(
   query: string, page = 1, limit = 24,
   filters: SearchFilters = {},
@@ -389,38 +404,59 @@ export async function searchAnime(
   const hasActiveFilters = !!(filters.format || filters.season || filters.status || (filters.genres?.length) || filters.minScore || filters.yearFrom || filters.yearTo)
 
   if (hasActiveFilters) {
-    // Filters only work with Jikan — AniList fallback is title-only.
+    // Filters only work with Jikan — AniList/Kitsu fallbacks are title-only.
     try {
       const res = stripNsfw(await cachedGet<AnimeSearchResponse>('/anime', params))
       if (res.data && res.data.length > 0) return res
       throw new Error('Jikan returned empty results')
     } catch (err) {
-      console.warn('[searchAnime] Jikan filtered search failed, falling back to AniList', err)
-      return stripNsfw(await searchAnimeAniList(query, page, limit))
+      console.warn('[searchAnime] Jikan filtered search failed, falling back', err)
+      // Outage chain: AniList title search, then Kitsu title search. The
+      // query matters more than the dropped filters during an outage —
+      // returning SOMETHING relevant beats a fake "No results".
+      try {
+        return stripNsfw(await searchAnimeAniList(query, page, limit))
+      } catch {
+        if (query.trim()) return stripNsfw(await searchKitsu(query, page, limit))
+        throw err
+      }
     }
   }
 
-  // No filters: race Jikan and AniList — first one with data wins.
+  // No filters: race Jikan and AniList — first one with DATA wins.
+  // AniList must not win with an empty/failed result: during its site-wide
+  // 403 outage it resolves fast with nothing, which used to beat Jikan's
+  // slower success and made every search show a fake "No results".
   return new Promise((resolve) => {
     let settled = false
+    const empty = () => ({ data: [], pagination: { last_visible_page: 0, has_next_page: false, current_page: 1, items: { count: 0, total: 0, per_page: limit } } })
     const jikanPromise = cachedGet<AnimeSearchResponse>('/anime', params)
       .then((r) => { const f = stripNsfw(r); if (!settled && f.data?.length > 0) { settled = true; resolve(f) } })
       .catch(() => {})
     const anilistPromise = searchAnimeAniList(query, page, limit)
-      .then((r) => { if (!settled) { settled = true; resolve(stripNsfw(r)) } })
+      .then((r) => { const f = stripNsfw(r); if (!settled && f.data?.length > 0) { settled = true; resolve(f) } })
       .catch(() => {})
-    // 8s hard cap — neither source should take longer than this.
+    // Neither source produced data (both failed, or both resolved empty) →
+    // try the Kitsu relay before giving up. It's the third independent
+    // catalog and stays up through AniList/Jikan outages.
+    Promise.allSettled([jikanPromise, anilistPromise]).then(async () => {
+      if (settled) return
+      if (query.trim()) {
+        try {
+          const f = stripNsfw(await searchKitsu(query, page, limit))
+          if (!settled && f.data?.length > 0) { settled = true; resolve(f); return }
+        } catch { /* Kitsu down too */ }
+      }
+      if (!settled) { settled = true; resolve(empty()) }
+    })
+    // Hard cap — never let a stalled source hold the UI past 8s.
     setTimeout(() => {
       if (!settled) {
         settled = true
-        console.warn('[searchAnime] Both sources timed out — returning empty')
-        resolve({ data: [], pagination: { last_visible_page: 0, has_next_page: false, current_page: 1, items: { count: 0, total: 0, per_page: limit } } })
+        console.warn('[searchAnime] All sources timed out — returning empty')
+        resolve(empty())
       }
     }, 8000)
-    // If both promises reject, settle empty.
-    Promise.allSettled([jikanPromise, anilistPromise]).then(() => {
-      if (!settled) { settled = true; resolve({ data: [], pagination: { last_visible_page: 0, has_next_page: false, current_page: 1, items: { count: 0, total: 0, per_page: limit } } }) }
-    })
   })
 }
 

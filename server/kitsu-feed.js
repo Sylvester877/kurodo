@@ -258,6 +258,21 @@ export function register(app) {
     const media = await getKitsuFeed(kind, perPage, season, year)
     return res.json({ ok: true, media, source: 'kitsu' })
   })
+
+  // Fast title search — the direct route the client search race uses when
+  // AniList (403 outage) and Jikan (504) are both down. Returns Jikan v4
+  // list shape via getKitsuSearchAsJikan, so no client reshaping needed.
+  app.get('/api/kitsu-search', async (req, res) => {
+    const q = String(req.query.q || '').trim()
+    if (!q) return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'q required', retryable: false } })
+    const page = Math.max(1, Number(req.query.page) || 1)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 20)
+    const out = await getKitsuSearchAsJikan(q, page, limit)
+    if (!out) {
+      return res.status(502).json({ ok: false, error: { code: 'UPSTREAM_DOWN', message: 'Kitsu search unavailable', retryable: true } })
+    }
+    res.json(out)
+  })
 }
 
 // ── Jikan-shape bridge (final stage of the /api/jikan/* fallback chain) ──
@@ -486,7 +501,6 @@ async function getKitsuSearchAsJikan(q, page, limit) {
     return null
   }
 }
-
 /**
  * Genre browse fallback (/anime?genres=:id&order_by=score&sort=desc).
  *
