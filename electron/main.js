@@ -16,7 +16,7 @@
  * publish.provider in package.json > build.publish.
  */
 
-import { app, BrowserWindow, ipcMain, session, shell, screen, powerSaveBlocker } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, screen, powerSaveBlocker, crashReporter } from 'electron'
 import fs from 'node:fs'
 import { createHash } from 'node:crypto'
 import http from 'node:http'
@@ -114,6 +114,40 @@ function writeDiag(line) {
   } catch { /* ignore */ }
 }
 
+
+// ── Native crash-dump capture + memory telemetry ───────────────
+// fixes: silent process deaths left zero evidence — no WER report, no dump,
+// no log line. crashReporter.start() before app.ready enables Crashpad for
+// the main process AND all Chromium children (GPU/utility/renderer), so
+// native crashes and memory-exhaustion aborts land as .dmp files in
+// %APPDATA%/kurodo/Crashpad/completed/ for post-mortem analysis.
+try {
+  crashReporter.start({ uploadToServer: false, compress: true })
+} catch (e) {
+  console.warn('[electron] crashReporter unavailable:', e?.message)
+}
+
+// Memory telemetry — sampled every 60s into startup.log ONLY when rss is
+// high or rising fast, so a death-by-memory-pressure leaves a trace trail:
+let memPrevRss = 0
+let memHighStreak = 0
+setInterval(() => {
+  try {
+    const m = process.memoryUsage()
+    const rssMb = Math.round(m.rss / 1048576)
+    const delta = memPrevRss ? rssMb - memPrevRss : 0
+    memPrevRss = rssMb
+    // 1800MB rss = app hosting server + torrent + harvester + Chromium is
+    // in the top memory tier for a 16GB machine — start logging every tick.
+    if (rssMb > 1800 || delta > 400) {
+      memHighStreak++
+      writeDiag(`[memory] rss=${rssMb}MB (+${delta}) heap=${Math.round(m.heapUsed / 1048576)}MB ext=${Math.round(m.external / 1048576)}MB streak=${memHighStreak}`)
+      if (memHighStreak === 12) writeDiag('[memory] HIGH RSS for 12min — OS OOM kill becomes likely; check imgCache/subtitle caches')
+    } else {
+      memHighStreak = 0
+    }
+  } catch { /* ignore */ }
+}, 60_000).unref()
 
 // ── GPU self-heal marker ────────────────────────────────────────
 // When the renderer crashes repeatedly (almost always GPU/video-decode

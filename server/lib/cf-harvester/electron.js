@@ -51,8 +51,8 @@ async function electronInit() {
   // anidap extraction (or vice-versa). Each has its own mutex so the
   // two provider families can operate concurrently.
   const _contexts = {
-    anidap:  { hiddenWin: null, ready: false, mutex: Promise.resolve(), currentProxy: null },
-    gogoanime: { hiddenWin: null, ready: false, mutex: Promise.resolve(), currentProxy: null },
+    anidap:  { hiddenWin: null, ready: false, mutex: Promise.resolve(), currentProxy: null, busy: false },
+    gogoanime: { hiddenWin: null, ready: false, mutex: Promise.resolve(), currentProxy: null, busy: false },
   }
 
   // Bounded mutex: if an operation hangs (e.g. loadURL stalls), don't
@@ -77,13 +77,42 @@ async function electronInit() {
         // If the caller gave up while we were queued, never run the browser
         // work at all — release the mutex slot immediately.
         if (signal?.aborted) throw abortedError()
+        ctx.busy = true
         return await fn()
       } finally {
         release()
+        ctx.busy = false
       }
     }
     // prev only ever resolves via release(), but handle rejection defensively.
-    return prev.then(run, run)
+    return prev.then(run, run).finally(() => scheduleHarvesterIdleShutdown(context))
+  }
+
+  // ── Idle shutdown: free Chromium memory when the harvester is unused ──
+  // fixes: hidden harvester windows (one per context, ~100-300MB of
+  // Chromium each) stayed alive for the whole app session even when no
+  // extraction ran for hours — feeding the RSS pressure that invites the
+  // OS OOM killer. After 10 idle minutes the windows are destroyed;
+  // ensureWindow() recreates + rewarms one on demand (a few seconds on the
+  // next extraction — a fair trade for a much smaller resident footprint).
+  const HARVESTER_IDLE_MS = 10 * 60 * 1000
+  const _idleTimers = {}
+  function scheduleHarvesterIdleShutdown(context) {
+    const t = _idleTimers[context]
+    if (t) clearTimeout(t)
+    _idleTimers[context] = setTimeout(() => {
+      try {
+        const ctx = _contexts[context]
+        if (!ctx || !ctx.hiddenWin || ctx.hiddenWin.isDestroyed()) return
+        // A job started after this timer was scheduled — never destroy a
+        // window out from under a running extraction; try again later.
+        if (ctx.busy) { scheduleHarvesterIdleShutdown(context); return }
+        ctx.ready = false
+        try { ctx.hiddenWin.destroy() } catch { /* already gone */ }
+        ctx.hiddenWin = null
+        console.log(`[cf-harvester] ${context}: idle ${Math.round(HARVESTER_IDLE_MS / 60000)}min — window closed (recreated on demand)`)
+      } catch { /* ignore */ }
+    }, HARVESTER_IDLE_MS)
   }
   function withMutexBounded(fn, context = 'anidap', signal) {
     if (signal?.aborted) return Promise.reject(abortedError())

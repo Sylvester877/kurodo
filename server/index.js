@@ -3415,6 +3415,14 @@ app.get('/api/diag', async (req, res) => {
 const imgCache = new Map()
 const imgFailCache = new Map()
 const IMG_CACHE_MAX = 800
+// fixes: silent app deaths under memory pressure (OS OOM kill of the
+// Electron process hosting this server). The cache was capped by ENTRY
+// count only — with 4-6MB MangaDex originals flowing through, 800 entries
+// could balloon to multiple GB of RSS. Now byte-budgeted and pressure-aware.
+const IMG_CACHE_MAX_BYTES = 350 * 1024 * 1024 // 350MB heap budget for art
+// Tiered pressure response (called from the memory watchdog):
+//   amber — drop oversized + oldest entries, keep hot small art
+//   red   — drop everything (art refetches in ms from the disk cache)
 const IMG_CACHE_TTL = 48 * 60 * 60 * 1000  // 48h — cover art rarely changes
 const IMG_FAIL_TTL = 5 * 60 * 1000   // remember failures for 5min so retries are instant
 const IMG_FETCH_TIMEOUT = 6000       // 6s — fast fail so the browser falls back to placeholder quickly
@@ -3505,11 +3513,48 @@ function pumpUpstream() {
 }
 
 function pruneImgCache() {
+  const n = Date.now()
+  // Drop expired entries (older entries are least likely to be hot)
+  for (const [k, v] of imgCache) if (n - v.at > IMG_CACHE_TTL) imgCache.delete(k)
+  let total = 0
+  for (const v of imgCache.values()) total += v.body?.length || 0
+  // Hard byte budget first — biggest buffers go first (they cost the most
+  // RSS per hit and are exactly the ones the disk cache already holds).
+  if (total > IMG_CACHE_MAX_BYTES) {
+    const entries = [...imgCache.entries()].sort((a, b) => (b[1].body?.length || 0) - (a[1].body?.length || 0))
+    for (const [k, v] of entries) {
+      if (total <= IMG_CACHE_MAX_BYTES) break
+      total -= v.body?.length || 0
+      imgCache.delete(k)
+    }
+  }
   if (imgCache.size <= IMG_CACHE_MAX) return
   // Drop oldest 25%
   const drop = Math.floor(imgCache.size / 4)
   const keys = Array.from(imgCache.keys()).slice(0, drop)
   for (const k of keys) imgCache.delete(k)
+}
+
+/**
+ * Tiered memory-pressure response for the image caches.
+ * amber: evict oversized + stale entries (keep hot small art)
+ * red:   wipe in-memory art entirely — the disk cache rebuilds it in ms
+ * Called by the main-process memory watchdog when RSS crosses thresholds.
+ */
+function shedImageCaches(level) {
+  const before = imgCache.size
+  if (level === 'red') {
+    imgCache.clear()
+  } else {
+    const n = Date.now()
+    for (const [k, v] of imgCache) {
+      const big = (v.body?.length || 0) > 3 * 1024 * 1024
+      const stale = n - v.at > 60 * 60 * 1000 // 1h
+      if (big || stale) imgCache.delete(k)
+    }
+  }
+  if (level === 'red') coverDataCache.clear()
+  console.warn(`[memory] shedImageCaches(${level}): imgCache ${before} -> ${imgCache.size}`)
 }
 
 // Prune stale failure entries periodically
@@ -3588,15 +3633,68 @@ async function getCoverDataUrl(coverUrl) {
   } catch { /* fall through to placeholder */ }
   if (!bytes) return null
   const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpeg'
+  // fixes: coverDataCache held base64 data-URLs with only an entry cap —
+  // 300 × 5MB originals ≈ 2GB heap. Byte-budget it (base64 inflates ~4/3×).
+  const COVER_DATA_MAX_BYTES = 96 * 1024 * 1024
   const dataUrl = `data:image/${ext};base64,${bytes.toString('base64')}`
-  coverDataCache.set(coverUrl, { at: Date.now(), dataUrl })
-  if (coverDataCache.size > 300) {
+  coverDataCache.set(coverUrl, { at: Date.now(), dataUrl, bytes: bytes.length })
+  let cdTotal = 0
+  for (const v of coverDataCache.values()) cdTotal += v.bytes || 0
+  if (coverDataCache.size > 300 || cdTotal > COVER_DATA_MAX_BYTES) {
     const n = Date.now()
     for (const [k, v] of coverDataCache) if (n - v.at > COVER_DATA_TTL) coverDataCache.delete(k)
-    if (coverDataCache.size > 300) coverDataCache.delete(coverDataCache.keys().next().value)
+    // Evict biggest-first until back under budget
+    const entries = [...coverDataCache.entries()].sort((a, b) => (b[1].bytes || 0) - (a[1].bytes || 0))
+    let t = 0
+    for (const v of coverDataCache.values()) t += v.bytes || 0
+    for (const [k, v] of entries) {
+      if (t <= COVER_DATA_MAX_BYTES && coverDataCache.size <= 300) break
+      t -= v.bytes || 0
+      coverDataCache.delete(k)
+    }
   }
   return dataUrl
 }
+
+// ── Memory-pressure watchdog (tiered cache shedding) ────────────
+// The server runs INSIDE the Electron main process (dynamic import), so
+// this process's RSS covers server caches + torrent + harvester + Chromium
+// overhead. Sustained high RSS invites the OS OOM killer — and Windows
+// kills silently (no WER report). Response is tiered:
+//   1400MB amber → shed big/stale image entries (disk cache keeps art hot)
+//   1800MB red   → wipe in-memory image caches entirely + full GC
+//   inside Electron, red also flags the GPU (Chromium rendering is the
+//   other big allocator) so the existing self-heal can consider it.
+let memWatchPrevRss = 0
+let memWatchAmberStreak = 0
+const MEM_AMBER_BYTES = 1400 * 1024 * 1024
+const MEM_RED_BYTES = 1800 * 1024 * 1024
+function memoryWatchdogTick() {
+  try {
+    const rss = process.memoryUsage().rss
+    const prev = memWatchPrevRss
+    memWatchPrevRss = rss
+    if (rss < MEM_AMBER_BYTES) {
+      if (memWatchAmberStreak >= 5) console.log(`[memory] recovered: rss=${Math.round(rss / 1048576)}MB — pressure cleared`)
+      memWatchAmberStreak = 0
+      return
+    }
+    memWatchAmberStreak++
+    const level = rss >= MEM_RED_BYTES ? 'red' : 'amber'
+    // React on the crossing, not every tick (avoid shedding thrash),
+    // but re-shed every 5th tick if still high.
+    const crossed = prev < MEM_AMBER_BYTES
+    if (crossed || memWatchAmberStreak % 5 === 0) {
+      console.warn(`[memory] pressure ${level}: rss=${Math.round(rss / 1048576)}MB (prev ${Math.round(prev / 1048576)}MB) — shedding caches`)
+      shedImageCaches(level)
+      try { globalThis.gc?.() } catch { /* gc not exposed — fine */ }
+      if (level === 'red' && process.versions.electron) {
+        console.warn('[memory] red pressure inside Electron — GPU/heavy rendering is a likely co-contributor')
+      }
+    }
+  } catch { /* ignore */ }
+}
+setInterval(memoryWatchdogTick, 30_000).unref()
 
 /** Build a self-contained numbered card SVG from an embedded cover data-URL. */
 function buildCardSvg(dataUrl, epNum, accent, rawLabel) {
@@ -3725,6 +3823,10 @@ app.get('/img', async (req, res) => {
       const r = await runUpstream(() => axios.get(url, {
         timeout: IMG_FETCH_TIMEOUT,
         responseType: 'arraybuffer',
+        // fixes: 4MB+ originals inflate the heap cache — anything this size
+        // still gets served (disk-cache onlookers) but 20MB+ error blobs and
+        // pathological files are rejected outright.
+        maxContentLength: 20 * 1024 * 1024,
         validateStatus: (s) => s >= 200 && s < 300,
         headers: imgHeaders,
         maxRedirects: 3,
