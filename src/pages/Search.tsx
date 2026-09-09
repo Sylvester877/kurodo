@@ -17,7 +17,7 @@ import { useSettings } from '../store/useSettings'
 import { SkeletonRow } from '../components/Skeleton'
 import SearchFilters from '../components/SearchFilters'
 import VirtualizedAnimeGrid from '../components/VirtualizedAnimeGrid'
-import { cn, getBackendOrigin } from '../lib/utils'
+import { cn, getBackendOrigin, proxifyImgUrl } from '../lib/utils'
 import AnimeCard from '../components/AnimeCard'
 import type { Genre } from '../types'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -85,11 +85,21 @@ function convertMangaDexToFeedMedia(r: MangaDexManga): MangaFeedMedia {
   for (let i = 0; i < r.id.length; i++) numericId = (numericId * 31 + r.id.charCodeAt(i)) >>> 0
   const year = r.year ?? null
   const status = r.status === 'completed' ? 'FINISHED' : r.status === 'ongoing' ? 'RELEASING' : r.status === 'hiatus' ? 'HIATUS' : null
+  const prox = (u: string | null) => (u ? proxifyImgUrl(u) : null)
+  // fixes: MangaDex fallback covers rendered as broken boxes (the .512.jpg
+  // thumb variant 404s for some covers, and the original is a 4MB+ download
+  // that outlasts the /img proxy timeout). One proxy request now carries the
+  // whole chain: fast thumb first, original as automatic fallback.
+  const chain = (thumb: string | null, orig: string | null) => {
+    if (!thumb && !orig) return null
+    const urls = [thumb, orig].filter(Boolean).map((u) => `url=${encodeURIComponent(u as string)}`)
+    return `${getBackendOrigin()}/img?${urls.join('&')}`
+  }
   return {
     id: numericId || 1,
     idMal: null,
     title: { romaji: r.title, english: r.title, native: null },
-    coverImage: { extraLarge: r.coverUrl ?? null, large: r.coverThumb ?? r.coverUrl ?? null, color: null },
+    coverImage: { extraLarge: prox(r.coverUrl), large: chain(r.coverThumb, r.coverUrl), color: null },
     bannerImage: null,
     chapters: r.lastChapter ? Number(r.lastChapter) || null : null,
     volumes: r.lastVolume ? Number(r.lastVolume) || null : null,
@@ -831,7 +841,7 @@ function SearchPageContent() {
                           >
                             <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-card border border-pink-500/20">
                               {mdx.coverUrl ? (
-                                <img src={`${getBackendOrigin()}/img?url=${encodeURIComponent(mdx.coverUrl)}`} alt="" loading="lazy" decoding="async"
+                                <img src={`${getBackendOrigin()}/img?${[mdx.coverThumb, mdx.coverUrl].filter(Boolean).map((u) => `url=${encodeURIComponent(u as string)}`).join('&')}`} alt="" loading="lazy" decoding="async"
                                   className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
                               ) : (
                                 <div className="h-full w-full grid place-items-center">
@@ -878,7 +888,7 @@ function SearchPageContent() {
                         >
                           <div className="relative h-[88px] w-[60px] shrink-0 rounded-lg overflow-hidden bg-card border border-white/10">
                             {cover ? (
-                              <img src={cover} alt="" loading="lazy" decoding="async"
+                              <img src={cover} alt="" loading="eager" decoding="async"
                                 className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
                             ) : (
                               <div className="h-full w-full grid place-items-center">
@@ -957,7 +967,7 @@ function SearchPageContent() {
                         >
                           <div className="relative h-[88px] w-[60px] shrink-0 rounded-lg overflow-hidden bg-card border border-pink-500/20">
                             {mdx.coverUrl ? (
-                              <img src={`${getBackendOrigin()}/img?url=${encodeURIComponent(mdx.coverUrl)}`} alt="" loading="lazy" decoding="async"
+                              <img src={`${getBackendOrigin()}/img?${[mdx.coverThumb, mdx.coverUrl].filter(Boolean).map((u) => `url=${encodeURIComponent(u as string)}`).join('&')}`} alt="" loading="lazy" decoding="async"
                                 className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
                             ) : (
                               <div className="h-full w-full grid place-items-center">
