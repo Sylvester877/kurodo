@@ -488,12 +488,176 @@ async function getKitsuSearchAsJikan(q, page, limit) {
 }
 
 /**
+ * Genre browse fallback (/anime?genres=:id&order_by=score&sort=desc).
+ *
+ * Kitsu has no MAL genre ids, but its category titles align with MAL's
+ * anime genre names — so map MAL genre id → Kitsu category slug and serve
+ * the top-userCount titles of that category. Slugs verified live
+ * (2026-09-09: action → 6366 titles, mappings intact); a slug that Kitsu
+ * doesn't recognize simply returns 0 rows → null → the honest 502 UI.
+ */
+const MAL_GENRE_TO_KITSU_CATEGORY = {
+  1: 'action',
+  2: 'adventure',
+  4: 'comedy',
+  5: 'avant-garde',
+  7: 'mystery',
+  8: 'drama',
+  10: 'fantasy',
+  14: 'horror',
+  22: 'romance',
+  24: 'sci-fi',
+  26: 'girls-love',
+  28: 'boys-love',
+  30: 'sports',
+  36: 'slice-of-life',
+  37: 'supernatural',
+  41: 'suspense',
+  46: 'award-winning',
+  47: 'gourmet',
+}
+
+async function getKitsuGenreAsJikan(genreId, limit) {
+  const slug = MAL_GENRE_TO_KITSU_CATEGORY[genreId]
+  if (!slug) return null
+  const lim = Math.min(Math.max(Number(limit) || 20, 1), 20)
+  const key = `genre:${genreId}:${lim}`
+  const cached = cacheGet(key)
+  if (cached !== undefined) return cached
+  try {
+    const url = `${KITSU}/anime?filter[categories]=${encodeURIComponent(slug)}&sort=-userCount&include=mappings&${MAPPING_FIELDS}&page[limit]=${lim}`
+    const { data } = await axios.get(url, {
+      timeout: TIMEOUT_MS,
+      headers: {
+        Accept: 'application/vnd.api+json',
+        'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
+      },
+      validateStatus: (code) => code >= 200 && code < 300,
+    })
+    const includedById = new Map()
+    for (const inc of data?.included || []) {
+      if ((inc?.type === 'mappings' || inc?.type === 'mapping') && inc?.id != null) {
+        includedById.set(String(inc.id), inc.attributes || {})
+      }
+    }
+    const rows = (data?.data || [])
+      .map((a) => kitsuToFeedMedia(a, includedById))
+      .filter(Boolean)
+      .map(feedToJikanList)
+      .filter(Boolean)
+    if (rows.length === 0) {
+      cacheSet(key, null, FAIL_TTL)
+      return null
+    }
+    const total = Number(data?.meta?.count) || rows.length
+    const out = {
+      data: rows,
+      pagination: {
+        last_visible_page: 1,
+        has_next_page: false,
+        current_page: 1,
+        items: { count: rows.length, total, per_page: lim, pages: 1 },
+      },
+    }
+    cacheSet(key, out, TTL)
+    return out
+  } catch (e) {
+    console.warn('[kitsu-feed] genre fallback failed:', genreId, e?.message || e)
+    cacheSet(key, null, FAIL_TTL)
+    return null
+  }
+}
+
+/**
+ * A–Z letter fallback (/anime?letter=X&order_by=title&sort=asc).
+ *
+ * Kitsu has no starts-with filter, so approximate it: pull a pool of
+ * highest-userCount titles whose text-search matches the letter, then
+ * prefix-filter by canonical/en title client-side. Coverage is partial
+ * (a pool of 100 can't hold every title starting with a common letter) —
+ * but it keeps the grid painting real titles during a dual outage instead
+ * of a dead end. AniList sorting (its prefix search) stays the primary
+ * quality path; this stage is the outage net.
+ */
+async function getKitsuLetterAsJikan(letter, limit) {
+  const L = String(letter || '').trim().charAt(0).toUpperCase()
+  if (!/^[A-Z]$/.test(L)) return null
+  const lim = Math.min(Math.max(Number(limit) || 20, 1), 20)
+  const key = `letter:${L}:${lim}`
+  const cached = cacheGet(key)
+  if (cached !== undefined) return cached
+  try {
+    // Pool of 100 (5 × 20-capped pages in parallel) then prefix-filter.
+    const poolUrls = [0, 20, 40, 60, 80].map(
+      (offset) =>
+        `${KITSU}/anime?filter[text]=${encodeURIComponent(L)}&sort=-userCount&include=mappings&${MAPPING_FIELDS}&page[limit]=20&page[offset]=${offset}`,
+    )
+    const responses = await Promise.all(
+      poolUrls.map((url) =>
+        axios.get(url, {
+          timeout: TIMEOUT_MS,
+          headers: {
+            Accept: 'application/vnd.api+json',
+            'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
+          },
+          validateStatus: (code) => code >= 200 && code < 300,
+        }).catch(() => null),
+      ),
+    )
+    const rows = []
+    const seen = new Set()
+    for (const res of responses) {
+      if (!res) continue
+      const includedById = new Map()
+      for (const inc of res.data?.included || []) {
+        if ((inc?.type === 'mappings' || inc?.type === 'mapping') && inc?.id != null) {
+          includedById.set(String(inc.id), inc.attributes || {})
+        }
+      }
+      for (const a of res.data?.data || []) {
+        const attrs = a?.attributes || {}
+        const title = attrs.titles?.en_jp || attrs.canonicalTitle || ''
+        if (!title.toUpperCase().startsWith(L)) continue
+        const m = kitsuToFeedMedia(a, includedById)
+        if (!m || seen.has(m.idMal)) continue
+        seen.add(m.idMal)
+        rows.push(feedToJikanList(m))
+        if (rows.length >= lim) break
+      }
+      if (rows.length >= lim) break
+    }
+    if (rows.length === 0) {
+      cacheSet(key, null, FAIL_TTL)
+      return null
+    }
+    // Jikan's letter query is always alphabetical — keep that contract.
+    rows.sort((x, y) => (x.title || '').localeCompare(y.title || ''))
+    const out = {
+      data: rows,
+      pagination: {
+        last_visible_page: 1,
+        has_next_page: false,
+        current_page: 1,
+        items: { count: rows.length, total: rows.length, per_page: lim, pages: 1 },
+      },
+    }
+    cacheSet(key, out, TTL)
+    return out
+  } catch (e) {
+    console.warn('[kitsu-feed] letter fallback failed:', L, e?.message || e)
+    cacheSet(key, null, FAIL_TTL)
+    return null
+  }
+}
+
+/**
  * Final-stage fallback for /api/jikan/* when Jikan AND AniList both fail:
  * serve list endpoints (top / popular / upcoming / this-season / explicit
- * season), title search (/anime?q=…) and single-title details
- * (/anime/:id[/full]) from Kitsu in Jikan's v4 shape so Browse, Search and
- * the Anime details page keep working. A–Z letters and genre filters have
- * no Kitsu equivalent and return null → those keep their honest 502 UIs.
+ * season), title search (/anime?q=…), single-title details
+ * (/anime/:id[/full]), genre browse (/anime?genres=:id) and A–Z letters
+ * (/anime?letter=X) from Kitsu in Jikan's v4 shape so Browse, Search and
+ * the Anime details page keep working. Genre/letter coverage is partial
+ * (see each stage's doc) but always real titles with real MAL ids.
  */
 export async function getKitsuFeedAsJikan(targetPath, query) {
   const page = Math.max(1, Number.isFinite(Number(query?.page)) ? Number(query.page) : 1)
@@ -512,6 +676,24 @@ export async function getKitsuFeedAsJikan(targetPath, query) {
       const out = await getKitsuSearchAsJikan(String(q).trim(), page, query.limit)
       return out
     }
+  }
+
+  // Genre browse (/anime?genres=:id) — must precede generic /anime matching.
+  if (targetPath === '/anime' && query?.genres != null) {
+    const gid = Number(Array.isArray(query.genres) ? query.genres[0] : query.genres)
+    if (Number.isInteger(gid) && gid > 0 && page === 1) {
+      return await getKitsuGenreAsJikan(gid, query.limit)
+    }
+    return null
+  }
+
+  // A–Z letter browse (/anime?letter=X) — must precede generic /anime matching.
+  if (targetPath === '/anime' && query?.letter != null) {
+    const letter = Array.isArray(query.letter) ? query.letter[0] : query.letter
+    if (page === 1) {
+      return await getKitsuLetterAsJikan(String(letter || ''), query.limit)
+    }
+    return null
   }
 
   if (page > 1) return null
