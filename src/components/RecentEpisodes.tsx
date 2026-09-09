@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Play, Clock, Shuffle } from 'lucide-react'
+import { Play, Clock, Shuffle, RefreshCw, WifiOff } from 'lucide-react'
 import { getRecentEpisodes, type RecentEpisode } from '../api/anilist'
+import { getAiringScheduleJikan } from '../api/anime'
 import { getBackendOrigin, cn } from '../lib/utils'
 import StaggerCard from './StaggerCard'
 import SectionHeader from './SectionHeader'
@@ -25,10 +26,54 @@ const FILTER_TABS: { value: FilterTab; label: string }[] = [
   { value: 'random', label: 'Random' },
 ]
 
+/**
+ * Outage fallback for the "all" tab: AniList's airingSchedules query is
+ * AniList-only (no equivalent anywhere else for "just aired"), so when it
+ * 403s during the site-wide outage, degrade to Jikan's per-day /schedules
+ * (today + yesterday) — it has real episode numbers and MAL ids, just no
+ * exact air timestamps. Same trade the Schedule page's fallback makes.
+ */
+async function fetchRecentWithFallback(): Promise<RecentEpisode[]> {
+  try {
+    const items = await getRecentEpisodes(18)
+    if (items.length > 0) return items
+    console.warn('[recentEpisodes] AniList returned an empty recent window — trying Jikan fallback')
+  } catch (e) {
+    console.warn('[recentEpisodes] AniList recent failed — trying Jikan fallback:', (e as Error).message)
+  }
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const today = { date: now, key: now.toISOString().slice(0, 10) }
+  const yest = new Date(now)
+  yest.setDate(yest.getDate() - 1)
+  const yesterday = { date: yest, key: yest.toISOString().slice(0, 10) }
+  const sched = await getAiringScheduleJikan([yesterday, today])
+  return sched.map((s): RecentEpisode => ({
+    media: {
+      ...s.media,
+      // FeedMedia fields Jikan's schedule doesn't carry — the episode card
+      // renders fine with them nulled (it null-guards everything it shows).
+      coverImage: { ...s.media.coverImage, extraLarge: null },
+      episodes: null,
+      duration: null,
+      popularity: null,
+      status: null,
+      season: null,
+      seasonYear: null,
+      studios: { nodes: [] },
+      nextAiringEpisode: null,
+      description: null,
+      trailer: null,
+    },
+    episode: s.episode,
+    airedAt: s.airingAt,
+  }))
+}
+
 export default function RecentEpisodes() {
   const [filter, setFilter] = useState<FilterTab>('all')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['recentEpisodes', filter],
     queryFn: async () => {
       // Use the new discover endpoint when filter is active (non-default)
@@ -49,7 +94,12 @@ export default function RecentEpisodes() {
           likelySub: e.likelySub,
         }))
       }
-      return getRecentEpisodes(18)
+      return getRecentEpisodes(18).then(async (items) => {
+        if (items.length > 0) return items
+        // AniList outage mode can resolve with an EMPTY airing window —
+        // treat that as a failure and degrade to the Jikan schedule.
+        return fetchRecentWithFallback()
+      }).catch(() => fetchRecentWithFallback())
     },
     staleTime: 2 * 60 * 1000,
     meta: { persist: true },
@@ -68,6 +118,10 @@ export default function RecentEpisodes() {
 
   const rawItems = filter === 'random' && shuffled ? shuffled : (data ?? [])
   const items = rawItems.slice(0, 14)
+
+  // Honest outage state — never render a silently-empty "Recent Episodes"
+  // row (that looked like nothing aired all week when the source was down).
+  const showOutage = !isLoading && items.length === 0 && (isError || filter === 'all')
 
   return (
     <section className="mt-8 mx-4">
@@ -118,6 +172,25 @@ export default function RecentEpisodes() {
 
       {/* Mobile (< sm): touch-friendly horizontal scroller.
           sm+: dense responsive grid matching the main feed columns. */}
+      {showOutage ? (
+        <div className="glass-card rounded-2xl py-12 text-center max-w-md mx-auto">
+          <WifiOff className="h-9 w-9 text-muted-foreground mx-auto mb-3 opacity-40" />
+          <p className="text-white/80 font-semibold mb-1">Couldn't load recent episodes</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            The airing sources are unreachable right now. This is temporary —
+            check back in a bit.
+          </p>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="glass-pill text-xs disabled:opacity-50"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
+            {isFetching ? 'Retrying…' : 'Retry'}
+          </button>
+        </div>
+      ) : (
+      <>
       <div
         className="flex sm:hidden gap-3 overflow-x-auto custom-scrollbar pb-3 -mx-1 px-1 contain-auto"
         style={{ scrollSnapType: 'x mandatory' }}
@@ -153,6 +226,8 @@ export default function RecentEpisodes() {
               </StaggerCard>
             ))}
       </div>
+      </>
+      )}
     </section>
   )
 }

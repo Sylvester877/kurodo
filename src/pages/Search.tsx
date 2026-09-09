@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { searchAnime, getAnimeGenres, type SearchFilters as Filters } from '../api/anime'
-import { searchMangaAniListPaginated, type MangaSearchResult } from '../api/anilistManga'
+import { searchMangaAniListPaginated, type MangaSearchResult, type MangaFeedMedia } from '../api/anilistManga'
 import { searchManga as searchMangaDex, type MangaDexManga } from '../api/mangadex'
 import { useDebounce } from '../hooks/useDebounce'
 import { useTitle } from '../hooks/useTitle'
@@ -72,6 +72,35 @@ function hasActiveFilters(f: Filters): boolean {
     (f.orderBy && f.orderBy !== 'score') ||
     (f.sort && f.sort !== 'desc')
   )
+}
+
+/**
+ * MangaDex result → AniList MangaFeedMedia shape, for the manga search
+ * outage fallback. MangaDex ids are UUIDs and MangaDetails resolves them
+ * natively, so /manga/:id links keep working; the numeric id field just
+ * needs to be unique for React keys (hash the UUID deterministically).
+ */
+function convertMangaDexToFeedMedia(r: MangaDexManga): MangaFeedMedia {
+  let numericId = 0
+  for (let i = 0; i < r.id.length; i++) numericId = (numericId * 31 + r.id.charCodeAt(i)) >>> 0
+  const year = r.year ?? null
+  const status = r.status === 'completed' ? 'FINISHED' : r.status === 'ongoing' ? 'RELEASING' : r.status === 'hiatus' ? 'HIATUS' : null
+  return {
+    id: numericId || 1,
+    idMal: null,
+    title: { romaji: r.title, english: r.title, native: null },
+    coverImage: { extraLarge: r.coverUrl ?? null, large: r.coverThumb ?? r.coverUrl ?? null, color: null },
+    bannerImage: null,
+    chapters: r.lastChapter ? Number(r.lastChapter) || null : null,
+    volumes: r.lastVolume ? Number(r.lastVolume) || null : null,
+    averageScore: null,
+    popularity: null,
+    format: null,
+    status,
+    genres: r.tags?.slice(0, 4) ?? [],
+    description: r.description || null,
+    startDate: year ? { year, month: null, day: null } : null,
+  }
 }
 
 function SearchPageContent() {
@@ -172,6 +201,26 @@ function SearchPageContent() {
   const mangaLoadingMore = mangaQuery.isFetchingNextPage
   const mangaError = mangaQuery.isError
 
+  // ───── MangaDex outage fallback (anime tab uses Kitsu; manga uses MD) ─────
+  // Runs only when the AniList manga search FAILED (403 outage) — never
+  // competes with a successful AniList result.
+  const mdFallbackQuery = useQuery({
+    queryKey: ['manga-search-mdfallback', trimmed],
+    queryFn: async () => {
+      const res = await searchMangaDex(trimmed, 24, 0)
+      // MangaDex ids are UUIDs; MangaDetails resolves them natively, but the
+      // search grid dedupes/sorts by AniList-shape fields — so convert.
+      return res.results.map((r) => convertMangaDexToFeedMedia(r))
+    },
+    // Fire on AniList FAILURE **or** an empty success (AniList's outage mode
+    // can resolve with a valid empty page — the same trap the anime tab had).
+    enabled: trimmed.length >= 2 && activeTab === 'manga' &&
+      (mangaError || (!mangaLoading && !mangaQuery.isFetching && mangaResults.length === 0)),
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  })
+  const mdFallback: MangaFeedMedia[] = mdFallbackQuery.data ?? []
+
   // ───── MangaDex Colour query (parallel fetch for colored editions) ─────
   const colourQuery = useQuery({
     queryKey: ['manga-search-colour', trimmed],
@@ -212,6 +261,23 @@ function SearchPageContent() {
 
     return { og: ogFiltered, colour: colourUnique }
   }, [mangaResults, colourRaw])
+
+  // Final manga view list: AniList results, or the MangaDex fallback set
+  // when AniList is down. Colour editions render through their own blocks
+  // (colourView) so shapes never mix.
+  const mangaView = useMemo<MangaFeedMedia[]>(() => {
+    if (mergedManga.og.length > 0) return mergedManga.og
+    return mdFallback
+  }, [mergedManga, mdFallback])
+
+  // The grid is showing MangaDex fallback rows (AniList produced nothing).
+  const usingMdFallback = mangaView.length > 0 && mergedManga.og.length === 0
+
+  // Colour editions, minus any title already shown in mangaView.
+  const colourView = useMemo(() => {
+    const shown = new Set(mangaView.map((m) => (m.title.english || m.title.romaji || '').toLowerCase()))
+    return mergedManga.colour.filter((c) => !shown.has(c.title.toLowerCase()))
+  }, [mergedManga, mangaView])
 
   // Active tab switch handler
   const setTab = useCallback((tab: 'anime' | 'manga') => {
@@ -655,7 +721,12 @@ function SearchPageContent() {
                               </span> manga result{mangaTotalResults === 1 ? '' : 's'}
                               {trimmed && <> for <span className="text-white font-semibold">"{trimmed}"</span></>}
                             </>
-                          : `${mangaResults.length} loaded`}
+                          : `${mangaView.length} loaded`}
+                      {usingMdFallback && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wider font-bold text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 rounded px-1.5 py-0.5">
+                          via MangaDex · AniList down
+                        </span>
+                      )}
                     </p>
                   </div>
                   {mangaQuery.hasNextPage && (
@@ -666,9 +737,12 @@ function SearchPageContent() {
                 </div>
               )}
 
-              {mangaLoading && mergedManga.og.length === 0 ? (
+              {mangaLoading && mangaView.length === 0 ? (
                 <SkeletonRow count={12} />
-              ) : mangaError ? (
+              ) : mangaError && mangaView.length === 0 ? (
+                // AniList search failed AND MangaDex fallback found nothing —
+                // only then show the error card. When the fallback has rows,
+                // they render below with a source notice instead.
                 <div className="glass-card rounded-2xl py-16 text-center max-w-md mx-auto">
                   <Frown className="h-10 w-10 text-red-400 mx-auto mb-3 opacity-80" />
                   <p className="text-white font-semibold mb-1">Search failed</p>
@@ -676,13 +750,13 @@ function SearchPageContent() {
                     The AniList API might be rate-limited. Wait a moment and retry.
                   </p>
                   <button
-                    onClick={() => mangaQuery.refetch()}
+                    onClick={() => { mangaQuery.refetch(); mdFallbackQuery.refetch() }}
                     className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-all shadow-[0_4px_16px_-6px_hsl(245,75%,60%,0.4)]"
                   >
                     Try again
                   </button>
                 </div>
-              ) : !mangaLoading && mergedManga.og.length === 0 && mergedManga.colour.length === 0 && trimmed ? (
+              ) : !mangaLoading && mangaView.length === 0 && trimmed ? (
                 <div className="glass-card rounded-2xl py-16 text-center max-w-md mx-auto">
                   <Frown className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
                   <p className="text-white font-semibold mb-1">No manga results</p>
@@ -700,7 +774,7 @@ function SearchPageContent() {
                 <>
                   {/* Mobile: manga grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:hidden gap-x-3 gap-y-5 contain-auto">
-                    {mergedManga.og.map((manga) => {
+                    {mangaView.map((manga) => {
                       const cover = manga.coverImage?.large || manga.coverImage?.extraLarge
                       const score = manga.averageScore ? (manga.averageScore / 10).toFixed(1) : null
                       const year = manga.startDate?.year || null
@@ -740,7 +814,7 @@ function SearchPageContent() {
                       )
                     })}
                     {/* ── Coloured manga from MangaDex ── */}
-                    {mergedManga.colour.length > 0 && (
+                    {colourView.length > 0 && (
                       <>
                         <div className="col-span-full flex items-center gap-2 my-3 first:mt-0">
                           <div className="h-px flex-1 bg-gradient-to-r from-pink-500/30 to-purple-500/30" />
@@ -749,7 +823,7 @@ function SearchPageContent() {
                           </span>
                           <div className="h-px flex-1 bg-gradient-to-r from-purple-500/30 to-pink-500/30" />
                         </div>
-                        {mergedManga.colour.map((mdx) => (
+                        {colourView.map((mdx) => (
                           <Link
                             key={`colour-${mdx.id}`}
                             to={`/manga/${mdx.id}`}
@@ -781,7 +855,7 @@ function SearchPageContent() {
                     )}
                   </div>
 
-                  {mergedManga.colour.length > 0 && (
+                  {colourView.length > 0 && (
                     <div className="hidden lg:flex items-center gap-3 my-3 first:mt-0">
                       <div className="h-px flex-1 bg-gradient-to-r from-pink-500/30 to-purple-500/30" />
                       <span className="text-[10px] font-bold uppercase tracking-wider text-pink-300/80 bg-gradient-to-r from-pink-500/10 to-purple-500/10 px-2 py-0.5 rounded-full border border-pink-500/20">
@@ -792,7 +866,7 @@ function SearchPageContent() {
                   )}
                   {/* Desktop: manga list cards */}
                   <div className="hidden lg:block space-y-2">
-                    {mergedManga.og.map((manga) => {
+                    {mangaView.map((manga) => {
                       const cover = manga.coverImage?.large || manga.coverImage?.extraLarge
                       const score = manga.averageScore ? (manga.averageScore / 10).toFixed(1) : null
                       const year = manga.startDate?.year || null
@@ -861,7 +935,7 @@ function SearchPageContent() {
                           Loading more manga…
                         </span>
                       </div>
-                    ) : !mangaQuery.hasNextPage && mergedManga.og.length > 0 ? (
+                    ) : !mangaQuery.hasNextPage && mangaView.length > 0 ? (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <div className="h-px w-8 bg-white/10" />
                         <span className="text-[10px] uppercase tracking-wider font-semibold">
@@ -873,9 +947,9 @@ function SearchPageContent() {
                   </div>
 
                   {/* ── Desktop: Coloured manga list cards ── */}
-                  {mergedManga.colour.length > 0 && (
+                  {colourView.length > 0 && (
                     <div className="hidden lg:block space-y-2 mt-2">
-                      {mergedManga.colour.map((mdx) => (
+                      {colourView.map((mdx) => (
                         <Link
                           key={`colour-${mdx.id}`}
                           to={`/manga/${mdx.id}`}
