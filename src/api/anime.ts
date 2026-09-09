@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { Anime, AnimeSearchResponse, AnimeEpisodeResponse, Genre } from '../types'
 import { getBackendOrigin } from '../lib/utils'
-import { searchAnimeAniList, getAniListMediaByMalId } from './anilist'
+import { searchAnimeAniList, getAniListMediaByMalId, type AiringSchedule } from './anilist'
 
 // Use /api/jikan proxy on localhost to avoid browser CORS + rate limits.
 // In Electron/production, the backend serves the frontend and also proxies
@@ -174,6 +174,76 @@ export async function getSeasonalAnime(
 
 export async function getUpcomingAnime(page = 1, limit = 24): Promise<AnimeSearchResponse> {
   return cachedGet<AnimeSearchResponse>('/seasons/upcoming', { page, limit })
+}
+
+/**
+ * Schedule fallback: Jikan's /schedules endpoint (MAL data) when AniList's
+ * airingSchedules GraphQL query is down (its documented site-wide 403 mode).
+ *
+ * Jikan returns one entry per show per day (entry.episodes lists that day's
+ * episode numbers) and has NO exact air timestamps — so each day's entries
+ * are laid out at a steady pace across the day. The page keeps working
+ * (titles, posters, episode numbers, day grouping); only the precise
+ * countdown loses per-episode granularity during an AniList outage.
+ */
+export async function getAiringScheduleJikan(
+  days: { date: Date; key: string }[],
+): Promise<AiringSchedule[]> {
+  const DAY_FILTERS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  // All 7 days in parallel — the server's Jikan queue paces requests anyway,
+  // and sequential fetching made the outage fallback take 30s+ to give up.
+  const perDay = await Promise.all(
+    days.map(async (day) => {
+      const filter = DAY_FILTERS[day.date.getDay()]
+      try {
+        const res = await cachedGet<{ data?: {
+          mal_id?: number
+          title?: { romaji?: string; english?: string; default?: string }
+          images?: { jpg?: { image_url?: string; large_image_url?: string } }
+          episodes?: { mal_id?: number }[]
+          score?: number | null
+          genres?: { name?: string }[]
+        }[] }>(`/schedules`, { filter, limit: 25, sfw: true })
+        return { day, items: res?.data ?? [] }
+      } catch {
+        return { day, items: [] } // one dead day shouldn't kill the whole week
+      }
+    }),
+  )
+  const out: AiringSchedule[] = []
+  for (const { day, items } of perDay) {
+    // Spread the day's shows across the day (fake-but-stable timestamps).
+    const dayStart = Math.floor(day.date.getTime() / 1000)
+    items.forEach((it, idx) => {
+      const malId = it.mal_id ?? null
+      if (!malId) return
+      const epNums = (it.episodes ?? []).map((e) => e.mal_id).filter((n): n is number => typeof n === 'number')
+      const ep = epNums.length > 0 ? epNums[0] : 1
+      out.push({
+        id: malId * 1000 + ep, // stable unique key per (show, episode)
+        episode: ep,
+        airingAt: dayStart + (idx + 1) * 1800, // every 30 min across the day
+        timeUntilAiring: dayStart + (idx + 1) * 1800 - Math.floor(Date.now() / 1000),
+        media: {
+          id: malId,
+          idMal: malId,
+          title: {
+            romaji: it.title?.default ?? '',
+            english: it.title?.english ?? null,
+            native: null,
+          },
+          coverImage: { large: it.images?.jpg?.large_image_url ?? it.images?.jpg?.image_url ?? null, color: null },
+          bannerImage: null,
+          format: null,
+          averageScore: it.score != null ? Math.round(it.score * 10) : null,
+          episodes: null,
+          duration: null,
+          genres: (it.genres ?? []).map((g) => g.name ?? '').filter(Boolean),
+        },
+      })
+    })
+  }
+  return out
 }
 
 export async function getAnimeById(id: number): Promise<{ data: Anime }> {

@@ -41,6 +41,17 @@ const CURRENT_SEASON: Season = (() => {
 
 const YEAR_RANGE = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1]
 
+/**
+ * True when the season/year combo is strictly in the future relative to the
+ * current season (e.g. viewing Summer 2027 in September 2026). Such seasons
+ * are legitimately unannounced — an empty result is expected, not an outage.
+ */
+function isFutureSeason(year: number, season: Season): boolean {
+  const sIdx = SEASONS.indexOf(season)
+  const curIdx = SEASONS.indexOf(CURRENT_SEASON)
+  return year > CURRENT_YEAR || (year === CURRENT_YEAR && sIdx > curIdx)
+}
+
 export default function Seasonal() {
   useTitle('Seasonal Calendar')
   const [season, setSeason] = useState<Season>(CURRENT_SEASON)
@@ -173,12 +184,23 @@ export default function Seasonal() {
                 {isFetching ? 'Retrying…' : 'Retry'}
               </button>
             </div>
+          ) : isFutureSeason(year, season) ? (
+            // Future seasons have nothing announced YET — that's expected, not
+            // an outage. Say so instead of implying data went missing.
+            <div className="glass-card rounded-2xl py-16 text-center">
+              <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p className="text-white/80 font-semibold mb-1">{meta.label} {year} hasn't been announced yet</p>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                Studios reveal next-season lineups a few months ahead. Check back
+                closer to the season — or explore an already-announced one.
+              </p>
+            </div>
           ) : (
             <div className="glass-card rounded-2xl py-16 text-center">
               <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
               <p className="text-white/80 font-semibold mb-1">No anime listed yet</p>
               <p className="text-xs text-muted-foreground">
-                AniList may not have entries for {meta.label} {year} yet — try a past season.
+                No entries for {meta.label} {year} yet — try a past season.
               </p>
             </div>
           )

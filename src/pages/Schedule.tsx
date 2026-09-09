@@ -5,6 +5,7 @@ import {
   Calendar, Clock, Star, Radio, Bell, CalendarDays,
   ChevronRight, Tv, Filter, X, RefreshCw,
 } from 'lucide-react'
+import { getAiringScheduleJikan } from '../api/anime'
 import { getAiringSchedule, type AiringSchedule } from '../api/anilist'
 import { useTitle } from '../hooks/useTitle'
 import { cn, proxifyImgUrl } from '../lib/utils'
@@ -45,21 +46,37 @@ async function fetchWeek(days: DayInfo[]): Promise<AiringSchedule[]> {
   const from = Math.floor(days[0].date.getTime() / 1000)
   const to = Math.floor(days[6].date.getTime() / 1000) + 86400
   const all: AiringSchedule[] = []
-  for (let page = 1; page <= 6; page++) {
-    try {
-      const res = await getAiringSchedule(from, to, page, 50)
-      if (!res) break
-      all.push(...res.items)
-      if (!res.hasNextPage) break
-    } catch (e) {
-      console.warn(`[schedule] page ${page} failed:`, (e as Error).message)
-      // If even the first page fails, throw so React Query shows error state
-      // instead of silently showing an empty schedule.
-      if (page === 1) throw e
-      break
+  try {
+    for (let page = 1; page <= 6; page++) {
+      try {
+        const res = await getAiringSchedule(from, to, page, 50)
+        if (!res) break
+        all.push(...res.items)
+        if (!res.hasNextPage) break
+      } catch (e) {
+        console.warn(`[schedule] page ${page} failed:`, (e as Error).message)
+        // If even the first page fails, throw so React Query shows error state
+        // instead of silently showing an empty schedule.
+        if (page === 1) throw e
+        break
+      }
     }
+    if (all.length > 0) return all
+    // AniList served an empty week (its outage mode returns empty/403) —
+    // fall back to Jikan's per-day /schedules before claiming "no episodes".
+    console.warn('[schedule] AniList returned an empty week — trying Jikan fallback')
+  } catch (e) {
+    console.warn('[schedule] AniList schedule failed — trying Jikan fallback:', (e as Error).message)
   }
-  return all
+  return getAiringScheduleJikan(days).then((jikan) => {
+    if (jikan.length === 0) {
+      // Jikan fallback came back empty too — both schedule sources are down.
+      // Throw so the page shows its honest outage card instead of silently
+      // claiming "no episodes scheduled".
+      throw new Error('All schedule sources failed')
+    }
+    return jikan
+  })
 }
 
 export default function Schedule() {
@@ -337,8 +354,8 @@ export default function Schedule() {
                   Couldn't load the schedule
                 </p>
                 <p className="text-xs text-muted-foreground max-w-sm mx-auto mb-4">
-                  The schedule source (AniList) is having an outage right now.
-                  This is temporary — check back in a bit.
+                  Both schedule sources (AniList + MyAnimeList) are unreachable
+                  right now. This is temporary — check back in a bit.
                 </p>
                 <button
                   onClick={() => refetch()}

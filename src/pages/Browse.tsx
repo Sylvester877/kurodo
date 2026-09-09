@@ -157,6 +157,10 @@ export default function Browse() {
     const params = new URLSearchParams(searchParams)
     params.set('filter', filter)
     params.delete('genreId')
+    // Letter only means something in A–Z mode — leaving it behind when
+    // switching filters made /browse?filter=genre&letter=B&genreId=1 serve
+    // the letter-filtered (possibly empty) result set for genre queries.
+    if (filter !== 'az') params.delete('letter')
     // Entering A–Z with no letter yet — land on A so content shows instantly.
     if (filter === 'az' && !params.get('letter')) params.set('letter', 'A')
     setSearchParams(params)
@@ -175,9 +179,11 @@ export default function Browse() {
     if (genre) {
       params.set('filter', 'genre')
       params.set('genreId', String(genre.mal_id))
+      params.delete('letter') // stale A–Z letter must not filter the genre query
     } else {
       params.set('filter', 'top-rated')
       params.delete('genreId')
+      params.delete('letter')
     }
     setSearchParams(params)
     setShowFilters(false)
