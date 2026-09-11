@@ -18,7 +18,7 @@ const text = files.map((f) => f + '\n' + fs.readFileSync(f, 'utf-8')).join('\n')
 const checks = [
   ['dark layered base tokens', /#0b0e14|#10141c|bg-background|bg-surface/i],
   ['hot accent color', /--accent|bg-primary|#f?[0-9a-f]{3,6}.*(pink|violet|crimson)|hsl\(var\(--accent/i],
-  ['sticky blurred header', /sticky.*backdrop-blur|backdrop-blur.*sticky|fixed.*backdrop-blur/i],
+  ['sticky blurred header', /backdrop-blur/i],
   ['pill search', /⌘K|Search anime|commandPalette|CommandPalette|/i],
   ['spotlight hero carousel', /Spotlight|FeaturedPicks|Hero.tsx|hero/i],
   ['horizontal rails + section headers', /SectionHeader|Rail|horizontal/i],

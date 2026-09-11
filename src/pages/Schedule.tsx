@@ -464,7 +464,13 @@ export default function Schedule() {
                                     ? 'text-primary font-bold'
                                     : 'text-muted-foreground',
                                 )}>
-                                  · in {formatCountdown(secsUntil)}
+                                  · in {formatCountdown(secsUntil)}{' '}
+                                  <span
+                                    title="Estimated air time — AniList's schedule is broadcaster-based and may shift by a few minutes"
+                                    className="text-[9px] font-sans font-medium italic text-white/35 border-b border-dotted border-white/15 cursor-help"
+                                  >
+                                    est.
+                                  </span>
                                 </span>
                               )}
                               {entry.media.format && (

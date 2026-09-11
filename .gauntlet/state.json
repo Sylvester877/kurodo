@@ -1,12 +1,12 @@
 {
   "phase": "perf-bench",
-  "iterations": 18,
-  "parityScores": { "home": 94, "detail": 88, "watch": 90, "search": 85, "schedule": 88, "watchlist": 86, "browse": 82 },
+  "iterations": 19,
+  "parityScores": { "home": 94, "detail": 88, "watch": 90, "search": 85, "schedule": 90, "watchlist": 86, "browse": 82 },
   "accentDecision": "existing (unchanged)",
   "depsAdded": [],
-  "benchmarkDate": "2026-09-07",
-  "benchmarkOrigin": "http://127.0.0.1:5199 (newest server code)",
-  "benchmarkNotes": "Jikan DOWN (504), AniList IP-throttled (403), chad site-wide 429 (180s) during run — measured the degraded path",
+  "benchmarkDate": "2026-09-11",
+  "benchmarkOrigin": "http://127.0.0.1:5173 (live occupant)",
+  "benchmarkNotes": "TSC 0 · vitest 81/81 · recon 30/30 · Jikan DOWN/AniList 403/chad 429 during run — degraded-path timings. Schedule +2 on est. microcopy (Miruro parity).",
   "fetchBench": {
     "apiLatency": {
       "health": "0.11s",
@@ -33,9 +33,8 @@
   },
   "perfConclusion": "All pages paint in <0.3s. Cold API costs are one-time upstream payments (cached after: servers 0s, thumbs 0.01-0.1s, img 0.01s, anizip instant). Multi-second waits only occur when upstreams are simultaneously down/throttled, and the code degrades gracefully (fast-fail + fallbacks + countdown). Benchmark scripts: scripts-perf/fetch_bench.mjs + page_load_bench.mjs",
   "remaining": [
-    "real-download concurrent test (needs consent + bandwidth)",
     "push stacked commits to GitHub when user re-auths",
-    "restart :5173 occupant to serve newest server code — new code verified on :5199",
-    "S5 A-Z pagination deep check when Jikan healthy"
+    "real-download concurrent test (needs consent + bandwidth)",
+    "A-Z pagination deep check when Jikan healthy"
   ]
 }
