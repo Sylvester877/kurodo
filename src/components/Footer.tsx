@@ -51,7 +51,7 @@ export default function Footer() {
             <ul className="space-y-2.5">
               {[
                 { to: '/schedule', label: 'Schedule' },
-                { to: '/music', label: 'Music' },
+                { to: '/seasonal', label: 'Seasonal' },
               ].map(({ to, label }) => (
                 <li key={to}>
                   <Link to={to} className="inline-block py-1.5 text-[13px] text-white/40 hover:text-white hover:translate-x-0.5 transition-all duration-200">
