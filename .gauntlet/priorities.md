@@ -9,10 +9,9 @@ remaining work is gap-filling, not reskinning.
 4. [DONE] Dead /music footer link → 404 (SEV-2) — rerouted to /seasonal (Footer.tsx 2026-09-11).
 5. [PARITY] Schedule: today is auto-highlighted + countdown strip exists;
    consider Miruro-style per-episode "estimated release" microcopy.
-6. [BUG-HUNT] Re-run scripts-perf/error_sweep2.mjs now that image layer
-   proxies everything (may surface new 4xx/5xx shapes worth handling).
+6. [DONE] Bug-hunt re-sweep: image-proxy paths (/img kitsu + mangadex) prove 200, dead 404s return SVG placeholder, AniList 403 still honest error (verified live 2026-09-11).
 7. [PERF] Verify cold Browse first-paint with disk-cached covers (needs Jikan healthy to measure).
-8. [a11y] Audit focus rings on the new CharactersRow scroll region.
+8. [DONE] CharactersRow a11y: scroller now keyboard-focusable (tabIndex=0, role=region, aria-label) + visible focus ring (CharactersRow.tsx 2026-09-11).
 9. [MAINT] .gauntlet/recon.mjs kept as the reusable feature-matrix audit.
 10. [WATCH] Fullscreen baked-bar zoom (194ec09) — confirm on a real letterboxed movie once user play-tests.
 

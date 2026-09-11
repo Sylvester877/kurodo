@@ -98,7 +98,10 @@ export default function CharactersRow({ malId }: { malId: number }) {
         </div>
       ) : (
         <div
-          className="flex gap-2 overflow-x-auto custom-scrollbar pb-3 -mx-1 px-1 snap-x snap-mandatory"
+          tabIndex={0}
+          role="region"
+          aria-label="Characters & cast — scroll horizontally or use arrow keys"
+          className="flex gap-2 overflow-x-auto custom-scrollbar pb-3 -mx-1 px-1 snap-x snap-mandatory rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           style={{
             maskImage: 'linear-gradient(to right, transparent, black 4%, black 96%, transparent)',
             WebkitMaskImage: 'linear-gradient(to right, transparent, black 4%, black 96%, transparent)',
