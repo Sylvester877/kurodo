@@ -30,9 +30,13 @@
     <meta property="og:description" content="A sleek anime discovery & streaming companion." />
     <meta property="og:type" content="website" />
 
-    <!-- GPU compositor hint: promote the root element to its own layer for
-         smoother scroll + animation performance on integrated GPUs -->
-    <style>#root { will-change: transform; contain: layout style; }</style>
+    <!-- Containment for #root: avoid trapping fixed-position manga chrome.
+         `will-change: transform` + `contain: layout` created a containing
+         block for every `position: fixed` child (pill / spine / right stack
+         / bottom bar), so they scrolled with the page instead of sticking
+         to the viewport. Keep it minimal — only `contain: style` (no layout).
+         GPU promotion is handled per-animated element (framer-motion) instead. -->
+    <style>#root { contain: style; }</style>
     <!-- Preconnect to the APIs we hit on first paint -->
     <link rel="preconnect" href="https://api.jikan.moe" />
     <link rel="preconnect" href="https://cdn.myanimelist.net" crossorigin />

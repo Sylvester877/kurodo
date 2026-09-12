@@ -190,6 +190,16 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  // Dev: proxy /api + /img to the Express backend on :5174 so the Vite
+  // dev server (5173) can serve the SPA while API calls hit the real backend.
+  // In production the single server serves both, so this is dev-only.
+  server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:5174',
+      '/img': 'http://127.0.0.1:5174',
+      '/proxy': 'http://127.0.0.1:5174',
+    },
+  },
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },

@@ -1,5 +1,6 @@
 import { forwardRef, useState, useEffect, useRef, useCallback } from 'react'
 import type { LoadingMethod } from '../store/useReaderStore'
+import { proxifyImgUrl } from '../lib/utils'
 
 interface ReaderImageProps {
   url: string
@@ -28,7 +29,10 @@ interface ReaderImageProps {
  * Bg-image mode is purely cosmetic — pages render as CSS backgrounds.
  */
 export const ReaderImage = forwardRef<HTMLElement, ReaderImageProps>(
-  ({ url, alt, className, style, loadingMethod, imgLoading, onClick, onDoubleClick, fadeIn = 200, blurPlaceholder, onLoad }, ref) => {
+  ({ url: rawUrl, alt, className, style, loadingMethod, imgLoading, onClick, onDoubleClick, fadeIn = 200, blurPlaceholder, onLoad }, ref) => {
+    // Route atsu.moe pages through the /img proxy so CORS doesn't block
+    // canvas reads (blur) or blob fetches. Other CDNs work direct.
+    const url = rawUrl?.includes('atsu.moe') ? proxifyImgUrl(rawUrl) : rawUrl
     const [blobUrl, setBlobUrl] = useState<string>('')
     const [loaded, setLoaded] = useState(false)
     const [autoBlurUrl, setAutoBlurUrl] = useState<string>('')
@@ -93,6 +97,8 @@ export const ReaderImage = forwardRef<HTMLElement, ReaderImageProps>(
     }, [url, blurPlaceholder, fadeIn])
 
     const effectiveBlurPlaceholder = blurPlaceholder || autoBlurUrl
+    // When the proxied URL changes, reset loaded so the new image fades in
+    // (otherwise the old loaded=true keeps the placeholder hidden).
 
     const handleLoad = useCallback(() => {
       setLoaded(true)

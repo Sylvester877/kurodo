@@ -5,6 +5,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, ChevronDown, Loader2, AlertTriangle, Settings2, Play, Pause, SkipForward, Maximize, Minimize, Sun, Columns, AlignJustify, Bookmark } from 'lucide-react'
 import { cn } from '../lib/utils'
+import MangaPill from '../components/manga/MangaPill'
+import LeftProgressSpine from '../components/manga/LeftProgressSpine'
+import RightToolStack from '../components/manga/RightToolStack'
+import MangaDrawer from '../components/manga/MangaDrawer'
 import { getChapterPages, getChapterFeed, getMangaInfo, getChapterMangaId, type MangaDexPage } from '../api/mangadex'
 import { getChapterPages as getChapterPagesAtsu, getChapterFeed as getChapterFeedAtsu, getMangaInfo as getMangaInfoAtsu } from '../api/atsu'
 import { useTitle } from '../hooks/useTitle'
@@ -22,6 +26,7 @@ import KeyboardHelpModal from '../components/KeyboardHelpModal'
 import SyncConfirmDialog, { useSyncConfirm } from '../components/SyncConfirmDialog'
 
 import BookmarksPanel from '../components/BookmarksPanel'
+
 
 /** Stable empty arrays — module-level const. Using `?? []` inside a
  *  component creates a NEW array reference on every render when data
@@ -174,6 +179,9 @@ export default function MangaReader() {
   const [showQuickActions, setShowQuickActions] = useState(false)
   const [showBookmarks, setShowBookmarks] = useState(false)
   const [jumpToPageInput, setJumpToPageInput] = useState('')
+  const [showDrawer, setShowDrawer] = useState(false)
+  const [drawerPinned, setDrawerPinned] = useState(false)
+  const [drawerTab, setDrawerTab] = useState<'chapters' | 'settings' | 'comments'>('chapters')
 
   // ── Swipe gesture refs ──
   const swipeStartX = useRef(0)
@@ -965,16 +973,6 @@ export default function MangaReader() {
     }
   }, [nextChapterInFilter, mangaId, source, malIdParam, anilistIdParam, navigate])
 
-  const loading = pagesQuery.isLoading
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: getBgColor(bgTheme) }}><div className="text-center"><Loader2 className="h-8 w-8 text-primary animate-spin mx-auto mb-3" /><p className="text-sm text-white/50">Loading chapter...</p></div></div>
-  }
-
-  if (!loading && !hasPages && chapters.length === 0) {
-    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: getBgColor(bgTheme) }}><div className="text-center"><BookOpen className="h-12 w-12 text-white/10 mx-auto mb-3" /><p className="text-sm text-white/50">No pages found for this chapter.</p><Link to={mangaId ? `/manga/${mangaId}` : '/manga'} className="text-primary hover:underline text-sm mt-2 inline-block">Back to manga</Link></div></div>
-  }
-
   // ── Fit mode CSS classes (page mode only) ──
   const imgFitClass = isStrip ? 'w-full h-auto'
     : fitMode === 'width' ? 'w-full h-auto'
@@ -986,135 +984,121 @@ export default function MangaReader() {
   const loadingMethodEffective = isStrip && loadingMethod === 'bg-image' ? 'native' : loadingMethod
 
   // ── Navigate to chapter helper ──
-  const navigateToChapter = (ch: { id: string }) => {
+  const navigateToChapter = useCallback((ch: { id: string }) => {
     navigate(`/manga/read/${ch.id}?manga=${mangaId}&source=${source}${malIdParam ? `&malId=${malIdParam}` : ''}${anilistIdParam ? `&anilist=${anilistIdParam}` : ''}#rs=p:0`)
+  }, [mangaId, source, malIdParam, anilistIdParam, navigate])
+
+  // ── Drawer helpers ──
+  const prevChapter = useMemo(() => (currentChIndex > 0 ? displayChapters[currentChIndex - 1] : null), [displayChapters, currentChIndex])
+  const nextChapter = useMemo(() => (currentChIndex >= 0 && currentChIndex < displayChapters.length - 1 ? displayChapters[currentChIndex + 1] : null), [displayChapters, currentChIndex])
+
+  // Lazy drawer settings to avoid importing modal code when drawer closed
+  const drawerSettingsNode = useMemo(() => (
+    <Suspense fallback={<div className="h-20 animate-pulse bg-white/[0.03] rounded-xl" />}>
+      <div data-drawer-settings className="space-y-3">
+        <div className="text-[10px] text-white/20">Quick settings — G for full panel</div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-white/50">Mode</span>
+            <div className="flex rounded-lg bg-white/[0.04] border border-white/[0.06] overflow-hidden">
+              {(['strip', 'page'] as const).map((m) => (
+                <button key={m} onClick={() => readerSet('readMode', m)} className={cn('px-3 py-1.5 text-[11px] font-semibold capitalize', readMode === m ? 'bg-primary/20 text-primary' : 'text-white/35')}>{m}</button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-white/50">Fit</span>
+            <div className="flex rounded-lg bg-white/[0.04] border border-white/[0.06] overflow-hidden">
+              {(['width', 'height', 'none'] as const).map((v) => (
+                <button key={v} onClick={() => readerSet('fitMode', v)} className={cn('px-2 py-1.5 text-[10px] font-bold', fitMode === v ? 'bg-primary/20 text-primary' : 'text-white/35')}>{v === 'none' ? '1:1' : v === 'width' ? 'Fit W' : 'Fit H'}</button>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center justify-between text-xs text-white/50 gap-2">
+            Brightness {imageBrightness}%
+            <input type="range" min={50} max={150} step={5} value={imageBrightness} onChange={(e) => readerSet('imageBrightness', Number(e.target.value))} className="w-24 accent-primary h-1" />
+          </label>
+          {isStrip && (
+            <label className="flex items-center justify-between text-xs text-white/50 gap-2">
+              Auto-scroll
+              <input type="checkbox" checked={autoScrollEnabled} onChange={(e) => readerSet('autoScrollEnabled', e.target.checked)} className="accent-primary" />
+            </label>
+          )}
+        </div>
+        <button onClick={() => setShowSettings(true)} className="w-full py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.06] border border-white/[0.06] text-xs font-semibold text-white/60">Open full settings (G)</button>
+      </div>
+    </Suspense>
+  ), [readMode, fitMode, imageBrightness, isStrip, autoScrollEnabled])
+
+  const loading = pagesQuery.isLoading
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: getBgColor(bgTheme) }}><div className="text-center"><Loader2 className="h-8 w-8 text-primary animate-spin mx-auto mb-3" /><p className="text-sm text-white/50">Loading chapter...</p></div></div>
+  }
+
+  if (!loading && !hasPages && chapters.length === 0) {
+    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: getBgColor(bgTheme) }}><div className="text-center"><BookOpen className="h-12 w-12 text-white/10 mx-auto mb-3" /><p className="text-sm text-white/50">No pages found for this chapter.</p><Link to={mangaId ? `/manga/${mangaId}` : '/manga'} className="text-primary hover:underline text-sm mt-2 inline-block">Back to manga</Link></div></div>
   }
 
   return (
     <BackgroundPattern theme={bgTheme} pattern={bgPattern} intensity={paperIntensity}>
     <div className="min-h-screen relative" onClick={() => { if (!isStrip) resetUITimer() }}>
-      {/* ══════ Top bar ══════ */}
+      {/* ══════ Floating pill (mangafire) — replaces the old fixed top bar ══════ */}
       <AnimatePresence>
-        {showUI && !zenMode && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
-            className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/90 to-transparent pb-12 pointer-events-none"
-          >
-            <div className="max-w-[900px] mx-auto px-4 h-14 flex items-center justify-between gap-3 pointer-events-auto">
-              {/* Left: Back + title */}
-              <Link to={mangaId ? `/manga/${mangaId}` : '/manga'} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 text-white/55 hover:text-white/85 transition-colors shrink-0 group">
-                <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-                <span className="text-xs font-medium truncate max-w-[200px]">{mangaTitle}</span>
-                {isAtsu && <span className="glass-pill text-emerald-400/80 border-emerald-500/20 bg-emerald-500/10 text-[8px]">atsu</span>}
-              </Link>
+        {showUI && !zenMode && hasPages && (
+          <MangaPill
+            chapterLabel={currentChapter?.chapter ?? '—'}
+            totalChapters={displayChapters.length || undefined}
+            canPrev={!!prevChapter}
+            canNext={!!nextChapter}
+            onPrev={() => prevChapter && navigateToChapter(prevChapter)}
+            onNext={() => nextChapter && navigateToChapter(nextChapter)}
+            onOpenChapters={() => { setDrawerTab('chapters'); setShowDrawer(true) }}
+            pageLabel={isStrip ? `${Math.round(stripProgress)}%` : `${currentPage + 1} / ${pages.length}`}
+          />
+        )}
+      </AnimatePresence>
 
-              {/* Right: Auto-scroll + Fullscreen + Chapter dropdown + Page counter + Settings */}
-              <div className="flex items-center gap-1.5">
-                {/* Auto-scroll play/pause + speed slider (strip mode only) */}
-                {isStrip && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); readerSet('autoScrollEnabled', !autoScrollEnabled); resetUITimer() }}
-                      className={cn(
-                        'p-1.5 rounded-lg transition-colors',
-                        autoScrollEnabled
-                          ? 'text-primary bg-primary/10 hover:bg-primary/15'
-                          : 'text-white/40 hover:text-white/60 hover:bg-white/[0.04]',
-                      )}
-                      title={autoScrollEnabled ? 'Pause auto-scroll (Space)' : 'Play auto-scroll (Space)'}
-                    >
-                      {autoScrollEnabled ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                    </button>
-                    <input
-                      type="range"
-                      min={1}
-                      max={10}
-                      value={autoScrollSpeed}
-                      onChange={(e) => { e.stopPropagation(); readerSet('autoScrollSpeed', Number(e.target.value)); resetUITimer() }}
-                      className="w-16 accent-primary h-1"
-                      title={`Speed: ${autoScrollSpeed}px/frame`}
-                      style={{ marginTop: '1px' }}
-                    />
-                    <span className="text-[9px] font-mono text-white/25 w-5 text-right tabular-nums">{autoScrollSpeed}</span>
-                  </div>
-                )}
-
-                {/* Fullscreen toggle (atsu.moe style) */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleFullscreen(); resetUITimer() }}
-                  className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
-                  title={isFullscreen ? 'Exit fullscreen (F)' : 'Enter fullscreen (F)'}
-                >
-                  {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
-                </button>
-
-                {/* Chapter dropdown */}
-                {displayChapters.length > 0 && (
-                  <div className="relative" data-chapter-dropdown>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setShowChapterModal(true) }}
-                      className="glass-pill hover:bg-white/[0.08] hover:text-white transition-colors text-[11px]"
-                    >
-                      {currentChapter ? `Ch. ${currentChapter.chapter}` : 'Chapters'}
-                      <ChevronDown className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Page counter */}
-                {hasPages && (
-                  <div className="flex items-center gap-0.5 text-[11px] text-white/30 font-mono">
-                    {!isStrip && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); stepBackward(); resetUITimer() }}
-                        className={cn('p-1 rounded hover:text-white/60 hover:bg-white/[0.06] transition-colors', currentPage <= 0 && 'opacity-20 cursor-default')}
-                      >
-                        <ChevronLeft className="h-3 w-3" />
-                      </button>
-                    )}
-                    <span className="tabular-nums min-w-[40px] text-center text-white/60 font-medium">
-                      {isStrip ? `${Math.round(stripProgress)}%` : `${currentPage + 1}/${pages.length}`}
-                    </span>
-                    {!isStrip && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); stepForward(); resetUITimer() }}
-                        className={cn('p-1 rounded hover:text-white/60 hover:bg-white/[0.06] transition-colors', currentPage >= pages.length - 1 && 'opacity-20 cursor-default')}
-                      >
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                )}                  {/* Stats button */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowStatsModal(true) }}
-                  className="p-1.5 rounded-lg text-white/35 hover:text-white/65 hover:bg-white/[0.04] transition-colors"
-                  title="Reading stats"
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                </button>
-
-                {/* Bookmarks button */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowBookmarks(true) }}
-                  className="p-1.5 rounded-lg text-white/35 hover:text-white/65 hover:bg-white/[0.04] transition-colors"
-                  title="Bookmarks (B to add)"
-                >
-                  <Bookmark className="h-3.5 w-3.5" />
-                </button>
-
-                {/* Settings gear */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowSettings((v) => !v) }}
-                  className="p-1.5 rounded-lg text-white/35 hover:text-white/65 hover:bg-white/[0.04] transition-colors"
-                  title="Reader settings (G)"
-                >
-                  <Settings2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+      {/* Minimal back affordance when pill hidden (hover top edge reveals pill) */}
+      <AnimatePresence>
+        {showUI && !zenMode && !hasPages && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed top-3 left-3 z-40">
+            <Link to={mangaId ? `/manga/${mangaId}` : '/manga'} className="flex items-center gap-1.5 rounded-full bg-black/70 backdrop-blur border border-white/10 px-3 py-1.5 text-xs text-white/70 hover:text-white">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Left progress spine (mangafire) */}
+      {!zenMode && hasPages && (
+        <LeftProgressSpine
+          total={pages.length}
+          current={isStrip ? lastVisibleRef.current : currentPage}
+          onJump={(idx) => {
+            if (isStrip) {
+              const el = [...stripPageRefs.current.entries()].find(([, v]) => v === idx)?.[0] as HTMLElement | undefined
+              el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            } else setCurrentPage(idx)
+          }}
+        />
+      )}
+
+      {/* Right tool stack (atsu) — desktop */}
+      {!zenMode && hasPages && (
+        <RightToolStack
+          onBack={mangaId ? () => navigate(mangaId ? `/manga/${mangaId}` : '/manga') : undefined}
+          onToggleSettings={() => { setDrawerTab('settings'); setShowDrawer(true) }}
+          onToggleFullscreen={toggleFullscreen}
+          isFullscreen={isFullscreen}
+          onToggleBookmarks={() => setShowBookmarks(true)}
+          onToggleStats={() => setShowStatsModal(true)}
+          onPrevChapter={prevChapter ? () => navigateToChapter(prevChapter) : undefined}
+          onNextChapter={nextChapter ? () => navigateToChapter(nextChapter) : undefined}
+          canPrev={!!prevChapter}
+          canNext={!!nextChapter}
+        />
+      )}
 
       {/* ══════ Auto-advance countdown toast ══════ */}
       <AnimatePresence>
@@ -1410,6 +1394,28 @@ export default function MangaReader() {
         )}
       </Suspense>
 
+      {/* ══════ Right drawer (atsu) — chapters / settings / comments ══════ */}
+      <MangaDrawer
+        open={showDrawer}
+        onClose={() => setShowDrawer(false)}
+        pinned={drawerPinned}
+        onTogglePin={() => setDrawerPinned((v) => !v)}
+        mangaTitle={mangaTitle}
+        mangaCover={mangaCover}
+        chapters={displayChapters}
+        currentChapterId={chapterId || null}
+        onSelectChapter={(ch) => { navigateToChapter(ch); if (!drawerPinned) setShowDrawer(false) }}
+        totalPages={pages.length}
+        currentPage={currentPage}
+        pageUrls={pages.map((p) => p.url)}
+        onJumpPage={(idx) => { setCurrentPage(idx); resetUITimer() }}
+        activeTab={drawerTab}
+        onTab={setDrawerTab}
+        settingsSlot={drawerSettingsNode}
+        isChapterRead={(ch: any) => checkChapterRead(ch)}
+        chapterProgress={(ch: any) => checkChapterProgress(ch)}
+      />
+
       {/* ══════ Keyboard help modal ══════ */}
       <KeyboardHelpModal open={showKbdHelp} onClose={() => setShowKbdHelp(false)} isStrip={isStrip} />
 
@@ -1425,7 +1431,7 @@ export default function MangaReader() {
       />
 
       {/* ══════ Floating quick-actions button (always visible, even when UI hidden) ══════ */}
-      {hasPages && !zenMode && !showSettings && (
+      {hasPages && !zenMode && !showSettings && !showDrawer && (
         <div ref={quickActionsContainerRef} className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
           <AnimatePresence>
             {showQuickActions && (

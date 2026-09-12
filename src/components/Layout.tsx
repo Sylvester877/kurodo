@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { ReactLenis } from 'lenis/react'
 import Navbar from './Navbar'
 import Footer from './Footer'
@@ -29,6 +29,10 @@ import {
 
 export default function Layout() {
   const auth = useAuthStore((s) => s.auth)
+  const location = useLocation()
+  // Manga reader is immersive (mangafire / atsu): hide the site navbar
+  // so the floating pill + spine + drawer read as the chrome.
+  const isMangaReader = location.pathname.startsWith('/manga/read')
   const reduceMotion = useSettings((s) => s.reduceMotion)
   const reduceQuality = useSettings((s) => s.reduceQuality)
   const notifyAiring = useSettings((s) => s.notifyAiring)
@@ -143,7 +147,7 @@ export default function Layout() {
         Skip to content
       </a>
       <TopLoadingBar />
-      <Navbar />
+      {!isMangaReader && <Navbar />}
       <main id="main-content" className="flex-1 relative z-[1]">
         {/* ═══ No route-level page transitions ═══
              Route-level keyed wrappers / AnimatePresence opacity fades were
@@ -155,9 +159,11 @@ export default function Layout() {
              risking the whole route. */}
         <Outlet />
       </main>
-      <div className="relative z-[1]">
-        <Footer />
-      </div>
+      {!isMangaReader && (
+        <div className="relative z-[1]">
+          <Footer />
+        </div>
+      )}
       {/* ── PWA/browser-only features — hidden in Electron (desktop app) ── */}
       {!window.electronAPI?.isElectron && <OfflineBanner />}
       <Celebrations />
