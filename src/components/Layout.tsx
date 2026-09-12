@@ -135,7 +135,7 @@ export default function Layout() {
       root
       options={lenisOptions}
     >
-    <div className="min-h-screen flex flex-col bg-background relative">
+    <div className={`min-h-screen flex flex-col relative ${isMangaReader ? 'bg-black' : 'bg-background'}`}>
       {/* ── Aurora animated mesh gradient background ── */}
       {/* Disabled on integrated GPUs or reduced quality — avoids GPU memory pressure causing black screens */}
       {!reduceMotion && !reduceQuality && <AuroraBackground />}

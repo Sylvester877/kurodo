@@ -511,7 +511,7 @@ export default function MangaReader() {
     return filters.length > 0 ? { filter: filters.join(' ') } : {}
   })()
   const stripImgStyle = {
-    ...(stripMaxWidth > 0 ? { maxWidth: `${stripMaxWidth}px`, marginInline: 'auto', display: 'block' } : {}),
+    ...(stripMaxWidth > 0 ? { maxWidth: `${stripMaxWidth}px`, marginInline: 'auto', display: 'block' } : { maxWidth: '900px', marginInline: 'auto', display: 'block' }),
     ...(stripGap > 0 ? { paddingBottom: `${stripGap}px` } : {}),
     ...imageStyleFlag,
     ...imgFilterStyle,

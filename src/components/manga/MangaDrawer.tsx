@@ -89,7 +89,7 @@ export default function MangaDrawer({
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             className={cn(
               'fixed top-0 right-0 bottom-0 z-50 flex flex-col w-[343px] max-w-[86vw]',
-              'bg-[#0f131c] border-l border-white/[0.06] shadow-[-16px_0_48px_rgba(0,0,0,0.6)]',
+              'bg-[#0e131b] border-l border-white/[0.08] shadow-[-20px_0_60px_rgba(0,0,0,0.65)]',
             )}
           >
             {/* Header */}
@@ -120,8 +120,8 @@ export default function MangaDrawer({
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="flex items-center gap-1 px-2 py-2 border-b border-white/[0.04] shrink-0">
+            {/* Tabs — atsu-style segmented */}
+            <div className="flex items-center gap-1 px-2 py-2 border-b border-white/[0.04] shrink-0 bg-white/[0.015]">
               {([
                 { id: 'chapters' as const, label: 'Chapters', icon: Hash },
                 { id: 'settings' as const, label: 'Settings', icon: Settings2 },
@@ -131,8 +131,10 @@ export default function MangaDrawer({
                   key={t.id}
                   onClick={() => onTab(t.id)}
                   className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] font-semibold transition-colors',
-                    activeTab === t.id ? 'bg-white/[0.06] text-white border border-white/10' : 'text-white/40 hover:text-white/70 hover:bg-white/[0.03]',
+                    'flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] font-semibold transition-all',
+                    activeTab === t.id
+                      ? 'bg-white/[0.07] text-white border border-white/10 shadow-sm'
+                      : 'text-white/40 hover:text-white/70 hover:bg-white/[0.03] border border-transparent',
                   )}
                 >
                   <t.icon className="h-3.5 w-3.5" />

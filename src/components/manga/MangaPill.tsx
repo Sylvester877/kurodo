@@ -33,8 +33,8 @@ export default function MangaPill({
     <div
       className={cn(
         'fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 rounded-full',
-        'bg-[#1a2332]/92 backdrop-blur-xl border border-white/[0.07] shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
-        'px-1.5 py-1.5',
+        'bg-[#16202f]/95 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.55),0_1px_0_rgba(255,255,255,0.06)_inset]',
+        'px-1.5 py-1.5 select-none',
         className,
       )}
     >
@@ -52,16 +52,16 @@ export default function MangaPill({
 
       <button
         onClick={onOpenChapters}
-        className="flex items-center gap-2 rounded-full bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.04] px-3.5 py-1.5 transition-colors group"
+        className="flex items-center gap-2 rounded-full bg-white/[0.07] hover:bg-white/[0.11] active:bg-white/[0.09] border border-white/[0.05] px-[13px] py-[6px] transition-colors group"
       >
-        <span className="text-[12px] font-semibold tracking-tight text-white/90 group-hover:text-white">
+        <span className="text-[12px] font-bold tracking-[-0.01em] leading-none text-white/90 group-hover:text-white">
           Ch. {chapterLabel}
-          {totalChapters ? <span className="font-normal text-white/35"> / {totalChapters}</span> : null}
+          {totalChapters ? <span className="font-medium text-white/35 ml-1 tabular-nums">/ {totalChapters}</span> : null}
         </span>
         {pageLabel && (
           <>
-            <span className="h-3 w-px bg-white/10" />
-            <span className="text-[11px] font-mono text-white/45 tabular-nums">{pageLabel}</span>
+            <span className="h-3 w-px bg-white/12 shrink-0" />
+            <span className="text-[11px] font-medium font-mono text-white/45 tabular-nums leading-none">{pageLabel}</span>
           </>
         )}
       </button>
