@@ -21,9 +21,11 @@ export default function LeftProgressSpine({ total, current, onJump, className }:
   const segCount = Math.min(total, maxSegs)
   const segs = Array.from({ length: segCount }, (_, i) => {
     const pageIdx = Math.min(Math.floor(i * step), total - 1)
+    const endIdx = Math.min(Math.floor((i + 1) * step) - 1, total - 1)
     const isVisited = pageIdx <= current
     const isActive = pageIdx === current || (current >= pageIdx && current < pageIdx + step)
-    return { pageIdx, isVisited, isActive }
+    const label = segCount < total ? `Pages ${pageIdx + 1}–${Math.max(pageIdx + 1, endIdx + 1)}` : `Page ${pageIdx + 1}`
+    return { pageIdx, endIdx, isVisited, isActive, label }
   })
 
   return (
@@ -44,8 +46,9 @@ export default function LeftProgressSpine({ total, current, onJump, className }:
           <button
             key={i}
             onClick={() => onJump(s.pageIdx)}
-            aria-label={`Go to page ${s.pageIdx + 1}`}
-            className="group grid place-items-center h-[18px] w-8 shrink-0 cursor-pointer"
+            aria-label={s.label}
+            title={s.label}
+            className="group relative grid place-items-center h-[18px] w-8 shrink-0 cursor-pointer"
           >
             <span
               className={cn(
@@ -57,6 +60,10 @@ export default function LeftProgressSpine({ total, current, onJump, className }:
                     : 'w-[3px] h-[14px] bg-white/[0.09] group-hover:bg-white/25',
               )}
             />
+            {/* Hover tooltip — page range for sampled spine (mangafire parity) */}
+            <span className="pointer-events-none absolute left-[calc(100%+8px)] top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-black/85 border border-white/10 px-1.5 py-1 text-[10px] font-medium leading-none text-white/70 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-150 shadow-lg backdrop-blur hidden md:block">
+              {s.label}
+            </span>
           </button>
         ))}
       </div>

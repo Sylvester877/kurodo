@@ -1146,8 +1146,8 @@ export default function MangaReader() {
         </div>
       )}
 
-      {/* ══════ Reader content ══════ */}
-      <div ref={readerRef} className={cn(isStrip ? '' : 'min-h-screen')}>
+      {/* ══════ Reader content ══════ — when drawer is pinned, strip pages avoid sitting under 343px drawer */}
+      <div ref={readerRef} className={cn(isStrip ? '' : 'min-h-screen', drawerPinned && showDrawer && 'lg:pr-[343px]')}>
         {isStrip ? (
           /* ── Strip mode ── */
           <div className="flex flex-col items-center">

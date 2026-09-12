@@ -36,7 +36,7 @@ export default function MobileMangaToolbar({
   return (
     <div
       className={cn(
-        'fixed bottom-[56px] left-1/2 -translate-x-1/2 z-30 flex lg:hidden items-center gap-1.5 rounded-full bg-[#0e131b]/92 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_24px_rgba(0,0,0,0.5)] px-1.5 py-1.5 transition-opacity duration-200',
+        'fixed bottom-[max(56px,calc(env(safe-area-inset-bottom,0px)+14px))] left-1/2 -translate-x-1/2 z-30 flex lg:hidden items-center gap-1.5 rounded-full bg-[#0e131b]/92 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_24px_rgba(0,0,0,0.5)] px-1.5 py-1.5 transition-opacity duration-200',
         drawerOpen && 'opacity-0 pointer-events-none',
       )}
     >
