@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Pin, Search, Settings2, MessageSquare, Check, Hash } from 'lucide-react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { cn } from '../../lib/utils'
 import { ReaderImage } from '../ReaderImage'
 
@@ -67,6 +68,24 @@ export default function MangaDrawer({
 
   // Page list — show thumbnails for current chapter (atsu style: Page 1…N)
   const pageList = useMemo(() => pageUrls.map((url, i) => ({ idx: i, url })), [pageUrls])
+
+  // Virtualize chapter list when it's long (1000+ like One Piece). Falls
+  // back to plain map under 120 items so small manga pay no overhead.
+  const parentRef = useRef<HTMLDivElement>(null)
+  const useVirtual = filtered.length > 120
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 44,
+    overscan: 10,
+  })
+  // Keep current chapter visible when drawer opens or filter changes
+  useEffect(() => {
+    if (!useVirtual || !open || filtered.length === 0) return
+    const idx = filtered.findIndex((c) => c.id === currentChapterId)
+    if (idx >= 0) rowVirtualizer.scrollToIndex(idx, { align: 'center' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentChapterId])
 
   return (
     <AnimatePresence>
@@ -165,66 +184,142 @@ export default function MangaDrawer({
                     </div>
                   </div>
 
-                  {/* Two-section: chapter list + page thumbnails of current chapter */}
-                  <div data-lenis-prevent className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3 space-y-3">
-                    {/* Chapters */}
-                    <div className="space-y-1">
-                      {filtered.map((ch) => {
-                        const isCurrent = ch.id === currentChapterId
-                        const read = isChapterRead?.(ch) ?? false
-                        const prog = chapterProgress?.(ch)
-                        const pct = prog && prog.totalPages > 0 ? Math.min(Math.round((prog.page / prog.totalPages) * 100), 99) : 0
-                        return (
-                          <button
-                            key={ch.id}
-                            onClick={() => onSelectChapter(ch)}
-                            className={cn(
-                              'w-full text-left rounded-xl px-3 py-2.5 border transition-colors flex items-center gap-2',
-                              isCurrent
-                                ? 'bg-primary/15 border-primary/30 text-white'
-                                : read
-                                  ? 'bg-emerald-500/[0.05] border-emerald-500/15 hover:bg-emerald-500/[0.08] text-white/70'
-                                  : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] text-white/75',
-                            )}
-                          >
-                            <span className="text-[11px] font-semibold flex-1 truncate">Ch. {ch.chapter}{ch.title ? ` — ${ch.title}` : ''}</span>
-                            {isCurrent && <Check className="h-3 w-3 text-primary shrink-0" />}
-                            {read && !isCurrent && <span className="text-[10px] text-emerald-400 font-semibold shrink-0">✓ Read</span>}
-                            {pct > 0 && !read && !isCurrent && (
-                              <span className="text-[10px] text-white/25 font-mono shrink-0">{pct}%</span>
-                            )}
-                          </button>
-                        )
-                      })}
-                      {filtered.length === 0 && <div className="text-center text-xs text-white/30 py-8">No chapters match “{q}”</div>}
-                    </div>
-
-                    {/* Page thumbnails of current chapter — atsu vertical Page 1…N */}
-                    {pageList.length > 0 && (
-                      <div>
-                        <div className="text-[10px] font-semibold tracking-wider text-white/30 uppercase px-1 mb-2">
-                          Pages — Ch. {chapters.find((c) => c.id === currentChapterId)?.chapter ?? ''}
+                  {useVirtual ? (
+                    <>
+                      <div ref={parentRef} data-lenis-prevent className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-2">
+                        {filtered.length === 0 ? (
+                          <div className="text-center text-xs text-white/30 py-8">No chapters match “{q}”</div>
+                        ) : (
+                          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                            {rowVirtualizer.getVirtualItems().map((vr) => {
+                              const ch = filtered[vr.index]
+                              const isCurrent = ch.id === currentChapterId
+                              const read = isChapterRead?.(ch) ?? false
+                              const prog = chapterProgress?.(ch)
+                              const pct = prog && prog.totalPages > 0 ? Math.min(Math.round((prog.page / prog.totalPages) * 100), 99) : 0
+                              return (
+                                <div
+                                  key={ch.id}
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: `${vr.size}px`,
+                                    transform: `translateY(${vr.start}px)`,
+                                  }}
+                                  className="py-[2px]"
+                                >
+                                  <button
+                                    onClick={() => onSelectChapter(ch)}
+                                    className={cn(
+                                      'w-full text-left rounded-xl px-3 py-2.5 border transition-colors flex items-center gap-2 h-[40px]',
+                                      isCurrent
+                                        ? 'bg-primary/15 border-primary/30 text-white'
+                                        : read
+                                          ? 'bg-emerald-500/[0.05] border-emerald-500/15 hover:bg-emerald-500/[0.08] text-white/70'
+                                          : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] text-white/75',
+                                    )}
+                                  >
+                                    <span className="text-[11px] font-semibold flex-1 truncate">Ch. {ch.chapter}{ch.title ? ` — ${ch.title}` : ''}</span>
+                                    {isCurrent && <Check className="h-3 w-3 text-primary shrink-0" />}
+                                    {read && !isCurrent && <span className="text-[10px] text-emerald-400 font-semibold shrink-0">✓ Read</span>}
+                                    {pct > 0 && !read && !isCurrent && (
+                                      <span className="text-[10px] text-white/25 font-mono shrink-0">{pct}%</span>
+                                    )}
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      {pageList.length > 0 && (
+                        <div className="shrink-0 border-t border-white/[0.04] pt-3 px-2 pb-3 max-h-[38%] overflow-y-auto custom-scrollbar">
+                          <div className="text-[10px] font-semibold tracking-wider text-white/30 uppercase px-1 mb-2">
+                            Pages — Ch. {chapters.find((c) => c.id === currentChapterId)?.chapter ?? ''}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {pageList.map((p) => (
+                              <button
+                                key={p.idx}
+                                onClick={() => onJumpPage(p.idx)}
+                                className={cn(
+                                  'group relative rounded-lg overflow-hidden border bg-black/40 aspect-[3/4]',
+                                  p.idx === currentPage ? 'border-primary ring-1 ring-primary/30' : 'border-white/10 hover:border-white/20',
+                                )}
+                              >
+                                <ReaderImage url={p.url} alt={`Page ${p.idx + 1}`} className="h-full w-full object-cover" loadingMethod="native" imgLoading="lazy" />
+                                <span className="absolute bottom-1 left-1 rounded bg-black/70 text-[9px] font-mono text-white/80 px-1 py-0.5">
+                                  {p.idx + 1}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          {pageList.map((p) => (
+                      )}
+                    </>
+                  ) : (
+                    <div data-lenis-prevent className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3 space-y-3">
+                      {/* Chapters */}
+                      <div className="space-y-1">
+                        {filtered.map((ch) => {
+                          const isCurrent = ch.id === currentChapterId
+                          const read = isChapterRead?.(ch) ?? false
+                          const prog = chapterProgress?.(ch)
+                          const pct = prog && prog.totalPages > 0 ? Math.min(Math.round((prog.page / prog.totalPages) * 100), 99) : 0
+                          return (
                             <button
-                              key={p.idx}
-                              onClick={() => onJumpPage(p.idx)}
+                              key={ch.id}
+                              onClick={() => onSelectChapter(ch)}
                               className={cn(
-                                'group relative rounded-lg overflow-hidden border bg-black/40 aspect-[3/4]',
-                                p.idx === currentPage ? 'border-primary ring-1 ring-primary/30' : 'border-white/10 hover:border-white/20',
+                                'w-full text-left rounded-xl px-3 py-2.5 border transition-colors flex items-center gap-2',
+                                isCurrent
+                                  ? 'bg-primary/15 border-primary/30 text-white'
+                                  : read
+                                    ? 'bg-emerald-500/[0.05] border-emerald-500/15 hover:bg-emerald-500/[0.08] text-white/70'
+                                    : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] text-white/75',
                               )}
                             >
-                              <ReaderImage url={p.url} alt={`Page ${p.idx + 1}`} className="h-full w-full object-cover" loadingMethod="native" imgLoading="lazy" />
-                              <span className="absolute bottom-1 left-1 rounded bg-black/70 text-[9px] font-mono text-white/80 px-1 py-0.5">
-                                {p.idx + 1}
-                              </span>
+                              <span className="text-[11px] font-semibold flex-1 truncate">Ch. {ch.chapter}{ch.title ? ` — ${ch.title}` : ''}</span>
+                              {isCurrent && <Check className="h-3 w-3 text-primary shrink-0" />}
+                              {read && !isCurrent && <span className="text-[10px] text-emerald-400 font-semibold shrink-0">✓ Read</span>}
+                              {pct > 0 && !read && !isCurrent && (
+                                <span className="text-[10px] text-white/25 font-mono shrink-0">{pct}%</span>
+                              )}
                             </button>
-                          ))}
-                        </div>
+                          )
+                        })}
+                        {filtered.length === 0 && <div className="text-center text-xs text-white/30 py-8">No chapters match “{q}”</div>}
                       </div>
-                    )}
-                  </div>
+
+                      {/* Page thumbnails of current chapter — atsu vertical Page 1…N */}
+                      {pageList.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-semibold tracking-wider text-white/30 uppercase px-1 mb-2">
+                            Pages — Ch. {chapters.find((c) => c.id === currentChapterId)?.chapter ?? ''}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {pageList.map((p) => (
+                              <button
+                                key={p.idx}
+                                onClick={() => onJumpPage(p.idx)}
+                                className={cn(
+                                  'group relative rounded-lg overflow-hidden border bg-black/40 aspect-[3/4]',
+                                  p.idx === currentPage ? 'border-primary ring-1 ring-primary/30' : 'border-white/10 hover:border-white/20',
+                                )}
+                              >
+                                <ReaderImage url={p.url} alt={`Page ${p.idx + 1}`} className="h-full w-full object-cover" loadingMethod="native" imgLoading="lazy" />
+                                <span className="absolute bottom-1 left-1 rounded bg-black/70 text-[9px] font-mono text-white/80 px-1 py-0.5">
+                                  {p.idx + 1}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
