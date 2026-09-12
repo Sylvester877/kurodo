@@ -59,15 +59,25 @@ export default function ProgressScrubber({
 
   return (
     <div className={cn('relative group', className)}>
-      {/* Progress bar — 2px track, 6px hit-target via py-2, accent dot */}
+      {/* Progress bar — 2px track, py-3 hit-target (atsu needs fat zone), accent dot */}
       <div
         ref={barRef}
-        className="relative w-full cursor-pointer py-2"
+        role="slider"
+        aria-valuemin={0}
+        aria-valuemax={totalPages - 1}
+        aria-valuenow={isStrip ? Math.round((progressPct / 100) * (totalPages - 1)) : currentPage}
+        aria-valuetext={`Page ${isStrip ? Math.round((progressPct / 100) * totalPages) + 1 : currentPage + 1} of ${totalPages}`}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') { e.preventDefault(); onSeekToPage(Math.max(0, currentPage - 1)) }
+          else if (e.key === 'ArrowRight') { e.preventDefault(); onSeekToPage(Math.min(totalPages - 1, currentPage + 1)) }
+        }}
+        className="relative w-full cursor-pointer py-3 outline-none focus-visible:ring-1 focus-visible:ring-white/20 rounded-full"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
       >
-        <div className="w-full h-[2px] bg-white/[0.09] rounded-full overflow-visible relative">
+        <div className="w-full h-1 bg-white/[0.11] rounded-full overflow-visible relative">
           <div
             className="absolute left-0 top-0 h-full bg-primary/70 rounded-full transition-all duration-150"
             style={{ width: `${activePct}%` }}

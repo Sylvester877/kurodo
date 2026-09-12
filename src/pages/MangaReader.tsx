@@ -1237,7 +1237,7 @@ export default function MangaReader() {
                 animate={pageTransitionVariants.animate}
                 exit={pageTransitionVariants.exit}
                 transition={{ duration: 0.1 }}
-                className="flex items-center justify-center gap-0"
+                className="flex items-center justify-center gap-3"
                 onTouchStart={handleSwipeStart}
                 onTouchEnd={handleSwipeEnd}
               >
@@ -1308,7 +1308,7 @@ export default function MangaReader() {
         {showUI && !zenMode && hasPages && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
-            className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/90 to-transparent pt-8 pb-3 pointer-events-none"
+            className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/85 via-black/35 to-transparent pt-10 pb-[max(12px,env(safe-area-inset-bottom,0px))] pointer-events-none"
           >
             <div className="max-w-[900px] mx-auto px-4 pointer-events-auto">
               {/* Progress scrubber with hover thumbnails */}
