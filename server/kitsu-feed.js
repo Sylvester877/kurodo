@@ -531,55 +531,91 @@ const MAL_GENRE_TO_KITSU_CATEGORY = {
   47: 'gourmet',
 }
 
-async function getKitsuGenreAsJikan(genreId, limit) {
+async function getKitsuGenreAsJikan(genreId, page = 1, limit = 20) {
   const slug = MAL_GENRE_TO_KITSU_CATEGORY[genreId]
   if (!slug) return null
   const lim = Math.min(Math.max(Number(limit) || 20, 1), 20)
-  const key = `genre:${genreId}:${lim}`
+  const p = Math.max(1, Number(page) || 1)
+  const offset = (p - 1) * lim
+  const key = `genre:${genreId}:${lim}:${p}`
   const cached = cacheGet(key)
   if (cached !== undefined) return cached
-  try {
-    const url = `${KITSU}/anime?filter[categories]=${encodeURIComponent(slug)}&sort=-userCount&include=mappings&${MAPPING_FIELDS}&page[limit]=${lim}`
-    const { data } = await axios.get(url, {
-      timeout: TIMEOUT_MS,
-      headers: {
-        Accept: 'application/vnd.api+json',
-        'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
-      },
-      validateStatus: (code) => code >= 200 && code < 300,
-    })
-    const includedById = new Map()
-    for (const inc of data?.included || []) {
-      if ((inc?.type === 'mappings' || inc?.type === 'mapping') && inc?.id != null) {
-        includedById.set(String(inc.id), inc.attributes || {})
+  // Full pool cache — shared across pages of the same genre so page 2
+  // doesn't re-fetch 10 Kitsu pages when page 1 already warmed it.
+  const poolKey = `genrePool:${genreId}`
+  let fullRows = cacheGet(poolKey)
+  if (fullRows === undefined) {
+    try {
+      // Pool of 200 (10 × 20-capped pages) — Kitsu categories support
+      // offset paging, so collect in parallel then slice by offset.
+      const poolOffsets = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180]
+      const poolUrls = poolOffsets.map(
+        (off) =>
+          `${KITSU}/anime?filter[categories]=${encodeURIComponent(slug)}&sort=-userCount&include=mappings&${MAPPING_FIELDS}&page[limit]=20&page[offset]=${off}`,
+      )
+      const responses = await Promise.all(
+        poolUrls.map((url) =>
+          axios.get(url, {
+            timeout: TIMEOUT_MS,
+            headers: {
+              Accept: 'application/vnd.api+json',
+              'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
+            },
+            validateStatus: (code) => code >= 200 && code < 300,
+          }).catch(() => null),
+        ),
+      )
+      const rows = []
+      const seen = new Set()
+      for (const res of responses) {
+        if (!res) continue
+        const includedById = new Map()
+        for (const inc of res.data?.included || []) {
+          if ((inc?.type === 'mappings' || inc?.type === 'mapping') && inc?.id != null) {
+            includedById.set(String(inc.id), inc.attributes || {})
+          }
+        }
+        for (const a of res.data?.data || []) {
+          const m = kitsuToFeedMedia(a, includedById)
+          if (!m || seen.has(m.idMal)) continue
+          seen.add(m.idMal)
+          rows.push(feedToJikanList(m))
+        }
       }
-    }
-    const rows = (data?.data || [])
-      .map((a) => kitsuToFeedMedia(a, includedById))
-      .filter(Boolean)
-      .map(feedToJikanList)
-      .filter(Boolean)
-    if (rows.length === 0) {
+      if (rows.length === 0) {
+        cacheSet(poolKey, null, FAIL_TTL)
+        cacheSet(key, null, FAIL_TTL)
+        return null
+      }
+      fullRows = rows
+      cacheSet(poolKey, fullRows, TTL)
+    } catch (e) {
+      console.warn('[kitsu-feed] genre fallback failed:', genreId, e?.message || e)
+      cacheSet(poolKey, null, FAIL_TTL)
       cacheSet(key, null, FAIL_TTL)
       return null
     }
-    const total = Number(data?.meta?.count) || rows.length
-    const out = {
-      data: rows,
-      pagination: {
-        last_visible_page: 1,
-        has_next_page: false,
-        current_page: 1,
-        items: { count: rows.length, total, per_page: lim, pages: 1 },
-      },
-    }
-    cacheSet(key, out, TTL)
-    return out
-  } catch (e) {
-    console.warn('[kitsu-feed] genre fallback failed:', genreId, e?.message || e)
+  }
+  if (!fullRows || fullRows.length === 0) {
     cacheSet(key, null, FAIL_TTL)
     return null
   }
+  const slice = fullRows.slice(offset, offset + lim)
+  if (slice.length === 0) {
+    cacheSet(key, null, FAIL_TTL)
+    return null
+  }
+  const out = {
+    data: slice,
+    pagination: {
+      last_visible_page: Math.max(1, Math.ceil(fullRows.length / lim)),
+      has_next_page: fullRows.length > offset + lim,
+      current_page: p,
+      items: { count: slice.length, total: fullRows.length, per_page: lim, pages: Math.max(1, Math.ceil(fullRows.length / lim)) },
+    },
+  }
+  cacheSet(key, out, TTL)
+  return out
 }
 
 /**
@@ -716,10 +752,13 @@ export async function getKitsuFeedAsJikan(targetPath, query) {
   }
 
   // Genre browse (/anime?genres=:id) — must precede generic /anime matching.
+  // Paged: each page slices the pooled category so infinite scroll works past 20.
   if (targetPath === '/anime' && query?.genres != null) {
     const gid = Number(Array.isArray(query.genres) ? query.genres[0] : query.genres)
-    if (Number.isInteger(gid) && gid > 0 && page === 1) {
-      return await getKitsuGenreAsJikan(gid, query.limit)
+    if (Number.isInteger(gid) && gid > 0) {
+      const out = await getKitsuGenreAsJikan(gid, page, query.limit)
+      if (out) return out
+      return null
     }
     return null
   }
