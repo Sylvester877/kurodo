@@ -57,3 +57,22 @@
 - EDIT: AnimeHoverCard reads getQueryData(['characters', malId]) when
   visible; renders 5 avatars + Cast label only if cached.
 - VERIFY: tsc + 71/71 tests.
+
+### ITER-7 — fix(memory) + fix(covers) + fixes: browse dual-outage  cba1feb→227485d
+- MEMORY (cba1feb): cap imgCache by bytes (was entry-count only), add GC
+  pressure valve + watchdog — stops silent OOM death on big-cover pools.
+- COVERS (b03e62e): MangaDex thumbs now use pooled chain URL (thumb→full)
+  so 100-cover Browse doesn't stall on 4MB single-image loads.
+- BROWSE (227485d→af1aa95→98f557a): empty-success audit + Kitsu A–Z/genre
+  fallbacks + deep pagination fix. 98f557a specifically: Kitsu A–Z pooled
+  100→200, cached full sorted pool as letterPool:<L>, slices by offset —
+  Browse letter=B page 2+ now shows real titles instead of empty state.
+
+Run 2026-09-11 sweep:
+- d0807e2 Schedule est. microcopy + recon audit refresh (30/30 green).
+- 2026b1b CharactersRow a11y focus ring (tabIndex=0, role=region).
+- a8448b4 dead /music link → /seasonal (SEV-2 footer 404).
+- ae25ed2 close stale bugs + re-audit A–Z on healthy Jikan.
+- 98f557a paginate Kitsu A–Z beyond 24 (deep Browse past page 1).
+- This update: mark 11/11 priorities DONE, bump browse parity 82→86,
+  record pooled letterBench in state.json.

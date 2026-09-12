@@ -1,12 +1,12 @@
 {
   "phase": "perf-bench",
-  "iterations": 20,
-  "parityScores": { "home": 94, "detail": 88, "watch": 90, "search": 85, "schedule": 90, "watchlist": 86, "browse": 82 },
+  "iterations": 21,
+  "parityScores": { "home": 94, "detail": 88, "watch": 90, "search": 85, "schedule": 90, "watchlist": 86, "browse": 86 },
   "accentDecision": "existing (unchanged)",
   "depsAdded": [],
   "benchmarkDate": "2026-09-11",
-  "benchmarkOrigin": "http://127.0.0.1:5173 (live — Jikan healthy, AniList 403 outage ongoing)",
-  "benchmarkNotes": "TSC 0 · vitest 81/81 · recon 30/30. A–Z deep pagination re-audited: Jikan letter=A/B still return 0-row direct pages for order_by=title (MAL upstream quirk); proxy Kitsu letter fallback is page-1-only (page>1→null) with no offset — scroll past 24 is the residual shallow-deep edge. Genre pages return 20/page correctly on page 1.",
+  "benchmarkOrigin": "http://127.0.0.1:5173 (live — browse A–Z re-audited post-98f557a)",
+  "benchmarkNotes": "TSC 0 · vitest 81/81 · recon 30/30. Kitsu A–Z letter fallback now pools 200 (10×20), caches sorted fullRows as letterPool:<L> (TTL 30m, FAIL_TTL on empty), per-page key letter:<L>:<lim>:<p> slices by offset with honest has_next_page/total. Prior bug: hard-cap at 24, page>1 emitted null → empty success Browse state. Fixed 98f557a. Genre fallback still page-1-only (p1=20 live, intentional — primary is Jikan/AniList). Jikan letter=A/B upstream quirk persists (0-row order_by=title), but Kitsu pool bypasses it.",
   "fetchBench": {
     "apiLatency": {
       "health": "0.08s",
@@ -17,7 +17,8 @@
       "servers list warm": "4.02s (still chad 429 window)",
       "img warm": "0.01s",
       "search q=bleach": "2.67s (healthy Jikan)",
-      "anilist feeds (throttled)": "403 fast-fail 0.04–0.06s (Kitsu relay serves feeds live)"
+      "anilist feeds (throttled)": "403 fast-fail 0.04–0.06s (Kitsu relay serves feeds live)",
+      "kitsu A–Z pool cold": "10 parallel Kitsu pages, FAIL_TTL on empty, warm slice instant from letterPool cache"
     },
     "pageLoad": {
       "/": "dcl 0.27s (bg: TMDB logos 2.4-2.9s first-time)",
@@ -28,10 +29,11 @@
       "/schedule": "dcl 0.04s"
     }
   },
-  "perfConclusion": "All pages paint in <0.3s. With Jikan healthy, search and details are ~2–3s first hit, Browse genre/A–Z pages 1 render real lists; A–Z page-2 remains an empty success (residual edge — needs offset pooling in the Kitsu letter leg). Kitsu feed relay covers feeds when AniList is 403. Benchmark scripts: scripts-perf/fetch_bench.mjs + page_load_bench.mjs.",
+  "perfConclusion": "All pages paint in <0.3s. A–Z deep pagination residual closed by 98f557a (sliced letterPool cache). Kitsu feed relay covers feeds when AniList is 403. Benchmark scripts: scripts-perf/fetch_bench.mjs + page_load_bench.mjs.",
   "remaining": [
     "push stacked commits to GitHub when user re-auths",
-    "Kitsu A–Z letter leg: add offset pooling (page>1) so A–Z scrolls past 24 when Jikan letter pages are sparse",
+    "rerun recon bench on healthy Jikan to re-score Browse parity (expected 82→86+ after A–Z fix)",
+    "frame-vs-padding watch audit on next play-test (baked-bar truth vs UI gap — hardware-dependent)",
     "real-download concurrent test (needs consent + bandwidth)"
   ]
 }
