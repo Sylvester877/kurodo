@@ -20,7 +20,7 @@ export function feedMediaToAnime(m: FeedMedia): Anime | null {
 
   return {
     mal_id: m.idMal,
-    title: m.title.romaji || m.title.english || '',
+    title: m.title.english || m.title.romaji || '',
     title_english: m.title.english,
     title_japanese: m.title.native,
     synopsis: m.description

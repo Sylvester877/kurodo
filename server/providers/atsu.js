@@ -71,7 +71,7 @@ function normalizeSearchResult(doc) {
   const coverUrl = absolutize(poster)
   return {
     id: doc.id,
-    title: doc.title || doc.englishTitle || 'Unknown',
+    title: doc.englishTitle || doc.title || 'Unknown',
     englishTitle: doc.englishTitle || null,
     synopsis: doc.synopsis || '',
     status: doc.status || 'unknown',
@@ -90,7 +90,7 @@ function normalizeMangaInfo(data) {
   const bannerUrl = absolutize(manga.banner?.url ?? manga.banner)
   return {
     id: manga.id,
-    title: manga.title || '',
+    title: manga.englishTitle || manga.title || '',
     englishTitle: manga.englishTitle || null,
     synopsis: manga.synopsis || '',
     status: manga.status || '',

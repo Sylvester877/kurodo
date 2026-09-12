@@ -171,7 +171,7 @@ export async function pullMangaFromAniList(): Promise<void> {
           mal_id: entry.media.idMal!,
           anilistId: entry.media.id,
           mangaDexId: null, // No MangaDex mapping when pulled from AniList
-          title: entry.media.title.romaji || entry.media.title.english || '',
+          title: entry.media.title.english || entry.media.title.romaji || '',
           title_english: entry.media.title.english || null,
           coverUrl: entry.media.coverImage?.large || '',
           chapters: entry.media.chapters,

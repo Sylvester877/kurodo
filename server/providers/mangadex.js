@@ -61,7 +61,13 @@ function normalizeManga(md) {
   const coverFileName = coverRel?.attributes?.fileName || null
   return {
     id: md.id,
-    title: attrs.title?.en || Object.values(attrs.title || {})[0] || 'Unknown',
+    // Prefer English title; MangaDex stores the official English in
+    // altTitles[].en. Collect English alt-titles and use the first one
+    // before falling back to ja-ro / any locale.
+    title: attrs.title?.en
+      || (attrs.altTitles || []).map((a) => a.en).find(Boolean)
+      || Object.values(attrs.title || {})[0]
+      || 'Unknown',
     altTitles: attrs.altTitles || [],
     description: attrs.description?.en || '',
     status: attrs.status || 'unknown',
