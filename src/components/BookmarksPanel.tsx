@@ -12,8 +12,10 @@ interface Props {
   onNavigateToPage: (pageIdx: number) => void
 }
 
+const EMPTY_BOOKMARKS: import('../store/useReaderStore').Bookmark[] = []
+
 export default function BookmarksPanel({ open, onClose, mangaId, chapters, currentChapterId, onNavigateToPage }: Props) {
-  const bookmarks = useReaderStore((s) => s.bookmarks?.[mangaId] || [])
+  const bookmarks = useReaderStore((s) => s.bookmarks?.[mangaId] ?? EMPTY_BOOKMARKS)
   const removeBookmark = useReaderStore((s) => s.removeBookmark)
 
   // Enrich bookmarks with chapter info and sort by timestamp (newest first)
