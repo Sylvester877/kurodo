@@ -3,6 +3,7 @@ import { cn } from '../../lib/utils'
 
 interface Props {
   chapterLabel: string // e.g. "1.1"
+  chapterTitle?: string | null // e.g. "Chapter 1193" title — shown on hover
   totalChapters?: number // e.g. 698 — mangafire shows / 698
   onPrev?: () => void
   onNext?: () => void
@@ -20,6 +21,7 @@ interface Props {
  */
 export default function MangaPill({
   chapterLabel,
+  chapterTitle,
   totalChapters,
   onPrev,
   onNext,
@@ -52,7 +54,8 @@ export default function MangaPill({
 
       <button
         onClick={onOpenChapters}
-        className="flex items-center gap-2 rounded-full bg-white/[0.07] hover:bg-white/[0.11] active:bg-white/[0.09] border border-white/[0.05] px-[13px] py-[6px] transition-colors group"
+        title={chapterTitle ? `Ch. ${chapterLabel} — ${chapterTitle}` : `Ch. ${chapterLabel}`}
+        className="group relative flex items-center gap-2 rounded-full bg-white/[0.07] hover:bg-white/[0.11] active:bg-white/[0.09] border border-white/[0.05] px-[13px] py-[6px] transition-colors"
       >
         <span className="text-[12px] font-bold tracking-[-0.01em] leading-none text-white/90 group-hover:text-white">
           Ch. {chapterLabel}
@@ -63,6 +66,11 @@ export default function MangaPill({
             <span className="h-3 w-px bg-white/12 shrink-0" />
             <span className="text-[11px] font-medium font-mono text-white/45 tabular-nums leading-none">{pageLabel}</span>
           </>
+        )}
+        {chapterTitle && (
+          <span className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] -translate-x-1/2 whitespace-nowrap rounded-lg bg-black/85 border border-white/10 px-2 py-1 text-[11px] font-medium text-white/70 opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-150 shadow-lg backdrop-blur">
+            {chapterTitle.length > 42 ? chapterTitle.slice(0, 42) + '…' : chapterTitle}
+          </span>
         )}
       </button>
 

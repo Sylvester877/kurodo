@@ -1062,6 +1062,7 @@ export default function MangaReader() {
         {showUI && !zenMode && hasPages && (
           <MangaPill
             chapterLabel={currentChapter?.chapter ?? '—'}
+            chapterTitle={currentChapter?.title ?? null}
             totalChapters={displayChapters.length || undefined}
             canPrev={!!prevChapter}
             canNext={!!nextChapter}
@@ -1098,9 +1099,10 @@ export default function MangaReader() {
         />
       )}
 
-      {/* Right tool stack (atsu) — desktop */}
+      {/* Right tool stack (atsu) — desktop; fades when drawer is open to avoid overlap */}
       {!zenMode && hasPages && (
         <RightToolStack
+          drawerOpen={showDrawer}
           onBack={mangaId ? () => navigate(mangaId ? `/manga/${mangaId}` : '/manga') : undefined}
           onToggleSettings={() => { setDrawerTab('settings'); setShowDrawer(true) }}
           onToggleFullscreen={toggleFullscreen}

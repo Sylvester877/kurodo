@@ -14,6 +14,7 @@ interface Props {
   onNextChapter?: () => void
   canPrev: boolean
   canNext: boolean
+  drawerOpen?: boolean
   className?: string
 }
 
@@ -69,12 +70,14 @@ export default function RightToolStack({
   onNextChapter,
   canPrev,
   canNext,
+  drawerOpen,
   className,
 }: Props) {
   return (
     <div
       className={cn(
-        'fixed right-3 top-1/2 -translate-y-1/2 z-30 hidden lg:flex flex-col items-center gap-2',
+        'fixed right-3 top-1/2 -translate-y-1/2 z-30 hidden lg:flex flex-col items-center gap-2 transition-opacity duration-200',
+        drawerOpen && 'opacity-0 pointer-events-none',
         className,
       )}
     >
