@@ -8,6 +8,7 @@ import { cn } from '../lib/utils'
 import MangaPill from '../components/manga/MangaPill'
 import LeftProgressSpine from '../components/manga/LeftProgressSpine'
 import RightToolStack from '../components/manga/RightToolStack'
+import MobileMangaToolbar from '../components/manga/MobileMangaToolbar'
 import MangaDrawer from '../components/manga/MangaDrawer'
 import DrawerSettingsCompact from '../components/manga/DrawerSettingsCompact'
 import { getChapterPages, getChapterFeed, getMangaInfo, getChapterMangaId, type MangaDexPage } from '../api/mangadex'
@@ -1077,6 +1078,22 @@ export default function MangaReader() {
           isFullscreen={isFullscreen}
           onToggleBookmarks={() => setShowBookmarks(true)}
           onToggleStats={() => setShowStatsModal(true)}
+          onPrevChapter={prevChapter ? () => navigateToChapter(prevChapter) : undefined}
+          onNextChapter={nextChapter ? () => navigateToChapter(nextChapter) : undefined}
+          canPrev={!!prevChapter}
+          canNext={!!nextChapter}
+        />
+      )}
+      {/* Mobile toolbar — same controls horizontal, so phone users aren't stuck */}
+      {!zenMode && hasPages && (
+        <MobileMangaToolbar
+          drawerOpen={showDrawer}
+          onBack={mangaId ? () => navigate(mangaId ? `/manga/${mangaId}` : '/manga') : undefined}
+          onToggleSettings={() => { setDrawerTab('settings'); setShowDrawer(true) }}
+          onToggleBookmarks={() => setShowBookmarks(true)}
+          onToggleStats={() => setShowStatsModal(true)}
+          onToggleFullscreen={toggleFullscreen}
+          isFullscreen={isFullscreen}
           onPrevChapter={prevChapter ? () => navigateToChapter(prevChapter) : undefined}
           onNextChapter={nextChapter ? () => navigateToChapter(nextChapter) : undefined}
           canPrev={!!prevChapter}
