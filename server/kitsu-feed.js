@@ -593,75 +593,98 @@ async function getKitsuGenreAsJikan(genreId, limit) {
  * of a dead end. AniList sorting (its prefix search) stays the primary
  * quality path; this stage is the outage net.
  */
-async function getKitsuLetterAsJikan(letter, limit) {
+async function getKitsuLetterAsJikan(letter, page = 1, limit = 20) {
   const L = String(letter || '').trim().charAt(0).toUpperCase()
   if (!/^[A-Z]$/.test(L)) return null
   const lim = Math.min(Math.max(Number(limit) || 20, 1), 20)
-  const key = `letter:${L}:${lim}`
+  const p = Math.max(1, Number(page) || 1)
+  const offset = (p - 1) * lim
+  const key = `letter:${L}:${lim}:${p}`
   const cached = cacheGet(key)
   if (cached !== undefined) return cached
-  try {
-    // Pool of 100 (5 × 20-capped pages in parallel) then prefix-filter.
-    const poolUrls = [0, 20, 40, 60, 80].map(
-      (offset) =>
-        `${KITSU}/anime?filter[text]=${encodeURIComponent(L)}&sort=-userCount&include=mappings&${MAPPING_FIELDS}&page[limit]=20&page[offset]=${offset}`,
-    )
-    const responses = await Promise.all(
-      poolUrls.map((url) =>
-        axios.get(url, {
-          timeout: TIMEOUT_MS,
-          headers: {
-            Accept: 'application/vnd.api+json',
-            'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
-          },
-          validateStatus: (code) => code >= 200 && code < 300,
-        }).catch(() => null),
-      ),
-    )
-    const rows = []
-    const seen = new Set()
-    for (const res of responses) {
-      if (!res) continue
-      const includedById = new Map()
-      for (const inc of res.data?.included || []) {
-        if ((inc?.type === 'mappings' || inc?.type === 'mapping') && inc?.id != null) {
-          includedById.set(String(inc.id), inc.attributes || {})
+  // Full sorted pool cache — shared across pages of the same letter so
+  // page 2 doesn't re-fetch 10 Kitsu pages when page 1 already warmed it.
+  const poolKey = `letterPool:${L}`
+  let fullRows = cacheGet(poolKey)
+  if (fullRows === undefined) {
+    try {
+      // Pool of 200 (10 × 20-capped pages in parallel) then prefix-filter.
+      // Must collect the whole pool BEFORE sorting — alphabetical order is
+      // unrelated to Kitsu's -userCount order, so early-break would drop
+      // alphabetically-early titles that sit at high offsets.
+      const poolOffsets = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180]
+      const poolUrls = poolOffsets.map(
+        (off) =>
+          `${KITSU}/anime?filter[text]=${encodeURIComponent(L)}&sort=-userCount&include=mappings&${MAPPING_FIELDS}&page[limit]=20&page[offset]=${off}`,
+      )
+      const responses = await Promise.all(
+        poolUrls.map((url) =>
+          axios.get(url, {
+            timeout: TIMEOUT_MS,
+            headers: {
+              Accept: 'application/vnd.api+json',
+              'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
+            },
+            validateStatus: (code) => code >= 200 && code < 300,
+          }).catch(() => null),
+        ),
+      )
+      const rows = []
+      const seen = new Set()
+      for (const res of responses) {
+        if (!res) continue
+        const includedById = new Map()
+        for (const inc of res.data?.included || []) {
+          if ((inc?.type === 'mappings' || inc?.type === 'mapping') && inc?.id != null) {
+            includedById.set(String(inc.id), inc.attributes || {})
+          }
+        }
+        for (const a of res.data?.data || []) {
+          const attrs = a?.attributes || {}
+          const title = attrs.titles?.en_jp || attrs.canonicalTitle || ''
+          if (!title.toUpperCase().startsWith(L)) continue
+          const m = kitsuToFeedMedia(a, includedById)
+          if (!m || seen.has(m.idMal)) continue
+          seen.add(m.idMal)
+          rows.push(feedToJikanList(m))
         }
       }
-      for (const a of res.data?.data || []) {
-        const attrs = a?.attributes || {}
-        const title = attrs.titles?.en_jp || attrs.canonicalTitle || ''
-        if (!title.toUpperCase().startsWith(L)) continue
-        const m = kitsuToFeedMedia(a, includedById)
-        if (!m || seen.has(m.idMal)) continue
-        seen.add(m.idMal)
-        rows.push(feedToJikanList(m))
-        if (rows.length >= lim) break
+      if (rows.length === 0) {
+        cacheSet(poolKey, null, FAIL_TTL)
+        cacheSet(key, null, FAIL_TTL)
+        return null
       }
-      if (rows.length >= lim) break
-    }
-    if (rows.length === 0) {
+      // Jikan's letter query is always alphabetical — keep that contract.
+      rows.sort((x, y) => (x.title || '').localeCompare(y.title || ''))
+      fullRows = rows
+      cacheSet(poolKey, fullRows, TTL)
+    } catch (e) {
+      console.warn('[kitsu-feed] letter fallback failed:', L, e?.message || e)
+      cacheSet(poolKey, null, FAIL_TTL)
       cacheSet(key, null, FAIL_TTL)
       return null
     }
-    // Jikan's letter query is always alphabetical — keep that contract.
-    rows.sort((x, y) => (x.title || '').localeCompare(y.title || ''))
-    const out = {
-      data: rows,
-      pagination: {
-        last_visible_page: 1,
-        has_next_page: false,
-        current_page: 1,
-        items: { count: rows.length, total: rows.length, per_page: lim, pages: 1 },
-      },
-    }
-    cacheSet(key, out, TTL)
-    return out
-  } catch (e) {
-    console.warn('[kitsu-feed] letter fallback failed:', L, e?.message || e)
+  }
+  if (!fullRows || fullRows.length === 0) {
     cacheSet(key, null, FAIL_TTL)
     return null
   }
+  const slice = fullRows.slice(offset, offset + lim)
+  if (slice.length === 0) {
+    cacheSet(key, null, FAIL_TTL)
+    return null
+  }
+  const out = {
+    data: slice,
+    pagination: {
+      last_visible_page: Math.max(1, Math.ceil(fullRows.length / lim)),
+      has_next_page: fullRows.length > offset + lim,
+      current_page: p,
+      items: { count: slice.length, total: fullRows.length, per_page: lim, pages: Math.max(1, Math.ceil(fullRows.length / lim)) },
+    },
+  }
+  cacheSet(key, out, TTL)
+  return out
 }
 
 /**
@@ -702,11 +725,13 @@ export async function getKitsuFeedAsJikan(targetPath, query) {
   }
 
   // A–Z letter browse (/anime?letter=X) — must precede generic /anime matching.
+  // Paged: each page slices the sorted pool so infinite scroll works past 24.
   if (targetPath === '/anime' && query?.letter != null) {
     const letter = Array.isArray(query.letter) ? query.letter[0] : query.letter
-    if (page === 1) {
-      return await getKitsuLetterAsJikan(String(letter || ''), query.limit)
-    }
+    const out = await getKitsuLetterAsJikan(String(letter || ''), page, query.limit)
+    if (out) return out
+    // Pool exhausted → honest null so the proxy returns the proxy's normal
+    // 502 (last page was real data, this is a genuine "no more").
     return null
   }
 
