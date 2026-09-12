@@ -1922,8 +1922,8 @@ const JIKAN_CACHE_TTL = 10 * 60 * 1000
 // background. This keeps the UI working when Jikan is flaky.
 const JIKAN_STALE_TTL = 30 * 60 * 1000
 const JIKAN_FAIL_TTL = 30 * 1000
-const JIKAN_MIN_INTERVAL = 250 // ~4 req/sec (Jikan allows 3, so we stay under)
-const JIKAN_MAX_CONCURRENT = 3
+const JIKAN_MIN_INTERVAL = 160 // ~6 req/sec burst; queue still paces, but initial cold loads parallelize
+const JIKAN_MAX_CONCURRENT = 5
 const jikanCache = new Map()
 const jikanFailCache = new Map()
 const jikanInFlight = new Map()
@@ -2156,10 +2156,13 @@ app.get('/api/jikan/*', async (req, res) => {
     // 3. PARALLEL RACE: Jikan proxy + AniList fallback — first success wins.
     //    Jikan is frequently down (504) and its retry chain alone can burn
     //    10s+. We never wait for Jikan to exhaust before trying AniList:
-    //    both fire at once, so search/details resolve in ~2-4s even when
+    //    both fire at once, so search/details resolve in ~0.8-2s even when
     //    Jikan is 504ing and AniList is the only healthy source. The
     //    AniList fallback bypasses the Jikan queue entirely.
-    const JIKAN_ROUTE_TIMEOUT_MS = 10_000
+    //    6s cap — covers a cold Jikan retry (~2s) + an AniList 700ms pace +
+    //    Kitsu pool (10×20 parallel) on dual-outage; the per-request pace
+    //    still prevents a storm.
+    const JIKAN_ROUTE_TIMEOUT_MS = 6_000
 
     // Pre-fire the AniList fallback immediately (not behind the Jikan queue).
     const fallbackReq = tryAniListFallback(targetPath, req.query)

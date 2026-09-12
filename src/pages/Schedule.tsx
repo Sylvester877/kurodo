@@ -45,26 +45,29 @@ function formatCountdown(seconds: number): string {
 async function fetchWeek(days: DayInfo[]): Promise<AiringSchedule[]> {
   const from = Math.floor(days[0].date.getTime() / 1000)
   const to = Math.floor(days[6].date.getTime() / 1000) + 86400
-  const all: AiringSchedule[] = []
   try {
-    for (let page = 1; page <= 6; page++) {
-      try {
-        const res = await getAiringSchedule(from, to, page, 50)
-        if (!res) break
-        all.push(...res.items)
-        if (!res.hasNextPage) break
-      } catch (e) {
-        console.warn(`[schedule] page ${page} failed:`, (e as Error).message)
-        // If even the first page fails, throw so React Query shows error state
-        // instead of silently showing an empty schedule.
-        if (page === 1) throw e
-        break
+    // Fetch page 1 first — it tells us whether the outage/fast-fail path applies
+    // and whether there are more pages. This avoids 6 sequential round-trips.
+    const first = await getAiringSchedule(from, to, 1, 50)
+    const all: AiringSchedule[] = [...(first?.items ?? [])]
+    if (!first?.hasNextPage || all.length === 0 && !first?.hasNextPage) {
+      if (all.length > 0) return all
+      console.warn('[schedule] AniList returned an empty week — trying Jikan fallback')
+    } else {
+      // Remaining pages in parallel (2..6). hasNextPage false on page 1 means 0 extra fetches.
+      const remaining = [2, 3, 4, 5, 6]
+      const settled = await Promise.allSettled(
+        remaining.map((p) => getAiringSchedule(from, to, p, 50)),
+      )
+      for (const r of settled) {
+        if (r.status === 'fulfilled' && r.value) {
+          all.push(...r.value.items)
+          if (!r.value.hasNextPage) break
+        }
       }
+      if (all.length > 0) return all
+      console.warn('[schedule] AniList returned an empty week — trying Jikan fallback')
     }
-    if (all.length > 0) return all
-    // AniList served an empty week (its outage mode returns empty/403) —
-    // fall back to Jikan's per-day /schedules before claiming "no episodes".
-    console.warn('[schedule] AniList returned an empty week — trying Jikan fallback')
   } catch (e) {
     console.warn('[schedule] AniList schedule failed — trying Jikan fallback:', (e as Error).message)
   }
