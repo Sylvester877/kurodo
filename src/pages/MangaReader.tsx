@@ -473,11 +473,17 @@ export default function MangaReader() {
     lastVisibleRef.current = 0
     chapterMarkedRef.current = false
     advanceCancelledRef.current = false
+    hashReadOnMount.current = false
     setCurrentPage(0)
     setStripProgress(0)
     setShowAdvanceToast(false)
     setShowQuickActions(false)
     if (advanceTimerRef.current) { clearInterval(advanceTimerRef.current); advanceTimerRef.current = null }
+    // Strip mode: new chapter must start at top, not wherever the previous
+    // chapter's scroll left us. React Router keeps scroll position across
+    // same-route navigations — without this the user lands at the bottom.
+    window.scrollTo({ top: 0, behavior: 'auto' })
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }))
   }, [chapterId])
 
   // ── Page mode nav ──
@@ -902,6 +908,20 @@ export default function MangaReader() {
 
   // ── Click-outside chapter dropdown ── (removed; full-screen modal used instead)
 
+  // ── Navigate to chapter helper — always starts at the TOP of the new
+  // chapter. In strip mode React Router preserves the scroll position, so
+  // a naive navigate would leave the user at the bottom of the new chapter
+  // ("next puts me at the end"). We force scrollTo(0,0) on the next frame.
+  // Hash is also reset to #rs=p:0 so a reload starts at page 0.
+  const navigateToChapter = useCallback((ch: { id: string }) => {
+    const url = `/manga/read/${ch.id}?manga=${mangaId}&source=${source}${malIdParam ? `&malId=${malIdParam}` : ''}${anilistIdParam ? `&anilist=${anilistIdParam}` : ''}#rs=p:0`
+    const doScrollTop = () => window.scrollTo({ top: 0, behavior: 'auto' })
+    doScrollTop()
+    requestAnimationFrame(doScrollTop)
+    setTimeout(doScrollTop, 80)
+    navigate(url)
+  }, [mangaId, source, malIdParam, anilistIdParam, navigate])
+
   // ── Auto-advance chapter countdown ──
   const triggerAdvance = useCallback(() => {
     if (!autoAdvance || advanceCancelledRef.current) return
@@ -918,11 +938,10 @@ export default function MangaReader() {
         if (advanceTimerRef.current) clearInterval(advanceTimerRef.current)
         advanceTimerRef.current = null
         setShowAdvanceToast(false)
-        // Navigate to next chapter
-        navigate(`/manga/read/${nextChapterInFilter.id}?manga=${mangaId}&source=${source}${malIdParam ? `&malId=${malIdParam}` : ''}${anilistIdParam ? `&anilist=${anilistIdParam}` : ''}#rs=p:0`)
+        navigateToChapter(nextChapterInFilter)
       }
     }, 1000)
-  }, [autoAdvance, autoAdvanceDelay, nextChapterInFilter, mangaId, source, malIdParam, anilistIdParam, navigate])
+  }, [autoAdvance, autoAdvanceDelay, nextChapterInFilter, navigateToChapter])
 
   // Detect end of chapter and trigger auto-advance
   useEffect(() => {
@@ -970,10 +989,8 @@ export default function MangaReader() {
   const skipAdvance = useCallback(() => {
     if (advanceTimerRef.current) { clearInterval(advanceTimerRef.current); advanceTimerRef.current = null }
     setShowAdvanceToast(false)
-    if (nextChapterInFilter) {
-      navigate(`/manga/read/${nextChapterInFilter.id}?manga=${mangaId}&source=${source}${malIdParam ? `&malId=${malIdParam}` : ''}${anilistIdParam ? `&anilist=${anilistIdParam}` : ''}#rs=p:0`)
-    }
-  }, [nextChapterInFilter, mangaId, source, malIdParam, anilistIdParam, navigate])
+    if (nextChapterInFilter) navigateToChapter(nextChapterInFilter)
+  }, [nextChapterInFilter, navigateToChapter])
 
   // ── Fit mode CSS classes (page mode only) ──
   const imgFitClass = isStrip ? 'w-full h-auto'
@@ -984,11 +1001,6 @@ export default function MangaReader() {
   // ── Effective loading method: bg-image on strip mode collapses to 0 height,
   //    so fall back to native for strips.
   const loadingMethodEffective = isStrip && loadingMethod === 'bg-image' ? 'native' : loadingMethod
-
-  // ── Navigate to chapter helper ──
-  const navigateToChapter = useCallback((ch: { id: string }) => {
-    navigate(`/manga/read/${ch.id}?manga=${mangaId}&source=${source}${malIdParam ? `&malId=${malIdParam}` : ''}${anilistIdParam ? `&anilist=${anilistIdParam}` : ''}#rs=p:0`)
-  }, [mangaId, source, malIdParam, anilistIdParam, navigate])
 
   // ── Drawer helpers ──
   const prevChapter = useMemo(() => (currentChIndex > 0 ? displayChapters[currentChIndex - 1] : null), [displayChapters, currentChIndex])
