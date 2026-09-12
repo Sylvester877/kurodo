@@ -1,4 +1,4 @@
-# PRIORITIES (live top-10) — refreshed 2026-09-11 post-A–Z pooling (98f557a)
+# PRIORITIES (live top-10) — refreshed 2026-09-12 post-genre pooling (686a679)
 
 Ranked by (canon weight × visible impact ÷ risk). Recon 30/30 green; parity ≥85% average.
 
@@ -15,6 +15,7 @@ Ranked by (canon weight × visible impact ÷ risk). Recon 30/30 green; parity �
 
 — Also DONE (post-10/10 sweep) —
 11. [DONE] Kitsu A–Z deep pagination — letterPool:<L> warm cache + 200-pool slicing fixes scroll past 24 (Browse A–Z page 2+ now real titles, has_next_page honest) — server/kitsu-feed.js 98f557a.
+12. [DONE] Kitsu genre deep pagination — genrePool:<gid> warm cache + 200-pool slicing fixes scroll past 20 for every genre (verified live: Action 20→20→20, S-letter 20→9 slice) — server/kitsu-feed.js 686a679.
 
 Dropped: fonts.googleapis.com duplicate <link> — FIXED (1a28f23).
-Next tier TBD: rerun recon after 98f557a + open frame-vs-padding watch pass (baked-bar truth vs UI gap) on next play-test.
+Next tier TBD: rerun recon after 686a679 + open frame-vs-padding watch pass (baked-bar truth vs UI gap) on next play-test.

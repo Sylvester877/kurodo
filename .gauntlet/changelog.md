@@ -74,5 +74,9 @@ Run 2026-09-11 sweep:
 - a8448b4 dead /music link → /seasonal (SEV-2 footer 404).
 - ae25ed2 close stale bugs + re-audit A–Z on healthy Jikan.
 - 98f557a paginate Kitsu A–Z beyond 24 (deep Browse past page 1).
-- This update: mark 11/11 priorities DONE, bump browse parity 82→86,
-  record pooled letterBench in state.json.
+- 686a679 paginate Kitsu genre beyond 20 — same pooling (genrePool:<gid>,
+  200-pool, offset slicing). Verified live: genre Action p1 20 false →
+  p2 20 [Sword Art Online,…] → p3 20 [Kimetsu : Yuukaku-hen,…];
+  S-letter p2(20) 9-title slice also verified.
+- This pair: mark 12/12 priorities DONE, bump browse parity 86→90,
+  record pooled genreBench in state.json.
