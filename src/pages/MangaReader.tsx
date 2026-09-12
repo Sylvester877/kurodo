@@ -1177,6 +1177,37 @@ export default function MangaReader() {
                 onClick={(e) => { e.stopPropagation(); resetUITimer() }}
               />
             ))}
+            {/* End-of-chapter card — mangafire style */}
+            <div className="w-full max-w-[900px] mx-auto px-4 py-10 flex flex-col items-center gap-4">
+              <div className="h-px w-full bg-white/[0.06]" />
+              <p className="text-[11px] font-semibold tracking-[0.14em] uppercase text-white/30">
+                End of Ch. {currentChapter?.chapter ?? ''} · {pages.length} pages
+              </p>
+              {nextChapter ? (
+                <button
+                  onClick={() => navigateToChapter(nextChapter)}
+                  className="inline-flex items-center gap-2 rounded-full bg-white text-black px-6 py-2.5 text-[13px] font-bold hover:bg-white/90 active:scale-[0.98] transition-all shadow-lg"
+                >
+                  Next: Ch. {nextChapter.chapter}
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <Link
+                  to={mangaId ? `/manga/${mangaId}` : '/manga'}
+                  className="inline-flex items-center gap-2 rounded-full bg-white/[0.08] border border-white/10 text-white/70 px-6 py-2.5 text-[13px] font-semibold hover:bg-white/[0.12] hover:text-white transition-colors"
+                >
+                  <BookOpen className="h-4 w-4" /> Back to manga
+                </Link>
+              )}
+              {displayChapters.length > 1 && (
+                <button
+                  onClick={() => { setDrawerTab('chapters'); setShowDrawer(true) }}
+                  className="text-[11px] font-medium text-white/25 hover:text-white/50 transition-colors"
+                >
+                  Browse all {displayChapters.length} chapters →
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           /* ── Page mode ── */
