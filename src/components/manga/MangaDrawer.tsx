@@ -149,7 +149,7 @@ export default function MangaDrawer({
                 <>
                   {/* Search */}
                   <div className="px-3 py-2 shrink-0">
-                    <div className="flex items-center gap-2 rounded-xl bg-white/[0.04] border border-white/[0.06] px-3 py-2 focus-within:border-primary/30 focus-within:bg-white/[0.06] transition-colors">
+                    <div className="flex items-center gap-2 rounded-xl bg-white/[0.04] border border-white/[0.06] px-3 py-2 focus-within:border-primary/30 focus-within:bg-white/[0.06] focus-within:ring-2 focus-within:ring-primary/10 transition-colors">
                       <Search className="h-3.5 w-3.5 text-white/25 shrink-0" />
                       <input
                         value={q}
@@ -158,7 +158,7 @@ export default function MangaDrawer({
                         className="flex-1 bg-transparent outline-none text-[12px] text-white placeholder:text-white/25"
                       />
                       {q && (
-                        <button onClick={() => setQ('')} className="text-white/30 hover:text-white/60">
+                        <button onClick={() => setQ('')} className="h-6 w-6 grid place-items-center rounded-full bg-white/[0.06] hover:bg-white/[0.10] text-white/30 hover:text-white/60 transition-colors">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       )}

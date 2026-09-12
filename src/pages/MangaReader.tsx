@@ -1043,6 +1043,20 @@ export default function MangaReader() {
   return (
     <BackgroundPattern theme={bgTheme} pattern={bgPattern} intensity={paperIntensity}>
     <div className="min-h-screen relative" onClick={() => { if (!isStrip) resetUITimer() }}>
+      {/* Subtle top scrim so the pill reads on white pages */}
+      <AnimatePresence>
+        {showUI && !zenMode && hasPages && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed top-0 left-0 right-0 h-20 pointer-events-none z-30 bg-gradient-to-b from-black/55 via-black/20 to-transparent"
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+
       {/* ══════ Floating pill (mangafire) — replaces the old fixed top bar ══════ */}
       <AnimatePresence>
         {showUI && !zenMode && hasPages && (
@@ -1156,7 +1170,7 @@ export default function MangaReader() {
                 ref={(el) => registerStripPage(el, idx)}
                 url={page.url}
                 alt={`Page ${idx + 1}`}
-                className={cn('block select-none', imgFitClass)}
+                className={cn('block select-none shadow-[0_2px_24px_rgba(0,0,0,0.45)]', imgFitClass)}
                 style={stripImgStyle}
                 loadingMethod={loadingMethodEffective}
                 imgLoading={loadingStrategy === 'eager' ? 'eager' : idx < 3 ? 'eager' : 'lazy'}
