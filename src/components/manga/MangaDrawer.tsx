@@ -330,12 +330,24 @@ export default function MangaDrawer({
               )}
 
               {activeTab === 'comments' && (
-                <div className="flex-1 grid place-items-center p-6 text-center">
-                  <div>
-                    <MessageSquare className="h-8 w-8 text-white/10 mx-auto mb-2" />
-                    <div className="text-xs text-white/30">Comments coming soon</div>
-                    <div className="text-[11px] text-white/20 mt-1">Chapter discussion will live here.</div>
-                  </div>
+                <div className="flex-1 flex flex-col min-h-0">
+                  {commentsCount && commentsCount > 0 ? (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+                      <div className="text-[11px] font-semibold text-white/40">{commentsCount} comments</div>
+                      {/* Real comments fetched here when backend is wired — empty-state is the polished fallback */}
+                      <div className="text-[11px] text-white/25 py-6 text-center">Threaded comments arriving soon — replies + likes keep per-page discussion live.</div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 grid place-items-center p-6 text-center">
+                      <div className="max-w-[240px]">
+                        <div className="h-12 w-12 rounded-2xl bg-white/[0.04] border border-white/[0.06] grid place-items-center mx-auto mb-3">
+                          <MessageSquare className="h-5 w-5 text-white/20" />
+                        </div>
+                        <div className="text-[13px] font-semibold text-white/60">No comments yet</div>
+                        <div className="text-[11px] text-white/25 mt-1 leading-relaxed">Be the first to discuss Ch. {chapters.find((c) => c.id === currentChapterId)?.chapter ?? '—'}. Replies + reactions keep per-page threads live.</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
