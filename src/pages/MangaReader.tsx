@@ -9,6 +9,7 @@ import MangaPill from '../components/manga/MangaPill'
 import LeftProgressSpine from '../components/manga/LeftProgressSpine'
 import RightToolStack from '../components/manga/RightToolStack'
 import MangaDrawer from '../components/manga/MangaDrawer'
+import DrawerSettingsCompact from '../components/manga/DrawerSettingsCompact'
 import { getChapterPages, getChapterFeed, getMangaInfo, getChapterMangaId, type MangaDexPage } from '../api/mangadex'
 import { getChapterPages as getChapterPagesAtsu, getChapterFeed as getChapterFeedAtsu, getMangaInfo as getMangaInfoAtsu } from '../api/atsu'
 import { useTitle } from '../hooks/useTitle'
@@ -992,43 +993,10 @@ export default function MangaReader() {
   const prevChapter = useMemo(() => (currentChIndex > 0 ? displayChapters[currentChIndex - 1] : null), [displayChapters, currentChIndex])
   const nextChapter = useMemo(() => (currentChIndex >= 0 && currentChIndex < displayChapters.length - 1 ? displayChapters[currentChIndex + 1] : null), [displayChapters, currentChIndex])
 
-  // Lazy drawer settings to avoid importing modal code when drawer closed
+  // Drawer settings — full compact panel (tucks Fit H/W/1:1 + brightness + strip auto-scroll inside)
   const drawerSettingsNode = useMemo(() => (
-    <Suspense fallback={<div className="h-20 animate-pulse bg-white/[0.03] rounded-xl" />}>
-      <div data-drawer-settings className="space-y-3">
-        <div className="text-[10px] text-white/20">Quick settings — G for full panel</div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-white/50">Mode</span>
-            <div className="flex rounded-lg bg-white/[0.04] border border-white/[0.06] overflow-hidden">
-              {(['strip', 'page'] as const).map((m) => (
-                <button key={m} onClick={() => readerSet('readMode', m)} className={cn('px-3 py-1.5 text-[11px] font-semibold capitalize', readMode === m ? 'bg-primary/20 text-primary' : 'text-white/35')}>{m}</button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-white/50">Fit</span>
-            <div className="flex rounded-lg bg-white/[0.04] border border-white/[0.06] overflow-hidden">
-              {(['width', 'height', 'none'] as const).map((v) => (
-                <button key={v} onClick={() => readerSet('fitMode', v)} className={cn('px-2 py-1.5 text-[10px] font-bold', fitMode === v ? 'bg-primary/20 text-primary' : 'text-white/35')}>{v === 'none' ? '1:1' : v === 'width' ? 'Fit W' : 'Fit H'}</button>
-              ))}
-            </div>
-          </div>
-          <label className="flex items-center justify-between text-xs text-white/50 gap-2">
-            Brightness {imageBrightness}%
-            <input type="range" min={50} max={150} step={5} value={imageBrightness} onChange={(e) => readerSet('imageBrightness', Number(e.target.value))} className="w-24 accent-primary h-1" />
-          </label>
-          {isStrip && (
-            <label className="flex items-center justify-between text-xs text-white/50 gap-2">
-              Auto-scroll
-              <input type="checkbox" checked={autoScrollEnabled} onChange={(e) => readerSet('autoScrollEnabled', e.target.checked)} className="accent-primary" />
-            </label>
-          )}
-        </div>
-        <button onClick={() => setShowSettings(true)} className="w-full py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.06] border border-white/[0.06] text-xs font-semibold text-white/60">Open full settings (G)</button>
-      </div>
-    </Suspense>
-  ), [readMode, fitMode, imageBrightness, isStrip, autoScrollEnabled])
+    <DrawerSettingsCompact onOpenFull={() => setShowSettings(true)} />
+  ), [])
 
   const loading = pagesQuery.isLoading
 
