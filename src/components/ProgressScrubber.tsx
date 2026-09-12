@@ -91,28 +91,35 @@ export default function ProgressScrubber({
         })()}
       </div>
 
-      {/* Hover thumbnail preview */}
+      {/* Hover thumbnail preview — follows cursor, clamp to 12px from edge */}
       <AnimatePresence>
-        {previewUrl && isHovering && (
-          <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.95 }}
-            transition={{ duration: 0.12 }}
-            className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
-          >
-            <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/50 bg-black/92">
-              <img
-                src={previewUrl}
-                alt={`Page ${previewPage! + 1}`}
-                className="h-24 w-auto object-cover max-w-[160px]"
-              />
-              <div className="text-center text-[10px] text-white/60 py-1 px-2">
-                Page {previewPage! + 1} / {totalPages}
+        {previewUrl && isHovering && barRef.current && (() => {
+          const rect = barRef.current!.getBoundingClientRect()
+          const leftPct = ((hoverX! - rect.left) / rect.width) * 100
+          const clampedPct = Math.max(8, Math.min(92, leftPct))
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.95 }}
+              transition={{ duration: 0.12 }}
+              className="absolute bottom-full mb-2 z-50 pointer-events-none -translate-x-1/2"
+              style={{ left: `${clampedPct}%` }}
+            >
+              <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/50 bg-black/92">
+                <img
+                  src={previewUrl}
+                  alt={`Page ${previewPage! + 1}`}
+                  className="h-24 w-auto object-cover max-w-[160px]"
+                  loading="lazy"
+                />
+                <div className="text-center text-[10px] text-white/60 py-1 px-2">
+                  Page {previewPage! + 1} / {totalPages}
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )
+        })()}
       </AnimatePresence>
     </div>
   )
