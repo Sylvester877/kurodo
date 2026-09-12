@@ -4,6 +4,7 @@ import { Search, X, History, Loader2, ArrowRight, Star, BookOpen } from 'lucide-
 import { useQuery } from '@tanstack/react-query'
 import { searchAnime } from '../api/anime'
 import { searchMangaAniList, type MangaFeedMedia } from '../api/anilistManga'
+import { searchManga as searchMangaDex } from '../api/mangadex'
 import { useDebounce } from '../hooks/useDebounce'
 import {
   loadRecentSearches,
@@ -76,31 +77,76 @@ export default function NavbarSearchDropdown({
 
   // Fetch results via React Query so navbar searches share the cache
   // with the /search page (no double-fetching on submit).
+  // fixes: manga search appeared dead unless you were already on /manga —
+  // the dropdown only fired the AniList query on manga routes, so typing
+  // "Bleach" on Home showed "No matches" while manga results existed. Now
+  // it fires BOTH queries everywhere and merges the UI, with a MangaDex
+  // fallback when AniList is empty or down (same outage pattern as the
+  // full /search page). This makes manga search work from ANY page.
   const trimmed = debounced.trim()
   const searchEnabled = trimmed.length >= 2
-  const showAnime = contentType === 'anime'
-  const showManga = contentType === 'manga'
   const { data, isFetching } = useQuery({
     queryKey: ['search', trimmed, 1, 6],
     queryFn: () => searchAnime(trimmed, 1, 6),
-    enabled: searchEnabled && showAnime,
+    enabled: searchEnabled,
     staleTime: 5 * 60 * 1000,
   })
   const results: Anime[] = data?.data ?? []
   const hasQuery = trimmed.length >= 2
 
-  // Manga search — parallel fetch from AniList (only on manga pages)
-  const { data: mangaData } = useQuery({
+  // Manga search — AniList primary + MangaDex fallback (fires everywhere,
+  // not just on /manga routes). AniList has 403 site-wide outage states;
+  // MangaDex via our /api/manga proxy stays up. The fallback triggers on
+  // BOTH error and empty-success (AniList can return a valid 200 with 0
+  // items during partial outages — same trap as Search.tsx had).
+  const mangaAniQuery = useQuery({
     queryKey: ['manga-search', trimmed],
     queryFn: () => searchMangaAniList(trimmed, 4),
-    enabled: searchEnabled && showManga,
+    enabled: searchEnabled,
     staleTime: 5 * 60 * 1000,
+    retry: 0,
   })
-  const mangaResults: MangaFeedMedia[] = mangaData ?? []
+  const mangaAniData: MangaFeedMedia[] = mangaAniQuery.data ?? []
+  const mdFallbackQuery = useQuery({
+    queryKey: ['manga-search-md', trimmed],
+    queryFn: async () => {
+      const res = await searchMangaDex(trimmed, 4)
+      // Convert MangaDex shape → minimal MangaFeedMedia so the dropdown can
+      // render one shape (uuid ids still navigate to /manga/:uuid correctly).
+      return res.results.map((r: any) => {
+        let numericId = 0
+        for (let i = 0; i < String(r.id).length; i++) numericId = (numericId * 31 + String(r.id).charCodeAt(i)) >>> 0
+        return {
+          id: numericId || 1,
+          _mdId: r.id as string,
+          _mdCover: r.coverUrl as string | null,
+          title: { romaji: r.title, english: r.title, native: null },
+          coverImage: { large: r.coverUrl, extraLarge: r.coverUrl, color: null },
+          bannerImage: null,
+          chapters: null as number | null,
+          volumes: null as number | null,
+          averageScore: null as number | null,
+          popularity: null as number | null,
+          format: null as string | null,
+          status: r.status ?? null,
+          genres: (r.tags as string[])?.slice(0, 3) ?? [],
+          description: r.description ?? null,
+          startDate: r.year ? { year: r.year, month: null, day: null } : null,
+        } as MangaFeedMedia & { _mdId: string; _mdCover: string | null }
+      })
+    },
+    enabled: searchEnabled && (mangaAniQuery.isError || (!mangaAniQuery.isFetching && !mangaAniQuery.isLoading && mangaAniData.length === 0)),
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  })
+  const mangaResults: MangaFeedMedia[] = mangaAniData.length > 0 ? mangaAniData : ((mdFallbackQuery.data as unknown as MangaFeedMedia[]) ?? [])
+  const mangaFetching = mangaAniQuery.isFetching || mdFallbackQuery.isFetching
+  const isMangaFallback = mangaAniData.length === 0 && (mdFallbackQuery.data?.length ?? 0) > 0
 
   // Total rows for keyboard nav: anime results + manga results + 1 "See all".
-  const hasAnime = hasQuery && results.length > 0 && showAnime
-  const hasManga = hasQuery && mangaResults.length > 0 && showManga
+  // Both pools now run on every page, so include them regardless of contentType.
+  const hasAnime = hasQuery && results.length > 0
+  const hasManga = hasQuery && mangaResults.length > 0
   const totalRows = (hasAnime ? results.length : 0) + (hasManga ? mangaResults.length : 0) + ((hasAnime || hasManga) ? 1 : 0)
 
   // Commit (called from Enter, click, or recent-search pill click).
@@ -127,7 +173,9 @@ export default function NavbarSearchDropdown({
     if (debounced.trim()) setRecents(pushRecentSearch(debounced.trim()))
     setQuery('')
     onClose?.()
-    navigate(`/manga/${manga.id}`)
+    // MangaDex fallback rows carry a uuid in _mdId; AniList rows use numeric id
+    const md = (manga as unknown as { _mdId?: string })._mdId
+    navigate(md ? `/manga/${md}` : `/manga/${manga.id}`)
   }
 
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -197,10 +245,10 @@ export default function NavbarSearchDropdown({
           aria-autocomplete="list"
           aria-expanded={hasQuery || recents.length > 0}
         />
-        {isFetching && hasQuery && (
+        {(isFetching || mangaFetching) && hasQuery && (
           <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
         )}
-        {query && !isFetching && (
+        {query && !isFetching && !mangaFetching && (
           <button
             type="button"
             onClick={() => { setQuery(''); inputRef.current?.focus() }}
@@ -259,9 +307,7 @@ export default function NavbarSearchDropdown({
             </div>
           ) : (
             <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-              {showManga
-                ? 'Start typing to search manga & manhwa.'
-                : 'Start typing to search 100k+ anime.'}
+              Start typing to search anime & manga.
             </div>
           )
         )}
@@ -270,15 +316,15 @@ export default function NavbarSearchDropdown({
         {hasQuery && (
           <>
             {/* Loading row (only when we don't already have stale data). */}
-            {isFetching && results.length === 0 && (
+            {(isFetching || mangaFetching) && results.length === 0 && mangaResults.length === 0 && (
               <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
                 Searching…
               </div>
             )}
 
-            {/* Empty state */}
-            {!isFetching && results.length === 0 && (
+            {/* Empty state — only when BOTH pools are empty and settled */}
+            {!isFetching && !mangaFetching && results.length === 0 && mangaResults.length === 0 && (
               <div className="px-3 py-5 text-center">
                 <p className="text-sm text-white/80 font-medium mb-1">
                   No matches for "{trimmed}"
@@ -349,12 +395,12 @@ export default function NavbarSearchDropdown({
               )
             })}
 
-            {/* Manga results */}
+            {/* Manga results — merged across AniList + MangaDex fallback */}
             {mangaResults.length > 0 && (
               <>
                 <div className="flex items-center gap-2 px-3 py-2 border-t border-white/5 text-[10px] uppercase tracking-wider font-bold text-emerald-400/70">
                   <BookOpen className="h-3 w-3" />
-                  Manga
+                  Manga{isMangaFallback ? ' · via MangaDex' : ''}
                 </div>
                 {mangaResults.map((manga, i) => {
                   const absIdx = results.length + i

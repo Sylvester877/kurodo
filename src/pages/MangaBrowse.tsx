@@ -187,31 +187,40 @@ export default function MangaBrowse() {
   // Primary: AniList (rich metadata + scores). AniList has site-wide outage
   // states (403 on every query), so when it fails the search transparently
   // re-runs against MangaDex (uuid ids → the grid/detail pages handle them).
+  // ── Manga search — AniList primary + MangaDex fallback ──
+  // fixes: search appeared dead when AniList returned a *valid empty page*
+  // (200 + media:[]) during partial outages — the old code treated that as
+  // success and showed "No manga found" instead of running MangaDex. Now
+  // both an error AND an empty SUCCESS trigger the fallback, so typing
+  // "Bleach" always returns results even when AniList is half-down.
   const searchQuery = useQuery({
     queryKey: ['manga', 'search', debouncedSearch],
     queryFn: () => searchMangaAniList(debouncedSearch, 24),
     enabled: debouncedSearch.trim().length >= 2,
     staleTime: 2 * 60 * 1000,
-    retry: 1,
+    retry: 0,
   })
+  const aniSearchData = searchQuery.data ?? []
+  const aniSearchEmpty = !searchQuery.isFetching && !searchQuery.isLoading && aniSearchData.length === 0
   const mdSearchQuery = useQuery({
     queryKey: ['manga', 'search-md', debouncedSearch],
     queryFn: async () => {
       const res = await searchMangaDex(debouncedSearch, 24)
       return res.results
     },
-    enabled: debouncedSearch.trim().length >= 2 && !!searchQuery.isError,
+    enabled: debouncedSearch.trim().length >= 2 && (searchQuery.isError || aniSearchEmpty),
     staleTime: 2 * 60 * 1000,
+    retry: 0,
   })
-
-  const searchOnAniList = !searchQuery.isError
+  const usingMdSearchFallback = (searchQuery.isError || aniSearchEmpty) && (mdSearchQuery.data?.length ?? 0) > 0
+  const searchOnAniList = !usingMdSearchFallback
   const searching = (searchQuery.isFetching || mdSearchQuery.isFetching) &&
     debouncedSearch.trim().length >= 2
-  // Unified list — normalized AniList items, or MangaDex items during an
-  // AniList outage (keeps the dropdown + grid rendering one shape).
-  const searchResults: SearchCard[] = searchOnAniList
-    ? (searchQuery.data ?? []).map(anilistToSearchCard)
-    : (mdSearchQuery.data ?? []).map(mangadexToSearchCard)
+  // Unified list — AniList when it has results, MangaDex when AniList is
+  // empty/errored (outage fallback). Normalized into SearchCard shape.
+  const searchResults: SearchCard[] = usingMdSearchFallback
+    ? (mdSearchQuery.data ?? []).map(mangadexToSearchCard)
+    : aniSearchData.map(anilistToSearchCard)
   const showSearch = debouncedSearch.trim().length >= 2
 
   // ── Derived data ──
@@ -320,7 +329,9 @@ export default function MangaBrowse() {
         </div>
       </div>
 
-      {/* Search bar */}
+      {/* Search bar — mirrors Search.tsx top bar; the /manga page is the
+          manga-native surface so the search here is manga-only (no anime tab
+          confusion). Placeholder is explicit about it. */}
       <div className="relative mb-6">
         <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 focus-within:border-primary/30 focus-within:bg-white/[0.05] transition-all">
           <Search className="h-4 w-4 text-white/30 shrink-0" />
@@ -328,10 +339,22 @@ export default function MangaBrowse() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search manga by title…"
+            placeholder="Search 100k+ manga, manhwa & novels…"
+            autoComplete="off"
+            spellCheck={false}
             className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder:text-white/30"
           />
           {searching && <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />}
+          {search && !searching && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label="Clear manga search"
+              className="text-white/30 hover:text-white transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Quick dropdown — only while searching or when there ARE results.
