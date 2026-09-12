@@ -311,29 +311,30 @@ export default function MangaBrowse() {
   const hasActiveBrowseFilters =
     selectedGenres.length > 0 || browseFormat || browseStatus || browseSort !== 'popular'
 
+  // Onisaga Home: the manga landing ("Manga" home) reads as a flat charcoal
+  // sheet with compact rail headers and dense grids — mirror that here so
+  // /manga feels like Onisaga's manga home, not the anime Home.
   return (
-    <div className="pt-20 pb-12 px-4 max-w-[1600px] mx-auto">
-      {/* Continue Reading rail */}
+    <div className="pt-20 pb-12 px-4 max-w-[1600px] mx-auto bg-[#262626]" style={{ backgroundColor: '#262626' }}>
+      {/* Continue Reading rail — first, like Onisaga's resume strip */}
       <MangaContinueReadingRail />
 
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/20 grid place-items-center">
-            <BookOpen className="h-5 w-5 text-primary" />
+      {/* Header — tighter, Onisaga's manga home has a compact header then rails */}
+      <div className="mb-5">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="h-9 w-9 rounded-xl bg-primary/15 border border-primary/20 grid place-items-center">
+            <BookOpen className="h-4.5 w-4.5 text-primary" />
           </div>
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white">Manga</h1>
-            <p className="text-xs text-muted-foreground">Discover manga, manhwa & novels · powered by AniList + MangaDex</p>
+            <h1 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white">Manga</h1>
+            <p className="text-[11px] text-white/45">Discover manga, manhwa & novels · AniList + MangaDex</p>
           </div>
         </div>
       </div>
 
-      {/* Search bar — mirrors Search.tsx top bar; the /manga page is the
-          manga-native surface so the search here is manga-only (no anime tab
-          confusion). Placeholder is explicit about it. */}
-      <div className="relative mb-6">
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 focus-within:border-primary/30 focus-within:bg-white/[0.05] transition-all">
+      {/* Search bar — Onisaga-style compact pill on the charcoal sheet */}
+      <div className="relative mb-5">
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 focus-within:border-primary/30 focus-within:bg-white/[0.06] transition-all">
           <Search className="h-4 w-4 text-white/30 shrink-0" />
           <input
             type="text"
@@ -408,9 +409,9 @@ export default function MangaBrowse() {
         )}
       </div>
 
-      {/* Tab bar */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06]">
+      {/* Tab bar — Onisaga's manga tabs are dense pills with tighter vertical rhythm */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-white/[0.05] border border-white/[0.07]">
           {tabs.map((t) => (
             <button
               key={t.key}
