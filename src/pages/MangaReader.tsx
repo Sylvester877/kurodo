@@ -1423,7 +1423,13 @@ export default function MangaReader() {
         totalPages={pages.length}
         currentPage={currentPage}
         pageUrls={pages.map((p) => p.url)}
-        onJumpPage={(idx) => { setCurrentPage(idx); resetUITimer() }}
+        onJumpPage={(idx) => {
+          if (isStrip) {
+            const el = [...stripPageRefs.current.entries()].find(([, v]) => v === idx)?.[0] as HTMLElement | undefined
+            el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          } else setCurrentPage(idx)
+          resetUITimer()
+        }}
         activeTab={drawerTab}
         onTab={setDrawerTab}
         settingsSlot={drawerSettingsNode}
