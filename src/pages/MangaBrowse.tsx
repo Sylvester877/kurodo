@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { cn, proxifyImgUrl } from '../lib/utils'
 import MangaContinueReadingRail from '../components/MangaContinueReadingRail'
+import MangaHero, { type MangaHeroItem } from '../components/MangaHero'
 import {
   getLatestManga, browseManga, getBrowseTags, searchManga as searchMangaDex,
   type BrowseTags,
@@ -119,6 +120,44 @@ export default function MangaBrowse() {
     staleTime: 24 * 60 * 60 * 1000,
   })
   const tags: BrowseTags | undefined = tagsQuery.data
+
+  // ── Manga hero spotlight (Onisaga sheet: banner-first hero) ──
+  const heroQuery = useQuery({
+    queryKey: ['manga', 'hero'],
+    queryFn: async () => {
+      try {
+        const items = await getTrendingManga(6)
+        return items.map((m: any) => ({
+          id: m.id,
+          title: m.title?.english || m.title?.romaji || 'Untitled',
+          coverUrl: m.coverImage?.extraLarge || m.coverImage?.large || '',
+          bannerUrl: (m as any).bannerImage || m.coverImage?.extraLarge || null,
+          description: (m as any).description || null,
+          genres: (m.genres as string[])?.slice(0, 4) || [],
+          score: m.averageScore ? m.averageScore / 10 : null,
+          year: m.startDate?.year || null,
+          chapters: m.chapters ?? null,
+          format: m.format || null,
+        })) as MangaHeroItem[]
+      } catch {
+        const md = await browseManga({ sort: 'trending', limit: 6 })
+        return md.results.slice(0, 6).map((r: any) => ({
+          id: r.id,
+          title: r.title || 'Untitled',
+          coverUrl: r.coverUrl || '',
+          bannerUrl: null,
+          description: r.description || null,
+          genres: (r.tags as string[])?.slice(0, 4) || [],
+          score: null,
+          year: r.year || null,
+          chapters: null,
+          format: null,
+        })) as MangaHeroItem[]
+      }
+    },
+    staleTime: 10 * 60 * 1000,
+  })
+  const heroItems: MangaHeroItem[] = heroQuery.data ?? []
 
   // ── Existing tab queries ──
   // AniList is the rich source (scores / formats / chapter counts), but it
@@ -318,6 +357,9 @@ export default function MangaBrowse() {
     <div className="pt-20 pb-12 px-4 max-w-[1600px] mx-auto bg-[#262626]" style={{ backgroundColor: '#262626' }}>
       {/* Continue Reading rail — first, like Onisaga's resume strip */}
       <MangaContinueReadingRail />
+
+      {/* Spotlight hero — Onisaga DNA: 420px banner + left thumb + counter, on manga home only */}
+      {heroItems.length > 0 && <MangaHero items={heroItems} />}
 
       {/* Header — tighter, Onisaga's manga home has a compact header then rails */}
       <div className="mb-5">
