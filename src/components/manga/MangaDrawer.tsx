@@ -215,7 +215,7 @@ export default function MangaDrawer({
                                 p.idx === currentPage ? 'border-primary ring-1 ring-primary/30' : 'border-white/10 hover:border-white/20',
                               )}
                             >
-                              <ReaderImage url={p.url} alt={`Page ${p.idx + 1}`} className="h-full w-full object-cover" loadingMethod="native" />
+                              <ReaderImage url={p.url} alt={`Page ${p.idx + 1}`} className="h-full w-full object-cover" loadingMethod="native" imgLoading="lazy" />
                               <span className="absolute bottom-1 left-1 rounded bg-black/70 text-[9px] font-mono text-white/80 px-1 py-0.5">
                                 {p.idx + 1}
                               </span>

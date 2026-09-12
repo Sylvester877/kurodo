@@ -59,18 +59,23 @@ export default function ProgressScrubber({
 
   return (
     <div className={cn('relative group', className)}>
-      {/* Progress bar */}
+      {/* Progress bar — 2px track, 6px hit-target via py-2, accent dot */}
       <div
         ref={barRef}
-        className="relative w-full cursor-pointer py-1"
+        className="relative w-full cursor-pointer py-2"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
       >
-        <div className="w-full h-1 bg-white/[0.06] rounded-full overflow-hidden">
+        <div className="w-full h-[2px] bg-white/[0.09] rounded-full overflow-visible relative">
           <div
-            className="h-full bg-primary/60 rounded-full transition-all duration-150"
+            className="absolute left-0 top-0 h-full bg-primary/70 rounded-full transition-all duration-150"
             style={{ width: `${activePct}%` }}
+          />
+          {/* Knob */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-[8px] w-[8px] rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)] -ml-[4px] transition-all duration-150"
+            style={{ left: `${activePct}%` }}
           />
         </div>
         {/* Hover dot indicator */}
