@@ -36,7 +36,7 @@ export default function MangaPill({
       className={cn(
         'fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 rounded-full',
         'bg-[#16202f]/95 backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.55),0_1px_0_rgba(255,255,255,0.06)_inset]',
-        'px-1.5 py-1.5 select-none',
+        'px-1.5 py-1.5 select-none max-w-[86vw]',
         className,
       )}
     >
