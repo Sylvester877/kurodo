@@ -213,7 +213,7 @@ export async function getKitsuFeed(kind, perPage, season = null, year = null) {
       timeout: TIMEOUT_MS,
       headers: {
         Accept: 'application/vnd.api+json',
-        'User-Agent': 'kurodo/0.3.37 (anime desktop app; fallback feed)',
+        'User-Agent': 'kurodo/0.3.38 (anime desktop app; fallback feed)',
       },
       validateStatus: (code) => code >= 200 && code < 300,
     })
