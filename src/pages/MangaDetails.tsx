@@ -314,6 +314,16 @@ export default function MangaDetails() {
       }))
   }, [detail])
 
+  // ── mangafire-style hero backdrop — banner → cover fallback ──
+  // fixes: details was a flat sheet (cover left + title right) with no
+  // blurred backdrop hero; mangafire/atsu both use a banner-first hero so
+  // the page reads as a premium detail view. Uses AniList banner when
+  // present, else the cover so every manga gets a hero.
+  const heroBg = detail?.bannerImage || (detail?.coverImage as any)?.extraLarge || detail?.coverImage?.large || manga?.coverUrl || storedEntry?.coverUrl || null
+  const heroCover = manga?.coverUrl || (detail?.coverImage as any)?.extraLarge || detail?.coverImage?.large || storedEntry?.coverUrl || ''
+  const heroTitle = resolved?.parentTitle || resolved?.displayTitle || manga?.title || storedEntry?.title_english || storedEntry?.title || 'Manga'
+  const hasHero = !!heroBg || !!heroCover
+
   if (loading) {
     return (
       <div className="pt-20 pb-12 mx-4">
@@ -325,46 +335,115 @@ export default function MangaDetails() {
   }
 
   return (
-    <div className="pt-20 pb-12 px-4 max-w-[1600px] mx-auto">
-      {/* Back link */}
-      <Link
-        to="/manga"
-        className="inline-flex items-center gap-1.5 text-xs text-white/55 hover:text-white transition-colors group mb-4"
-      >
-        <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
-        Back to Manga
-      </Link>
-
-      {/* Coloured edition banner */}
-      {resolved?.isColoured && resolved.parentTitle && (
-        <div className="mb-4 p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-primary shrink-0" />
-          <p className="text-xs text-white/80">
-            This is a <span className="text-primary font-semibold">coloured edition</span> of{' '}
-            <span className="text-white font-semibold">{resolved.parentTitle}</span>.
-            Tracking as the original manga.
-          </p>
+    <>
+      {/* mangafire-style hero — banner + cover + title (was flat sheet, now premium backdrop) */}
+      {hasHero && (
+        <div className="relative -mt-20 pt-20 overflow-hidden border-b border-white/[0.06]">
+          {heroBg ? (
+            <img
+              src={proxifyImgUrl(heroBg)}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="eager"
+              fetchPriority="high"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-[#1a1a1f] to-[#0f0f12]" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
+          <div className="absolute inset-0 backdrop-blur-[1px] bg-black/10" />
+          <div className="relative z-10 max-w-[1600px] mx-auto px-4 pb-6 pt-4 flex gap-5 sm:gap-6 items-end">
+            <div className="hidden sm:block shrink-0 w-[168px] rounded-xl overflow-hidden border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.6)] bg-card aspect-[3/4]">
+              {heroCover ? (
+                <img src={proxifyImgUrl(heroCover)} alt={heroTitle} className="h-full w-full object-cover" loading="eager" />
+              ) : (
+                <div className="h-full w-full grid place-items-center"><BookOpen className="h-10 w-10 text-white/10" /></div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1 pb-1">
+              <Link to="/manga" className="inline-flex items-center gap-1.5 text-[11px] text-white/50 hover:text-white transition-colors group mb-2">
+                <ArrowLeft className="h-3 w-3 group-hover:-translate-x-0.5 transition-transform" /> Back to Manga
+              </Link>
+              <h1 className="font-display text-[22px] sm:text-[30px] font-extrabold leading-none tracking-tight text-white line-clamp-2 drop-shadow-[0_2px_16px_rgba(0,0,0,0.6)]">
+                {heroTitle}
+              </h1>
+              {resolved?.isColoured && resolved.displayTitle !== resolved.parentTitle && (
+                <p className="text-xs text-white/50 mt-1">{resolved.displayTitle}</p>
+              )}
+              <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                {detail?.format && <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/80">{detail.format}</span>}
+                {detail?.status && <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[10px] font-semibold capitalize text-white/70">{detail.status.replace(/_/g, ' ')}</span>}
+                {manga?.status && !detail?.status && <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[10px] font-semibold capitalize text-white/70">{manga.status}</span>}
+                {detail?.averageScore != null && <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 border border-yellow-500/20 px-2.5 py-1 text-[10px] font-bold text-yellow-300"><Star className="h-3 w-3 fill-yellow-400" /> {(detail.averageScore / 10).toFixed(1)}</span>}
+                {detail?.chapters != null && <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[10px] font-semibold text-white/60">{detail.chapters} ch</span>}
+                {detail?.startDate?.year && <span className="rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[10px] font-semibold text-white/60">{detail.startDate.year}</span>}
+                {detail?.popularity && <span className="inline-flex items-center gap-1 rounded-full bg-white/10 border border-white/15 px-2 py-1 text-[10px] font-semibold text-white/55"><TrendingUp className="h-3 w-3" /> #{detail.popularity.toLocaleString()}</span>}
+              </div>
+              {detail?.genres && detail.genres.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {detail.genres.slice(0, 5).map((g) => (
+                    <span key={g} className="text-[10px] font-medium text-white/45">#{g}</span>
+                  ))}
+                </div>
+              )}
+              {(detail?.description || manga?.description) && (
+                <p className="mt-3 hidden sm:block text-[12px] leading-relaxed text-white/60 line-clamp-2 max-w-[60ch]">
+                  {(detail?.description || manga?.description || '').slice(0, 280)}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
+      <div className={hasHero ? "pb-12 px-4 max-w-[1600px] mx-auto pt-6" : "pt-20 pb-12 px-4 max-w-[1600px] mx-auto"}>
+        {!hasHero && (
+          <Link to="/manga" className="inline-flex items-center gap-1.5 text-xs text-white/55 hover:text-white transition-colors group mb-4">
+            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" /> Back to Manga
+          </Link>
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-6 items-start">
-        {/* Cover + info sidebar */}
-        <div className="space-y-4 lg:sticky lg:top-20">
-          {/* Cover */}
-          <div className="rounded-xl overflow-hidden border border-white/10 aspect-[3/4] bg-card relative">
-            {manga?.coverUrl ? (
-              <img src={manga.coverUrl} alt={manga.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
-            ) : detail?.coverImage?.large ? (
-              <img src={proxifyImgUrl(detail.coverImage.large)} alt={resolved?.displayTitle || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
-            ) : storedEntry?.coverUrl ? (
-              // Saved-list fallback: cover keeps working during an AniList outage
-              <img src={storedEntry.coverUrl} alt={storedEntry.title_english || storedEntry.title || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
-            ) : (
-              <div className="h-full w-full grid place-items-center">
-                <BookOpen className="h-12 w-12 text-white/10" />
+        {/* Coloured edition banner */}
+        {resolved?.isColoured && resolved.parentTitle && (
+          <div className="mb-4 p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-xs text-white/80">
+              This is a <span className="text-primary font-semibold">coloured edition</span> of{' '}
+              <span className="text-white font-semibold">{resolved.parentTitle}</span>.
+              Tracking as the original manga.
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-6 items-start">
+          {/* Cover + info sidebar */}
+          <div className="space-y-4 lg:sticky lg:top-20">
+            {/* Cover — hidden when hero already shows it (mangafire: single cover in hero) */}
+            {!hasHero && (
+              <div className="rounded-xl overflow-hidden border border-white/10 aspect-[3/4] bg-card relative">
+                {manga?.coverUrl ? (
+                  <img src={manga.coverUrl} alt={manga.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                ) : detail?.coverImage?.large ? (
+                  <img src={proxifyImgUrl(detail.coverImage.large)} alt={resolved?.displayTitle || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                ) : storedEntry?.coverUrl ? (
+                  <img src={storedEntry.coverUrl} alt={storedEntry.title_english || storedEntry.title || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                ) : (
+                  <div className="h-full w-full grid place-items-center">
+                    <BookOpen className="h-12 w-12 text-white/10" />
+                  </div>
+                )}
               </div>
             )}
-          </div>
+            {/* Mobile cover when hero hidden on mobile (hero hides thumb <sm) */}
+            {hasHero && (
+              <div className="sm:hidden rounded-xl overflow-hidden border border-white/10 aspect-[3/4] bg-card relative">
+                {heroCover ? (
+                  <img src={proxifyImgUrl(heroCover)} alt={heroTitle} className="h-full w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="h-full w-full grid place-items-center"><BookOpen className="h-12 w-12 text-white/10" /></div>
+                )}
+              </div>
+            )}
 
           {/* Actions */}
           <div className="space-y-2">
@@ -554,39 +633,42 @@ export default function MangaDetails() {
           )}
         </div>
 
-        {/* Main content — title + chapters */}
+        {/* Main content — chapters (title + synopsis live in the hero when hasHero) */}
         <div className="space-y-6 min-w-0">
-          {/* Title + description */}
-          <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
-              {resolved?.parentTitle || resolved?.displayTitle || manga?.title || storedEntry?.title_english || storedEntry?.title || 'Manga'}
-            </h1>
-            {resolved?.isColoured && resolved.displayTitle !== resolved.parentTitle && (
-              <p className="text-sm text-primary/70 mb-2">{resolved.displayTitle}</p>
-            )}
-            {(detail?.description || manga?.description) && (
-              <div className="relative">
-                <p className={cn(
-                  'text-sm text-white/55 leading-relaxed',
-                  !synopsisExpanded && 'line-clamp-4',
-                )}>
-                  {detail?.description || manga?.description}
-                </p>
-                {(detail?.description || '').length > 300 && (
-                  <button
-                    onClick={() => setSynopsisExpanded(!synopsisExpanded)}
-                    className="mt-1 flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                  >
-                    {synopsisExpanded ? (
-                      <><ChevronUp className="h-3 w-3" /> Show less</>
-                    ) : (
-                      <><ChevronDown className="h-3 w-3" /> Read more</>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {!hasHero ? (
+            <div>
+              <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
+                {resolved?.parentTitle || resolved?.displayTitle || manga?.title || storedEntry?.title_english || storedEntry?.title || 'Manga'}
+              </h1>
+              {resolved?.isColoured && resolved.displayTitle !== resolved.parentTitle && (
+                <p className="text-sm text-primary/70 mb-2">{resolved.displayTitle}</p>
+              )}
+              {(detail?.description || manga?.description) && (
+                <div className="relative">
+                  <p className={cn('text-sm text-white/55 leading-relaxed', !synopsisExpanded && 'line-clamp-4')}>
+                    {detail?.description || manga?.description}
+                  </p>
+                  {(detail?.description || '').length > 300 && (
+                    <button onClick={() => setSynopsisExpanded(!synopsisExpanded)} className="mt-1 flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors">
+                      {synopsisExpanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Read more</>}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (detail?.description || manga?.description) ? (
+            <div className="relative">
+              <h3 className="text-xs font-bold text-white/45 uppercase tracking-wider mb-2 flex items-center gap-2"><span className="kicker-bar" /> Synopsis</h3>
+              <p className={cn('text-sm text-white/55 leading-relaxed', !synopsisExpanded && 'line-clamp-4')}>
+                {detail?.description || manga?.description}
+              </p>
+              {(detail?.description || '').length > 300 && (
+                <button onClick={() => setSynopsisExpanded(!synopsisExpanded)} className="mt-1 flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors">
+                  {synopsisExpanded ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> Read more</>}
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {/* Related manga */}
           {relatedManga.length > 0 && (
@@ -850,6 +932,7 @@ export default function MangaDetails() {
         </div>
       </div>
     </div>
+    </>
   )
 }
 
@@ -939,17 +1022,11 @@ function ChapterButton({ chapter, mangaId, malId, isRead, isColored, coloredMode
 
   return (
     <Link to={link} className={sharedClass} data-chapter-id={chapter.id} data-chapter-num={chapter.chapter}>
-      <span className={cn('font-semibold truncate', isRead ? 'text-emerald-400/80' : 'text-white/90')}>
-        Ch. {chapter.chapter}
-      </span>
-      {chapter.title && (
-        <span className="text-[10px] text-white/40 truncate">{chapter.title}</span>
-      )}
+      <span className={cn('font-semibold truncate', isRead ? 'text-emerald-400/80' : 'text-white/90')}>Ch. {chapter.chapter}</span>
+      {chapter.title && <span className="text-[10px] text-white/40 truncate">{chapter.title}</span>}
       <div className="flex items-center gap-2 mt-1">
         {isRead && <span className="text-[9px] text-emerald-400 font-semibold">✓ Read</span>}
-        {isColored && (
-          <span className="text-[9px] text-amber-400 font-semibold">🎨</span>
-        )}
+        {isColored && <span className="text-[9px] text-amber-400 font-semibold">🎨</span>}
         {chapter.scanGroup && (
           <span className="text-[9px] text-primary/60 truncate">{chapter.scanGroup}</span>
         )}
