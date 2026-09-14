@@ -628,6 +628,13 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
       return fail(res, new Error('No stream found'), 404)
     }
 
+    // ── Subtitle alias — providers return `tracks`, frontend reads `subtitles` ──
+    // Keep both keys identical so cached + fresh responses always contain
+    // `subtitles` (what Watch.tsx expects) and `tracks` (legacy probe).
+    // fixes: "no subtitle" — every stream looked mute because the alias was missing.
+    if (Array.isArray(data.tracks) && !Array.isArray(data.subtitles)) data.subtitles = data.tracks
+    if (Array.isArray(data.subtitles) && !Array.isArray(data.tracks)) data.tracks = data.subtitles
+
     const primarySrc = data.raw || data.url || ''
 
     // Guard: if we got no URL at all, fail gracefully

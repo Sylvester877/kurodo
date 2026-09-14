@@ -255,8 +255,13 @@ export default React.memo(function VideoPlayer({
   const [, _setShowCaptions] = useState(false)  // legacy: now owned by PlayerControls
   // Index into the subtitles[] array; -1 = off.
   const [activeSubIdx, setActiveSubIdx] = useState<number>(() => {
+    if (subtitles.length === 0) return -1
     const def = subtitles.findIndex((s) => s.default)
-    return def >= 0 ? def : -1
+    if (def >= 0) return def
+    const isEn = (s: typeof subtitles[number]) =>
+      /\beng(lish)?\b/i.test(s.label || '') || /^en/i.test(s.lang || '')
+    const en = subtitles.findIndex(isEn)
+    return en >= 0 ? en : 0
   })
   const activeSubIdxRef = useRef(activeSubIdx)
   activeSubIdxRef.current = activeSubIdx
@@ -1073,14 +1078,35 @@ export default React.memo(function VideoPlayer({
   }, [pauseOnBlur])
 
   // ---- Reset caption selection when the subtitle list changes ----
+  // fixes: "no subtitle" — previously `default` was the only trigger, so
+  // Japanese-audio (sub) streams whose CDN omitted the `default` flag
+  // stayed on `activeSubIdx = -1` (captions hidden) until the user
+  // manually opened the CC menu. Now English is auto-selected for `sub`
+  // (and `hsub` as a safety net), preferring an explicit `default` first,
+  // then an English-labelled track, then the first available track.
   // Without this, switching episodes leaves activeSubIdx pointing at a
   // (possibly out-of-bounds) old index from the previous episode.
   const subtitlesKey = subtitles.map((s) => s.src).join('|')
   useEffect(() => {
+    if (subtitles.length === 0) { setActiveSubIdx(-1); return }
     const def = subtitles.findIndex((s) => s.default)
-    setActiveSubIdx(def >= 0 ? def : (subtitles.length > 0 ? 0 : -1))
+    if (def >= 0) { setActiveSubIdx(def); return }
+    const isEnglish = (s: typeof subtitles[number]) =>
+      /\beng(lish)?\b/i.test(s.label || '') ||
+      /\beng\b|^en$/i.test(s.lang || '') ||
+      s.lang?.toLowerCase().startsWith('en')
+    const enIdx = subtitles.findIndex(isEnglish)
+    // For Japanese-audio content (sub/hsub) captions are essential —
+    // auto-enable the English track (or first track) immediately so the
+    // player never starts silent. For dub we also auto-enable English
+    // if it exists, otherwise the first track (often still English).
+    if (streamType === 'sub' || streamType === 'hsub') {
+      setActiveSubIdx(enIdx >= 0 ? enIdx : 0)
+      return
+    }
+    setActiveSubIdx(enIdx >= 0 ? enIdx : 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subtitlesKey])
+  }, [subtitlesKey, streamType])
 
   // ---- Sync caption track visibility with the picker ----
   useEffect(() => {
@@ -1540,6 +1566,14 @@ export default React.memo(function VideoPlayer({
   // small <style> tag that targets `.{captionScope} > ::cue`.
   // useMemo prevents this heavy string computation from running 5x/sec
   // on every VideoPlayer re-render (triggered by stats/skipCountdown intervals).
+  // ── Cinematic caption aesthetic ──────────────────────────────────
+  // Netflix/Crunchyroll-parity: soft rounded pill behind the text,
+  // letter-spaced bold sans, halo shadow (readable over snow/sky),
+  // no hard rectangular black box. ::cue's background is per-fragment —
+  // we give it a rounded translucent pill + padding so the bar feels
+  // like a designed element, not a plain VTT dump. The halo (0.9 alpha)
+  // is the real readability trick: four tight black shadows + a soft
+  // spread so white text pops even on white scenes.
   const captionCss = useMemo(() => {
     const c = captionScopeRef.current
     const size = captionSize
@@ -1547,26 +1581,39 @@ export default React.memo(function VideoPlayer({
     const bgAlpha = captionBackgroundOpacity
     const edge = captionEdgeStrength
     const offset = captionPositionOffset
-    const shadowStrength = edge * 2
-    const shadow = `
-      ${-shadowStrength}px ${-shadowStrength}px ${shadowStrength * 1.5}px rgba(0,0,0,${edge}),
-      ${shadowStrength}px ${-shadowStrength}px ${shadowStrength * 1.5}px rgba(0,0,0,${edge}),
-      ${-shadowStrength}px ${shadowStrength}px ${shadowStrength * 1.5}px rgba(0,0,0,${edge}),
-      ${shadowStrength}px ${shadowStrength}px ${shadowStrength * 1.5}px rgba(0,0,0,${edge})
-    `.trim()
+    // ── Cinematic halo — Netflix / Crunchyroll parity ──
+    // Tight 1px crisp outline + soft velvet bloom. The crisp edge keeps
+    // white readable on white skies; the bloom lifts it off bright anime
+    // scenes without a heavy black box. Edge slider scales bloom only.
+    const halo = Math.min(0.96, Math.max(0.72, edge + 0.08))
+    const bloom = 7 + edge * 5
+    const haloShadow = [
+      `0 1px 1px rgba(0,0,0,${halo})`,
+      `0 2px ${bloom}px rgba(0,0,0,${(halo * 0.94).toFixed(2)})`,
+      `0 0 1.2px rgba(0,0,0,1)`,
+    ].join(', ')
+    // Pill: warm near-black, low alpha — per-fragment rounded rect that
+    // feels like a designed element, not a plain VTT black bar. Keep it
+    // subtle so the halo does the heavy lifting on bright scenes.
+    const pillBg = bgAlpha > 0.08
+      ? `rgba(14,14,18,${Math.min(0.58, +(bgAlpha + 0.06).toFixed(2))})`
+      : 'transparent'
 
     return `
 .${c}::cue {
   font-size: ${size * 100}%;
   color: ${color};
-  background-color: rgba(0,0,0,${bgAlpha});
-  text-shadow: ${shadow};
-  font-family: '${captionFont}', 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: ${pillBg};
+  text-shadow: ${haloShadow};
+  font-family: '${captionFont}', 'Inter', 'Outfit', system-ui, -apple-system, sans-serif;
   font-weight: 600;
+  letter-spacing: 0.022em;
   white-space: pre-line;
-  line-height: 1.35;
+  line-height: 1.5;
+  padding: 0.2em 0.62em;
+  border-radius: 0.42em;
 }
-.${c}::cue(b), .${c}::cue(strong) { font-weight: 800; }
+.${c}::cue(b), .${c}::cue(strong) { font-weight: 750; }
 .${c}::cue(i), .${c}::cue(em)     { font-style: italic; }
 ${offset > 0 ? `
 /* Lift cues away from the bottom edge by re-positioning the cue box
@@ -1720,7 +1767,7 @@ ${offset > 0 ? `
     <div
       ref={wrapRef}
       tabIndex={-1}
-      className="group relative w-full overflow-hidden rounded-2xl bg-black touch-none select-none outline-none"
+      className="group relative w-full overflow-hidden rounded-xl bg-black border border-white/[0.06] shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7),0_4px_16px_rgba(0,0,0,0.5)] touch-none select-none outline-none"
       style={{ aspectRatio: !fullscreenActive && contentAspect ? `${contentAspect}` : undefined }}
       onPointerDown={onPointerDown}
       onPointerMove={(e) => { onPointerMove(e); setControlsVisible(true) }}

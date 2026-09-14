@@ -485,11 +485,11 @@ export default function PlayerControls({
         </div>
       )}
 
-      {/* Ghost glass control bar — transparent, blur-backed for anidap feel */}
+      {/* Anikage-style bottom scrim — soft, not heavy — chips float with bg-black/60 */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-28 transition-opacity duration-500"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-32 transition-opacity duration-500"
         style={{
-          background: 'linear-gradient(to top, rgba(8,8,10,0.85) 0%, rgba(8,8,10,0.35) 60%, transparent 100%)',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.18) 55%, transparent 100%)',
         }}
       />
 
@@ -519,7 +519,9 @@ export default function PlayerControls({
         onMouseEnter={() => { mouseOnBarRef.current = true }}
         onMouseLeave={() => { mouseOnBarRef.current = false; scheduleHide() }}
         className={cn(
-          'absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 pt-1 flex flex-col gap-1.5',
+          // Anikage parity: row sits `flex w-full items-center gap-1 px-2 pb-1.5`
+          // inside a flex column that holds timeline + chips.
+          'absolute inset-x-0 bottom-0 px-2 pb-1.5 flex flex-col gap-1',
           // When hidden the bar must not eat clicks — the click-anywhere
           // surface below should toggle play instead (visible dead-zone fix).
           visible ? 'pointer-events-auto' : 'pointer-events-none',
@@ -551,11 +553,13 @@ export default function PlayerControls({
           onPointerLeave={onTlLeave}
           className="relative h-5 group flex items-center cursor-pointer touch-none"
         >
-          {/* Track (3px, expands to 8px on hover — ghost thin-line) */}
-          <div className="relative w-full h-[3px] group-hover:h-2 transition-all duration-200 rounded-full bg-white/[0.12] overflow-hidden">
-            {/* Buffered range */}
+          {/* Anikage parity: track h-[5px] w-full rounded-sm bg-white/20,
+              fills use --chapter-fill / --chapter-buffer math — we keep the
+              simpler instant % fills but match colour + height + thumb size. */}
+          <div className="relative w-full h-[5px] group-hover:h-2 transition-[height] duration-300 rounded-sm bg-white/20 overflow-hidden">
+            {/* Buffered range — chrome-tinted, sits under fill */}
             <div
-              className="absolute inset-y-0 left-0 bg-white/25"
+              className="absolute inset-y-0 left-0 bg-white/50"
               style={{ width: `${bufferedPct}%` }}
             />
             {/* Chapter ranges — translucent colored swaths sitting UNDER
@@ -579,9 +583,9 @@ export default function PlayerControls({
                 />
               )
             })}
-            {/* Progress — paints over both base + chapter swaths */}
+            {/* Progress — anikage uses bg-action; tailwind primary maps there */}
             <div
-              className="absolute inset-y-0 left-0 bg-primary rounded-full"
+              className="absolute inset-y-0 left-0 bg-primary rounded-sm"
               style={{ width: `${progressPct}%` }}
             />
           </div>
@@ -601,16 +605,17 @@ export default function PlayerControls({
             />
           ))}
 
-          {/* Scrubber knob (visible on hover / scrub) */}
+          {/* Scrubber thumb — anikage exact: h-[15px] w-[15px]
+              rounded-full border-[#cacaca] bg-action — appears on group-hover. */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white shadow-[0_0_0_3px_rgba(79,70,229,0.5)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-            style={{ left: `calc(${progressPct}% - 8px)` }}
+            className="absolute top-1/2 -translate-y-1/2 h-[15px] w-[15px] rounded-full border border-[#cacaca] bg-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+            style={{ left: `calc(${progressPct}% - 7.5px)` }}
           />
 
-          {/* Hover time tooltip */}
+          {/* Hover time tooltip — anikage twin: rounded-xl bg-black/80, opacity gated on pointing */}
           {hoverTime != null && (
             <div
-              className="absolute bottom-full mb-2 -translate-x-1/2 pointer-events-none rounded-md bg-black/90 border border-white/10 px-2 py-1 text-[11px] font-mono text-white whitespace-nowrap"
+              className="absolute bottom-full mb-2 -translate-x-1/2 pointer-events-none rounded-xl bg-black/80 px-2 py-0.5 text-xs font-medium text-white whitespace-nowrap"
               style={{ left: `${(hoveredPct ?? 0) * 100}%` }}
             >
               {formatTime(hoverTime)}
@@ -618,30 +623,36 @@ export default function PlayerControls({
           )}
         </div>
 
-        {/* Button row */}
-        <div className="flex items-center gap-1 text-white">
-          {/* Left cluster — transport + volume + time (anikage order) */}
-          <CtrlBtn onClick={togglePlay} label={playing ? 'Pause' : 'Play'}>
-            {playing ? <Pause className="h-5 w-5 fill-white" /> : <Play className="h-5 w-5 fill-white" />}
-          </CtrlBtn>
+        {/* Button row — anikage parity: grouped ghost chips (bg-black/60
+            rounded-full) instead of loose buttons floating on a scrim. */}
+        <div className="flex items-center gap-1.5 text-white">
+          {/* Left chip group — transport (play + next episode) */}
+          <ControlChip>
+            <CtrlBtn onClick={togglePlay} label={playing ? 'Pause' : 'Play'}>
+              {playing ? <Pause className="fill-white" /> : <Play className="fill-white" />}
+            </CtrlBtn>
 
-          {hasPrevEpisode && (
-            <CtrlBtn onClick={onPrevEpisode} label="Previous episode">
-              <SkipBack className="h-5 w-5" />
-            </CtrlBtn>
-          )}
-          {hasNextEpisode && (
-            <CtrlBtn onClick={onNextEpisode} label="Next episode">
-              <SkipForward className="h-5 w-5" />
-            </CtrlBtn>
-          )}
+            {hasPrevEpisode && (
+              <CtrlBtn onClick={onPrevEpisode} label="Previous episode" className="hidden sm:inline-flex">
+                <SkipBack />
+              </CtrlBtn>
+            )}
+            {hasNextEpisode && (
+              <CtrlBtn onClick={onNextEpisode} label="Next episode">
+                <SkipForward />
+              </CtrlBtn>
+            )}
+          </ControlChip>
 
-          {/* Volume — hover to reveal slider */}
-          <div className="group/vol relative flex items-center">
-            <CtrlBtn onClick={toggleMute} label={muted ? 'Unmute' : 'Mute'}>
-              <VolumeIcon className="h-5 w-5" />
-            </CtrlBtn>
-            <div className="hidden sm:block w-0 group-hover/vol:w-[80px] transition-all overflow-hidden">
+          {/* Volume chip — icon plus a slider that expands on hover, exactly
+              like anikage's vjs-volume-group (w-0 → w-[95px]). */}
+          <ControlChip className="group/vol">
+            <div className="flex items-center rounded-full px-1.5 py-1 transition-colors duration-200 group-hover/vol:bg-white/20">
+              <CtrlBtn onClick={toggleMute} label={muted ? 'Unmute' : 'Mute'}>
+                <VolumeIcon />
+              </CtrlBtn>
+            </div>
+            <div className="hidden sm:block w-0 group-hover/vol:w-[95px] transition-all duration-300 overflow-hidden">
               <input
                 type="range"
                 min={0}
@@ -650,16 +661,16 @@ export default function PlayerControls({
                 value={muted ? 0 : volume}
                 onChange={(e) => setVolumeAndUnmute(Number(e.target.value))}
                 aria-label="Volume"
-                className="ml-1 w-[72px] accent-primary cursor-pointer align-middle"
+                className="mx-[6px] w-[80px] accent-primary cursor-pointer align-middle"
               />
             </div>
-          </div>
+          </ControlChip>
 
-          {/* Time — clickable pill, toggles elapsed ↔ remaining (anikage) */}
+          {/* Time chip — clickable pill, toggles elapsed ↔ remaining (anikage) */}
           <CtrlBtn
             label={showRemaining ? 'Show elapsed time' : 'Show remaining time'}
             onClick={() => setShowRemaining((r) => !r)}
-            className="ml-0.5 px-2.5 text-[11px] font-mono font-semibold tabular-nums tracking-tight"
+            className="bg-black/60 hover:bg-white/20 px-3 py-2 text-sm font-medium tracking-tight"
           >
             {showRemaining ? (
               <>
@@ -678,12 +689,14 @@ export default function PlayerControls({
 
           <div className="flex-1" />
 
-          {/* Right cluster — seek ±10, captions, screenshot (anikage order) */}
+          {/* Right chip group — seek ±10, captions, screenshot, settings,
+              PiP, theater, fullscreen (anikage order). */}
+          <ControlChip>
           <CtrlBtn onClick={() => seek(-10)} label="Back 10 seconds">
-            <RotateCcw className="h-5 w-5" />
+            <RotateCcw />
           </CtrlBtn>
           <CtrlBtn onClick={() => seek(10)} label="Forward 10 seconds">
-            <RotateCw className="h-5 w-5" />
+            <RotateCw />
           </CtrlBtn>
 
           {/* Captions */}
@@ -694,7 +707,7 @@ export default function PlayerControls({
                 onClick={() => setMenu(menu === 'captions' ? null : 'captions')}
                 active={activeSubIdx >= 0}
               >
-                <Captions className="h-5 w-5" />
+                <Captions />
               </CtrlBtn>
               {menu === 'captions' && (
                 <MenuPanel
@@ -750,7 +763,7 @@ export default function PlayerControls({
 
           {/* Screenshot — anikage keeps it on the bar */}
           <CtrlBtn onClick={captureScreenshot} label="Take screenshot">
-            <Camera className="h-5 w-5" />
+            <Camera />
           </CtrlBtn>
 
           {/* Settings */}
@@ -758,7 +771,7 @@ export default function PlayerControls({
             <CtrlBtn
               label="Settings"
               onClick={() => setMenu(menu === 'settings' ? null : 'settings')}
-            >                <Settings className="h-5 w-5" />
+            >                <Settings />
             </CtrlBtn>
             {menu === 'settings' && (
               <MenuPanel>
@@ -958,14 +971,14 @@ export default function PlayerControls({
               label={pipActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
               active={pipActive}
             >
-              <PictureInPicture2 className="h-5 w-5" />
+              <PictureInPicture2 />
             </CtrlBtn>
           )}
 
           {/* AirPlay (Safari only) */}
           {hasAirPlay && (
             <CtrlBtn onClick={onTriggerAirPlay} label="AirPlay">
-              <Cast className="h-5 w-5" />
+              <Cast />
             </CtrlBtn>
           )}
 
@@ -979,15 +992,16 @@ export default function PlayerControls({
                 active={theaterMode}
               >
                 {/* Rectangle icon — narrower when in theater mode (visual cue). */}
-                <RectangleHorizontal className={cn('h-5 w-5', theaterMode && 'rotate-90')} />
+                <RectangleHorizontal className={cn(theaterMode && 'rotate-90')} />
               </CtrlBtn>
             </span>
           )}
 
           {/* Fullscreen */}
           <CtrlBtn onClick={toggleFullscreen} label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
-            {fullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+            {fullscreen ? <Minimize /> : <Maximize />}
           </CtrlBtn>
+          </ControlChip>
         </div>
       </div>
     </div>
@@ -1013,10 +1027,14 @@ function CtrlBtn({
       title={label}
       tabIndex={hidden ? -1 : 0}
       className={cn(
-        // Anikage/Media-Chrome style: soft pill buttons (px-2 py-1, ~40px
-        // wide) with 20px icons and a rounded hover wash.
-        'inline-flex items-center justify-center rounded-full px-2 py-1.5 text-white/95 transition-all',
-        'hover:bg-white/[0.12] active:scale-95 active:bg-white/[0.2]',
+        // Anikage parity: grouped ghost chip buttons — h-[25px] w-[25px]
+        // icons, px-2 py-1 soft pill, white/20 hover wash — exact twin of
+        // anikage's media-play-button / media-seek-button / vjs-captions-button.
+        // Sizing is forced via descendant selector so icon nodes (lucide or
+        // media-chrome) all render 25px regardless of any class on the
+        // <svg> itself — that mirrors anikage's single-icon-class approach.
+        'group inline-flex items-center justify-center rounded-full px-2 py-1 text-white/95 transition-all [&_svg]:h-[25px] [&_svg]:w-[25px]',
+        'hover:bg-white/20 active:scale-95 active:bg-white/[0.2]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
         active && 'text-primary',
         hidden && 'opacity-0 pointer-events-none',
@@ -1026,6 +1044,21 @@ function CtrlBtn({
       {children}
     </button>
   )
+}
+
+/**
+ * Anikage parity: the dark pill that wraps a set of controls.
+ * Exact anikage: `vjs-ctrl-chip flex items-center rounded-full bg-black/60 px-1 py-1`.
+ * Each pill gets px-1 py-1 so buttons sit snug like in the reference.
+ */
+function ControlChip({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return <div className={cn('flex items-center rounded-full bg-black/60 px-1 py-1', className)}>{children}</div>
 }
 
 function Menu({

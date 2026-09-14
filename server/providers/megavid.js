@@ -98,7 +98,8 @@ async function fetchSource(malId, ep, type) {
     url: src,
     raw: src,
     headers: { Referer: `${BASE}/` },
-    tracks: (Array.isArray(data.tracks) ? data.tracks : [])
+    // Keep both keys identical: anidap streams use `tracks`, Watch reads `subtitles`.
+    subtitles: (Array.isArray(data.tracks) ? data.tracks : [])
       .filter((t) => t && (t.file || t.url))
       .map((t) => ({
         file: t.file || t.url,
@@ -106,6 +107,7 @@ async function fetchSource(malId, ep, type) {
         kind: t.kind || 'captions',
         default: /eng/i.test(t.srclang || t.label || '') && !/orig/i.test(t.label || ''),
       })),
+    get tracks() { return this.subtitles },
   }
 }
 

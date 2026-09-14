@@ -1154,13 +1154,15 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
           // Prefer the headers chad tells us to use (e.g. kryntal CDN needs
           // Referer: megaplay.buzz) — playerRefererFor is only a guess by
           // host and goes stale when anidap switches CDNs.
+          const _subs = tracks.length > 0 ? tracks : null
           const result = {
             url: streamUrl,
             raw: streamUrl,
             headers: data.headers && Object.keys(data.headers).length > 0
               ? data.headers
               : { Referer: playerRefererFor(streamUrl) },
-            tracks: tracks.length > 0 ? tracks : null,
+            tracks: _subs,
+            subtitles: _subs,
           }
           setStreamCache(noStreamKey, result)
           console.log(`[anidap] ✓ chad API stream: ${streamUrl.slice(0, 80)} (${Date.now() - tFast}ms)`)
@@ -1278,13 +1280,15 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
             default: t.default || false,
             lang: t.lang || undefined,
           }))
+          const _subs2 = tracks.length > 0 ? tracks : null
           const result = {
             url: normalizedUrl,
             raw: normalizedUrl,
             headers: browserData.headers && Object.keys(browserData.headers).length > 0
               ? browserData.headers
               : { Referer: playerRefererFor(normalizedUrl) },
-            tracks: tracks.length > 0 ? tracks : null,
+            tracks: _subs2,
+            subtitles: _subs2,
           }
           setStreamCache(noStreamKey, result)
           console.log(`[anidap] ✓ browser chad stream: ${normalizedUrl.slice(0, 80)} (${Date.now() - tBrowser}ms)`)
@@ -1361,13 +1365,15 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
         kind: t.kind || 'captions',
         default: t.default || false,
       }))
+      const _subs3 = tracks.length > 0 ? tracks : null
       const result = {
         url: normalizedUrl,
         raw: normalizedUrl,
         headers: domData.headers && Object.keys(domData.headers).length > 0
           ? domData.headers
           : { Referer: watchUrl },
-        tracks: tracks.length > 0 ? tracks : null,
+        tracks: _subs3,
+        subtitles: _subs3,
       }
       setStreamCache(noStreamKey, result)
       console.log(`[anidap] ✓ DOM stream: ${normalizedUrl.slice(0, 80)} (${Date.now() - tStart}ms)`)

@@ -344,10 +344,11 @@ export const gogoanimeProvider = {
           return {
             url: streamUrl, raw: streamUrl,
             headers: { Referer: watchUrl },
-            tracks: (data.tracks || []).map(t => ({
+            subtitles: (data.tracks || []).map(t => ({
               file: t.file || t.url || '', label: t.label || '',
               kind: t.kind || 'captions', default: t.default || false,
             })),
+            get tracks() { return this.subtitles },
           }
         }
       } catch (e) { console.warn(`[gogoanime] URL failed ${watchUrl}:`, e.message) }

@@ -168,11 +168,16 @@ const DEFAULTS: Omit<SettingsState, 'set' | 'reset'> = {
   autoSkipOutro: false,
   skipDelay: 3,
 
-  captionSize: 1.0,
+  // Cinematic defaults — Netflix/Crunchyrow parity:
+  //  • pill 26% (warm near-black, barely there)
+  //  • crisp 1px outline + soft velvet bloom (reads on snow/sky)
+  //  • Inter 600 (book-ish, not heavy), 1.5 line-height, 4% lift
+  //  • slightly wider tracking so glyphs don't clump at 900p distance
+  captionSize: 1.04,
   captionColor: '#ffffff',
-  captionBackgroundOpacity: 0.55,
-  captionEdgeStrength: 0.6,
-  captionPositionOffset: 0,
+  captionBackgroundOpacity: 0.26,
+  captionEdgeStrength: 0.82,
+  captionPositionOffset: 4,
 
   titleLang: 'english',
   showNsfw: false,
