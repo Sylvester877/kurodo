@@ -348,18 +348,42 @@ export default React.memo(function VideoPlayer({
     setIntrinsicAspect(null)
     setCrop({ l: 0, r: 0, t: 0, b: 0 })
   }, [activeSrc])
-  // Adopt intrinsic aspect when metadata arrives.
+  // Adopt intrinsic aspect ASAP — metadata can be slow via hls.js, so we
+  // poll videoWidth for the first 3s and also listen to canplay/loadeddata.
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    const onMeta = () => {
+    let cancelled = false
+    const trySet = () => {
+      if (cancelled) return false
       if (v.videoWidth > 0 && v.videoHeight > 0) {
-        setIntrinsicAspect(v.videoWidth / v.videoHeight)
+        const a = v.videoWidth / v.videoHeight
+        // Guard: ignore bogus 0 or >3.5 (invalid metadata)
+        if (a > 0.4 && a < 3.6) {
+          setIntrinsicAspect((prev) => (prev === a ? prev : a))
+          return true
+        }
       }
+      return false
     }
+    const onMeta = () => { trySet() }
     v.addEventListener('loadedmetadata', onMeta)
-    if (v.readyState >= 1) onMeta()
-    return () => v.removeEventListener('loadedmetadata', onMeta)
+    v.addEventListener('loadeddata', onMeta)
+    v.addEventListener('canplay', onMeta)
+    if (v.readyState >= 1) trySet()
+    // Fast poll for hls.js where loadedmetadata fires late — 100ms × 30 = 3s
+    let polls = 0
+    const iv = window.setInterval(() => {
+      polls++
+      if (trySet() || polls > 30) window.clearInterval(iv)
+    }, 100)
+    return () => {
+      cancelled = true
+      v.removeEventListener('loadedmetadata', onMeta)
+      v.removeEventListener('loadeddata', onMeta)
+      v.removeEventListener('canplay', onMeta)
+      window.clearInterval(iv)
+    }
   }, [activeSrc])
   // Detect baked-in black bars — ffmpeg-cropdetect style, but tuned for
   // anime streams whose scenes constantly FADE through black. A single-frame
@@ -379,9 +403,10 @@ export default React.memo(function VideoPlayer({
     let streak = 0
     let applied = false
     let revertVotes = 0
-    // Bars must hold the EXACT same boundary (±1 col) for ~12s straight.
+    // Bars must hold the EXACT same boundary (±1 col) for ~4s straight.
     // Fades never freeze that long; episode-length bars always do.
-    const CONFIRM_SAMPLES = 24
+    // Previous 24 samples (12s) left baked bars visible for half the cold open.
+    const CONFIRM_SAMPLES = 8
     const measure = () => {
       // Sample at 1/4 native res with smoothing DISABLED — block-blending
       // a tiny canvas smears the sharp bar boundary away and hides texture.
@@ -442,8 +467,19 @@ export default React.memo(function VideoPlayer({
     }
     const analyze = () => {
       if (cancelled) return
-      if (v.readyState < 2 || v.videoWidth === 0 || v.paused) {
-        timer = window.setTimeout(analyze, 500)
+      // Allow detection even while paused on the first frame — the poster
+      // frame itself has baked bars. Only skip if video has zero size or
+      // is still in HAVE_NOTHING. The paused gate previously delayed
+      // windowed crop by 5-10s while the user stared at bars.
+      if (v.readyState < 2 || v.videoWidth === 0) {
+        timer = window.setTimeout(analyze, 300)
+        return
+      }
+      // If paused and currentTime is 0, still measure — first frame is valid.
+      // If paused mid-episode after a seek, also valid. Only skip the
+      // transient "paused before canplay" where frame is black.
+      if (v.paused && v.currentTime < 0.1 && v.readyState < 3) {
+        timer = window.setTimeout(analyze, 300)
         return
       }
       try {
@@ -482,9 +518,16 @@ export default React.memo(function VideoPlayer({
       } catch {
         return // cross-origin taint or similar — silent no-op
       }
-      timer = window.setTimeout(analyze, applied ? 500 : 500)
+      timer = window.setTimeout(analyze, applied ? 600 : 300)
     }
-    analyze()
+    // Kick off after canplay so first frame is decoded — otherwise first
+    // canvas sample is pure black and gives a false "no bars" vote.
+    const kick = () => {
+      if (cancelled) return
+      if (v.readyState >= 2) analyze()
+      else window.setTimeout(kick, 150)
+    }
+    kick()
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [activeSrc, videoFit])
 
@@ -1724,11 +1767,10 @@ ${offset > 0 ? `
     )
   }, [activeSkip, skipCountdown, autoSkipIntro, autoSkipOutro, autoSkipRecap, skipSegment])
 
-  // Content-space geometry derived from the crop: the box shows exactly the
-  // content rect; the video element inside is oversized/offset to match.
-  // Manual fit modes (fill/cover) bypass the crop entirely. In fullscreen
-  // the box MUST fill the screen — the bar-crop reshaping is disabled there.
-  const effCrop = videoFit === 'contain' && !fullscreenActive ? crop : { l: 0, r: 0, t: 0, b: 0 }
+  // Content-space geometry: the box shows exactly the content rect; the
+  // video element inside is oversized/offset to match. Manual fill/cover
+  // bypass the crop. Fullscreen keeps the crop via fullscreenZoom below.
+  const effCrop = videoFit === 'contain' ? crop : { l: 0, r: 0, t: 0, b: 0 }
   // Fullscreen fill: when the user hasn't chosen a manual fit, the default
   // 'contain' would letterbox 16:9 content on wider/narrower screens (e.g.
   // the 16:10 laptop) with black bars above/below. Cover fills the whole
@@ -1751,7 +1793,10 @@ ${offset > 0 ? `
       : null
   const hasHBar = effCrop.l > 0 || effCrop.r > 0
   const hasVBar = effCrop.t > 0 || effCrop.b > 0
+  // Windowed: box matches CONTENT aspect so contain has no letterbox.
+  // Fullscreen: UA sizes the box to the screen — suppress our aspectRatio.
   const contentAspect = (() => {
+    if (fullscreenActive) return null as unknown as number
     const base = intrinsicAspect ?? 16 / 9
     if (!hasHBar && !hasVBar) return base
     // Content rect inside the stream: (1-l-r) of width, (1-t-b) of height.
@@ -1768,7 +1813,7 @@ ${offset > 0 ? `
       ref={wrapRef}
       tabIndex={-1}
       className="group relative w-full overflow-hidden rounded-xl bg-black border border-white/[0.06] shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7),0_4px_16px_rgba(0,0,0,0.5)] touch-none select-none outline-none"
-      style={{ aspectRatio: !fullscreenActive && contentAspect ? `${contentAspect}` : undefined }}
+      style={{ aspectRatio: contentAspect ? `${contentAspect}` : undefined }}
       onPointerDown={onPointerDown}
       onPointerMove={(e) => { onPointerMove(e); setControlsVisible(true) }}
       onPointerUp={onPointerUp}
