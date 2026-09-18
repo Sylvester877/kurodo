@@ -326,9 +326,13 @@ export default function MangaReader() {
       const feed = await getChapterFeedAtsu(best.id)
       const num = currentChapter?.chapter
       if (!num) return null
+      const n = parseFloat(num)
+      // Publishers split chapters on MangaDex (114.1, 114.2) that atsu carries
+      // combined (114) — exact match first, then the floored integer.
       const match =
         feed.chapters.find((c) => c.chapter === num) ||
-        feed.chapters.find((c) => parseFloat(c.chapter) === parseFloat(num))
+        feed.chapters.find((c) => parseFloat(c.chapter) === n) ||
+        (Number.isFinite(n) ? feed.chapters.find((c) => parseFloat(c.chapter) === Math.floor(n)) : undefined)
       if (!match) return null
       const pagesRes = await getChapterPagesAtsu(best.id, match.id)
       return { pages: pagesRes.pages.map((p) => ({ url: p.url, fileName: '' })) }

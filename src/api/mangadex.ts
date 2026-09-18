@@ -109,7 +109,7 @@ export async function getMangaInfo(mangaId: string): Promise<MangaDexManga> {
 export async function getChapterFeed(
   mangaId: string,
   lang = 'en',
-  limit = 96,
+  limit = 500,
   offset = 0,
 ): Promise<ChapterFeed> {
   const { data } = await axios.get(`${BASE()}/chapters/${mangaId}`, {

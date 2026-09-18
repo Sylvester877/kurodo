@@ -697,3 +697,22 @@ Tests: settings.store.test.ts (+7) — defaults, setters, real-JSON persistence
   (guards the "[object Object]" regression), version 8, v6 → v8 legacy flag
   carry-over, and that a v7 state is not re-migrated.
 Green: tsc clean · vitest 98/98 · build 11.01s
+
+## Manga publisher-notice rescue (Sep 18, 2026)
+SYMPTOM: every chapter of licensed manga (My Dress-Up Darling, One Piece,
+Dandadan, JJK) rendered a white "EXTERNAL CHAPTER" card.
+ROOT CAUSES (2):
+  1. getChapterFeed fetched only the first 96 chapters (limit=96, no
+     pagination) — Dress-Up Darling showed 96 of 220; ch 114.1 never existed
+     client-side.
+  2. MangaDex serves publisher chapters as a single notice PNG; the reader
+     rendered it as a page.
+FIXES:
+  - Feed paginates to full catalog (cap 3000, 8 pages).
+  - Reader detects notice chapters and pulls the SAME chapter number from
+    atsu.moe (exact → float → floored-integer match; publishers split
+    114 → 114.1/114.2 that atsu carries combined).
+  - Rescue failure falls back to a themed publisher-only panel with a real
+    link out — the raw notice PNG never renders.
+VERIFY: live Electron — ch 114.1 → 21 atsu pages + "reading via atsu.moe"
+badge, 0 notice cards. vitest 98/98 · tsc clean · build 13.9s.

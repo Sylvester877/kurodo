@@ -174,7 +174,7 @@ export async function getMangaInfo(mangaId) {
  * Get chapter feed for a manga.
  * GET /manga/{id}/feed?limit=96&translatedLanguage[]=en&order[chapter]=asc&includes[]=scanlation_group
  */
-export async function getChapterFeed(mangaId, { language = 'en', limit = 96, offset = 0 } = {}) {
+export async function getChapterFeed(mangaId, { language = 'en', limit = 500, offset = 0 } = {}) {
   const key = `feed:${mangaId}:${language}:${limit}:${offset}`
   return cached(key, 5 * 60 * 1000, async () => {
     const params = {
@@ -185,9 +185,23 @@ export async function getChapterFeed(mangaId, { language = 'en', limit = 96, off
       'includes[]': 'scanlation_group',
     }
     const { data } = await api.get(`/manga/${mangaId}/feed`, { params })
+    let all = data.data || []
+    const total = data.total || 0
+    // fixes: chapters past the first page were missing (Dress-Up Darling showed 96
+    // of 220) — paginate to the full feed, capped for sanity.
+    let nextOffset = offset + all.length
+    let guard = 0
+    while (nextOffset < total && all.length < 3000 && guard < 8) {
+      const { data: more } = await api.get(`/manga/${mangaId}/feed`, { params: { ...params, offset: nextOffset } })
+      const batch = more.data || []
+      if (batch.length === 0) break
+      all = all.concat(batch)
+      nextOffset += batch.length
+      guard++
+    }
     return {
-      chapters: (data.data || []).map(normalizeChapter),
-      total: data.total || 0,
+      chapters: all.map(normalizeChapter),
+      total,
       offset: data.offset || 0,
       limit: data.limit || limit,
     }

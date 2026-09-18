@@ -3450,7 +3450,7 @@ app.get('/api/manga/chapters/:mangaId', async (req, res) => {
   try {
     const { mangaId } = req.params
     const lang = String(req.query.lang || 'en')
-    const limit = Math.min(Number(req.query.limit) || 96, 500)
+    const limit = Math.min(Number(req.query.limit) || 500, 500)
     const offset = Number(req.query.offset) || 0
     const data = await cachedManga(`manga:chapters:${mangaId}:${lang}:${limit}:${offset}`, MANGA_CACHE_TTL, () =>
       getChapterFeed(mangaId, { language: lang, limit, offset }),
