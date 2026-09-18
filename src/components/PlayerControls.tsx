@@ -70,8 +70,8 @@ interface Props {
   onToggleLoop: () => void
 
   // Video fit mode
-  videoFit: 'contain' | 'cover' | 'fill'
-  onChangeVideoFit: (fit: 'contain' | 'cover' | 'fill') => void
+  videoFit: 'contain' | 'cover' | 'fill' | 'original'
+  onChangeVideoFit: (fit: 'contain' | 'cover' | 'fill' | 'original') => void
 
   // Episode navigation
   hasNextEpisode: boolean
@@ -946,8 +946,9 @@ export default function PlayerControls({
                       { value: 'contain', label: 'Contain' },
                       { value: 'cover', label: 'Cover' },
                       { value: 'fill', label: 'Fill' },
+                      { value: 'original', label: 'Original' },
                     ]}
-                    onChange={(v) => onChangeVideoFit(v as 'contain' | 'cover' | 'fill')}
+                    onChange={(v) => onChangeVideoFit(v as 'contain' | 'cover' | 'fill' | 'original')}
                     size="sm"
                   />
                 </MenuRow>

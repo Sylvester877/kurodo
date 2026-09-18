@@ -1269,6 +1269,24 @@ video:-webkit-full-screen {
   margin: auto !important;
 }
 
+/* 'original' fit: 1:1 pixels in fullscreen too — the element is sized in px
+   by the component (native size, downscaled only to fit; never upscaled).
+   Exempt it from the fill-the-stage rule above. */
+video:fullscreen.fit-original,
+video:-webkit-full-screen.fit-original,
+div:fullscreen video.fit-original,
+div:-webkit-full-screen video.fit-original {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  transform: none !important;
+  object-fit: fill !important;
+  object-position: center center !important;
+  margin: auto !important;
+  position: relative !important;
+}
+
 /* Overlays (controls bar, captions, skip button) must stay pinned to the
    fullscreen stage. The video gets exactly ONE sizing mechanism: fill the
    stage (100%/100%, centered) + an OPTIONAL symmetric zoom passed in as

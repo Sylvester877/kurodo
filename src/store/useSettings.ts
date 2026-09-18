@@ -106,8 +106,13 @@ export interface SettingsState {
   // ───── Player extras ─────
   /** Loop the current video when it ends. */
   loop: boolean
-  /** How the video fills the player container. */
-  videoFit: 'contain' | 'cover' | 'fill'
+  /**
+   * How the video fills the player container.
+   * `original` plays at the stream's native pixel size (letterboxed when
+   * the box can't fit it; never upscaled, never cropped, no baked-bar zoo
+   * — 1:1 pixels).
+   */
+  videoFit: 'contain' | 'cover' | 'fill' | 'original'
   /** Subtitle sync offset in seconds (-30..+30). Positive = delay subtitles. */
   subtitleOffset: number
   /** Show nerd-stats overlay (bitrate, resolution, buffer, dropped frames). */

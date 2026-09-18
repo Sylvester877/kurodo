@@ -1,5 +1,5 @@
 import { Loader2, AlertCircle, SkipForward } from 'lucide-react'
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo, useReducer } from 'react'
 import type Hls from 'hls.js'
 import type { Level } from 'hls.js'
 import PlayerControls from './PlayerControls'
@@ -1915,6 +1915,8 @@ ${offset > 0 ? `
   // Content-space geometry: the box shows exactly the content rect; the
   // video element inside is oversized/offset to match. Manual fill/cover
   // bypass the crop. Fullscreen uses a dedicated layout (see below).
+  // 'original' fit: 1:1 pixels — no crop, no auto-zoom, the box stays at
+  // the player-area aspect and the video letterboxes inside it.
   const effCrop = videoFit === 'contain' ? crop : { l: 0, r: 0, t: 0, b: 0 }
   // Fullscreen fill: when the user hasn't chosen a manual fit, the default
   // 'contain' would letterbox 16:9 content on wider/narrower screens (e.g.
@@ -1922,7 +1924,12 @@ ${offset > 0 ? `
   // screen with a small symmetric crop instead. Windowed playback is
   // unaffected (the box already matches the content aspect there, so
   // contain == cover inside it, and the baked-bar crop still runs).
-  const effFit = videoFit === 'contain' && fullscreenActive ? 'cover' : videoFit
+  const effFit =
+    videoFit === 'original'
+      ? 'contain'
+      : videoFit === 'contain' && fullscreenActive
+        ? 'cover'
+        : videoFit
   // ── Fullscreen baked-bar zoom (single mechanism) ──
   // Cinematic encodes bake black bars into the pixels; no object-fit value
   // can remove those. In fullscreen we allow ONE zoom mechanism: a CSS
@@ -1936,8 +1943,9 @@ ${offset > 0 ? `
   const cropSymmetricV = Math.abs(crop.t - crop.b) <= 0.01
   const hasBakedBars = crop.l > 0 || crop.r > 0 || crop.t > 0 || crop.b > 0
   const cropUsable = hasBakedBars && cropSymmetricH && cropSymmetricV
+  // 'original' is a no-zoom mode: baked bars stay visible, picture stays 1:1.
   const fullscreenZoom =
-    fullscreenActive && effFit === 'cover' && cropUsable
+    fullscreenActive && effFit === 'cover' && cropUsable && videoFit !== 'original'
       ? 1 / Math.min(1 - crop.l - crop.r, 1 - crop.t - crop.b)
       : 1
   const hasHBar = effCrop.l > 0 || effCrop.r > 0
@@ -1946,6 +1954,8 @@ ${offset > 0 ? `
   // Fullscreen: the :fullscreen CSS sizes the stage — no inline aspect.
   const contentAspect = (() => {
     if (fullscreenActive) return null as unknown as number
+    // 'original' keeps the player-area box; the video letterboxes inside it.
+    if (videoFit === 'original') return intrinsicAspect ?? (16 / 9)
     const base = intrinsicAspect ?? 16 / 9
     if (!hasHBar && !hasVBar) return base
     // Content rect inside the stream: (1-l-r) of width, (1-t-b) of height.
@@ -1956,6 +1966,31 @@ ${offset > 0 ? `
 
   // Subtitle tracks with offset applied (blob URLs when offset != 0)
   const offsetSubtitles = useOffsetSubtitles(subtitles, subtitleOffset)
+
+  // 'original' fit sizes the video in px from the box dimensions — re-measure
+  // on window resizes so the native-size box tracks the container.
+  const [, bumpOriginalMeasure] = useReducer((x: number) => x + 1, 0)
+  useEffect(() => {
+    if (videoFit !== 'original') return
+    const onResize = () => bumpOriginalMeasure()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [videoFit])
+
+  // 'original' fit geometry: the stream's NATIVE pixel size, downscaled only
+  // if the box cannot fit it (never upscaled). null = metadata not ready →
+  // fall back to contain until videoWidth/videoHeight are known.
+  const originalGeom = (() => {
+    if (videoFit !== 'original') return null
+    const natW = videoRef.current?.videoWidth || 0
+    const natH = videoRef.current?.videoHeight || 0
+    if (!natW || !natH) return null
+    const boxW = wrapRef.current?.clientWidth || 0
+    const boxH = wrapRef.current?.clientHeight || 0
+    if (!boxW || !boxH) return null
+    const scale = Math.min(1, Math.min(boxW / natW, boxH / natH))
+    return { w: Math.round(natW * scale), h: Math.round(natH * scale) }
+  })()
 
   return (
     <div
@@ -1998,9 +2033,24 @@ ${offset > 0 ? `
         autoPlay={autoPlay !== false}
         poster={poster}
         crossOrigin="anonymous"
-        className={`h-full w-full bg-black ${captionScopeRef.current}`}
+        className={`h-full w-full bg-black ${videoFit === 'original' ? 'fit-original' : ''} ${captionScopeRef.current}`}
         style={{
-          objectFit: effFit,
+          // 'original': element is sized to native px (see originalGeom) with
+          // fill — a 1:1 pixel mapping. Before metadata: contain fallback.
+          objectFit:
+            videoFit === 'original'
+              ? originalGeom ? 'fill' : 'contain'
+              : effFit,
+          ...(originalGeom
+            ? {
+                width: `${originalGeom.w}px`,
+                height: `${originalGeom.h}px`,
+                maxWidth: '100%',
+                maxHeight: '100%',
+                margin: 'auto',
+                position: 'relative' as const,
+              }
+            : {}),
           // Windowed crop geometry ONLY — never applied in fullscreen where
           // the :fullscreen CSS fills the stage and centers the video with
           // a single optional --fs-zoom scale. Mixing oversize% + left% +

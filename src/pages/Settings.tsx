@@ -369,13 +369,14 @@ export default function Settings() {
             description="In-player defaults and overlays"
           >
             <Row label="Video fit" description="How video fills the player area">
-              <Select<'contain' | 'cover' | 'fill'>
+              <Select<'contain' | 'cover' | 'fill' | 'original'>
                 value={s.videoFit}
                 onChange={(v) => s.set('videoFit', v)}
                 options={[
                   { value: 'contain', label: 'Contain (letterbox)' },
                   { value: 'cover',  label: 'Cover (crop to fill)' },
                   { value: 'fill',   label: 'Stretch (fill screen)' },
+                  { value: 'original', label: 'Original (1:1 pixels)' },
                 ]}
               />
             </Row>
