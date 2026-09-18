@@ -409,6 +409,31 @@ function createMainWindow() {
   win.removeMenu()
   mainWinCreatedAt = Date.now()
 
+  // fixes: HTML5 element fullscreen (player's F key / fullscreen button) only
+  // full-screened the PAGE inside the window — the OS window itself kept its
+  // restored 1600x1000 rect, leaving black margins around the player that
+  // read as a one-sided gap depending on window position. Electron fires
+  // 'enter-html-full-screen' / 'leave-html-full-screen'; drive the native
+  // window to match so the element fullscreen really covers the monitor.
+  let preHtmlFsState = null
+  win.on('enter-html-full-screen', () => {
+    try {
+      if (win.isFullScreen()) return
+      preHtmlFsState = { maximized: win.isMaximized(), bounds: win.getBounds() }
+      win.setFullScreen(true)
+    } catch (err) { console.warn('[electron] enter-html-full-screen:', err.message) }
+  })
+  win.on('leave-html-full-screen', () => {
+    try {
+      if (!win.isFullScreen() || !preHtmlFsState) return
+      const { maximized, bounds } = preHtmlFsState
+      preHtmlFsState = null
+      win.setFullScreen(false)
+      if (maximized) win.maximize()
+      else win.setBounds(bounds)
+    } catch (err) { console.warn('[electron] leave-html-full-screen:', err.message) }
+  })
+
   // If the last session ended maximized, start maximized (before show, so the
   // user never sees the un-maximized flash).
   if (maximized) win.maximize()

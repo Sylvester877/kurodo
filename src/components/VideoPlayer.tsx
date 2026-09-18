@@ -450,9 +450,39 @@ export default React.memo(function VideoPlayer({
   // crop reshaping must not fight it.
   const [fullscreenActive, setFullscreenActive] = useState(false)
   useEffect(() => {
-    const onFs = () => setFullscreenActive(!!document.fullscreenElement)
+    // Track OUR wrapper being the fullscreen element (not any element), and
+    // listen for the webkit-prefixed event too — Electron/Chromium fires
+    // both depending on how fullscreen was requested.
+    const onFs = () => {
+      const active = document.fullscreenElement === wrapRef.current
+        || (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement === wrapRef.current
+      setFullscreenActive(active)
+      // Root scrollbar kill: the themed 8px root scrollbar + the reserved
+      // scrollbar-gutter on <html> stay painted in fullscreen and appear as
+      // a persistent full-height strip on the right (8 CSS px = 10 physical
+      // px at 125% display scale). Hide the root scrollbar for the duration.
+      const anyFs = !!document.fullscreenElement
+        || !!(document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement
+      document.documentElement.classList.toggle('kurodo-fs-active', anyFs)
+      if (active) {
+        // Re-measure intrinsic aspect on entry — the windowed box may have
+        // been shaped by the crop system, leaving a stale value.
+        const v = videoRef.current
+        if (v && v.videoWidth > 0 && v.videoHeight > 0) {
+          const a = v.videoWidth / v.videoHeight
+          if (a > 0.4 && a < 3.6) setIntrinsicAspect((prev) => (prev === a ? prev : a))
+        }
+      }
+    }
     document.addEventListener('fullscreenchange', onFs)
-    return () => document.removeEventListener('fullscreenchange', onFs)
+    document.addEventListener('webkitfullscreenchange', onFs as EventListener)
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs)
+      document.removeEventListener('webkitfullscreenchange', onFs as EventListener)
+      // Never leave the root scrollbar hidden if we unmount mid-fullscreen.
+      document.documentElement.classList.remove('kurodo-fs-active')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // Baked-in bar crop, as fractions of the frame per side (0 = no crop).
   // The player box adopts the CONTENT's aspect ratio and the video element
@@ -1884,7 +1914,7 @@ ${offset > 0 ? `
 
   // Content-space geometry: the box shows exactly the content rect; the
   // video element inside is oversized/offset to match. Manual fill/cover
-  // bypass the crop. Fullscreen keeps the crop via fullscreenZoom below.
+  // bypass the crop. Fullscreen uses a dedicated layout (see below).
   const effCrop = videoFit === 'contain' ? crop : { l: 0, r: 0, t: 0, b: 0 }
   // Fullscreen fill: when the user hasn't chosen a manual fit, the default
   // 'contain' would letterbox 16:9 content on wider/narrower screens (e.g.
@@ -1893,23 +1923,27 @@ ${offset > 0 ? `
   // unaffected (the box already matches the content aspect there, so
   // contain == cover inside it, and the baked-bar crop still runs).
   const effFit = videoFit === 'contain' && fullscreenActive ? 'cover' : videoFit
-  // Fullscreen baked-bar zoom — the missing half of the crop system.
-  // Cinematic encodes (movies, 2.35:1 TV rips) have black bars BAKED into
-  // the pixels, so no object-fit value can remove them: contain/cover/fill
-  // all leave the same black bands, which is why the gap survived every
-  // fit mode in fullscreen. The detector above keeps measuring during
-  // fullscreen; here we zoom the element so the (symmetric) bar margins
-  // fall outside the screen. scale = 1 / smallest content fraction — with
-  // only top/bottom bars the content then fills the screen height exactly.
+  // ── Fullscreen baked-bar zoom (single mechanism) ──
+  // Cinematic encodes bake black bars into the pixels; no object-fit value
+  // can remove those. In fullscreen we allow ONE zoom mechanism: a CSS
+  // custom property --fs-zoom consumed by the :fullscreen CSS rules —
+  // never the windowed oversize%/left/top path. Gate: bars must be
+  // SYMMETRIC (l≈r within 1% of frame, t≈b) and the fit must be cover.
+  // fixes: fullscreen video was pinned left with a black gap on the right —
+  // the windowed crop math (width>100% + left% + scale together = double
+  // zoom + asymmetric offset) leaked into the fullscreen stage.
+  const cropSymmetricH = Math.abs(crop.l - crop.r) <= 0.01
+  const cropSymmetricV = Math.abs(crop.t - crop.b) <= 0.01
   const hasBakedBars = crop.l > 0 || crop.r > 0 || crop.t > 0 || crop.b > 0
+  const cropUsable = hasBakedBars && cropSymmetricH && cropSymmetricV
   const fullscreenZoom =
-    fullscreenActive && effFit === 'cover' && hasBakedBars
+    fullscreenActive && effFit === 'cover' && cropUsable
       ? 1 / Math.min(1 - crop.l - crop.r, 1 - crop.t - crop.b)
-      : null
+      : 1
   const hasHBar = effCrop.l > 0 || effCrop.r > 0
   const hasVBar = effCrop.t > 0 || effCrop.b > 0
   // Windowed: box matches CONTENT aspect so contain has no letterbox.
-  // Fullscreen: UA sizes the box to the screen — suppress our aspectRatio.
+  // Fullscreen: the :fullscreen CSS sizes the stage — no inline aspect.
   const contentAspect = (() => {
     if (fullscreenActive) return null as unknown as number
     const base = intrinsicAspect ?? 16 / 9
@@ -1927,8 +1961,22 @@ ${offset > 0 ? `
     <div
       ref={wrapRef}
       tabIndex={-1}
-      className="group relative w-full overflow-hidden rounded-xl bg-black border border-white/[0.06] shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7),0_4px_16px_rgba(0,0,0,0.5)] touch-none select-none outline-none"
-      style={{ aspectRatio: contentAspect ? `${contentAspect}` : undefined }}
+      // Windowed chrome (rounded, border, shadow) ONLY when not fullscreen —
+      // in fullscreen the :fullscreen CSS owns the stage: 100vw/100vh flex
+      // center, zero radius/border. fixes: rounded+border+aspect-ratio
+      // survived into fullscreen and mis-sized the video box.
+      className={cn(
+        'group relative w-full overflow-hidden bg-black touch-none select-none outline-none',
+        fullscreenActive
+          ? 'h-screen w-screen max-w-none border-0 p-0 m-0 rounded-none'
+          : 'rounded-xl border border-white/[0.06] shadow-[0_16px_48px_-8px_rgba(0,0,0,0.7),0_4px_16px_rgba(0,0,0,0.5)]',
+      )}
+      style={{
+        aspectRatio: contentAspect ? `${contentAspect}` : undefined,
+        // The ONLY fullscreen zoom channel — consumed by the :fullscreen
+        // CSS rules. Stays 1 unless symmetric baked bars are confirmed.
+        ['--fs-zoom' as string]: fullscreenActive ? String(fullscreenZoom) : undefined,
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={(e) => { onPointerMove(e); setControlsVisible(true) }}
       onPointerUp={onPointerUp}
@@ -1953,19 +2001,25 @@ ${offset > 0 ? `
         className={`h-full w-full bg-black ${captionScopeRef.current}`}
         style={{
           objectFit: effFit,
-          // Fullscreen baked-bar zoom (see above) — scales around the
-          // center so cropped margins stay symmetric; the wrapper clips.
-          transform: fullscreenZoom ? `scale(${fullscreenZoom})` : undefined,
+          // Windowed crop geometry ONLY — never applied in fullscreen where
+          // the :fullscreen CSS fills the stage and centers the video with
+          // a single optional --fs-zoom scale. Mixing oversize% + left% +
+          // scale() is what shifted the picture and opened the right gap.
           filter: brightness === 1 ? undefined : `brightness(${brightness})`,
-          // Bar-crop geometry: video is oversized by the bar fractions and
-          // shifted so the content rect fills the box 1:1 (no scaling, no
-          // cropping of real picture). At 16:9 content in a 4:3-crop box:
-          // width = 4/3 relative to box, shifted left by the left-bar share.
-          width: hasHBar || hasVBar ? `${(100 / (1 - effCrop.l - effCrop.r)).toFixed(4)}%` : undefined,
-          height: hasHBar || hasVBar ? `${(100 / (1 - effCrop.t - effCrop.b)).toFixed(4)}%` : undefined,
-          left: effCrop.l > 0 ? `${((-effCrop.l * 100) / (1 - effCrop.l - effCrop.r)).toFixed(4)}%` : undefined,
-          top: effCrop.t > 0 ? `${((-effCrop.t * 100) / (1 - effCrop.t - effCrop.b)).toFixed(4)}%` : undefined,
-          position: hasHBar || hasVBar ? 'relative' : undefined,
+          ...(fullscreenActive
+            ? {}
+            : {
+                // Bar-crop geometry: video is oversized by the bar fractions
+                // and shifted so the content rect fills the box 1:1 (no
+                // scaling, no cropping of real picture). At 16:9 content in
+                // a 4:3-crop box: width = 4/3 relative, shifted left by the
+                // left-bar share.
+                width: hasHBar || hasVBar ? `${(100 / (1 - effCrop.l - effCrop.r)).toFixed(4)}%` : undefined,
+                height: hasHBar || hasVBar ? `${(100 / (1 - effCrop.t - effCrop.b)).toFixed(4)}%` : undefined,
+                left: effCrop.l > 0 ? `${((-effCrop.l * 100) / (1 - effCrop.l - effCrop.r)).toFixed(4)}%` : undefined,
+                top: effCrop.t > 0 ? `${((-effCrop.t * 100) / (1 - effCrop.t - effCrop.b)).toFixed(4)}%` : undefined,
+                position: hasHBar || hasVBar ? 'relative' : undefined,
+              }),
         }}
       >
         {offsetSubtitles.map((s) => (

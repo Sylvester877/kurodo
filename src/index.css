@@ -1221,3 +1221,65 @@ html.light-mode body {
     radial-gradient(1.5px 1.5px at 85% 80%, rgba(255,255,255,0.11), transparent);
   opacity: 0.5;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Fullscreen player layout — kills the one-sided black gap.
+   The wrapper div is the fullscreen element; UA defaults alone leave
+   it at windowed styles (rounded/bordered/aspect-ratio'd), so the
+   video box ends up mis-sized and pinned left with a black remainder
+   on the right. These rules make :fullscreen a clean flex-centered
+   stage. Keeps working in Electron (Chrome) via -webkit- prefixes.
+   ══   ════════════════════════════════════════════════════════════════ */
+/* Root scrollbar kill while anything is fullscreen: the themed 8px root
+   scrollbar + the reserved scrollbar-gutter on <html> stay painted above
+   the fullscreen element and show up as a persistent full-height strip
+   on the RIGHT (8 CSS px = 10 physical px at 125% scale). Only the player
+   and theater layouts can go fullscreen, so this is safe globally. */
+html.kurodo-fs-active {
+  scrollbar-gutter: auto !important;
+  overflow-y: hidden !important;
+}
+html.kurodo-fs-active::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+div:fullscreen,
+div:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+
+video:fullscreen,
+video:-webkit-full-screen {
+  width: 100% !important;
+  height: 100% !important;
+  object-position: center center !important;
+  margin: auto !important;
+}
+
+/* Overlays (controls bar, captions, skip button) must stay pinned to the
+   fullscreen stage. The video gets exactly ONE sizing mechanism: fill the
+   stage (100%/100%, centered) + an OPTIONAL symmetric zoom passed in as
+   --fs-zoom (inline custom property) for baked-bar content. The windowed
+   crop path's oversize%/left/top/position:relative can never leak in —
+   which is what caused the one-sided black gap. */
+div:fullscreen video,
+div:-webkit-full-screen video {
+  transform: scale(var(--fs-zoom, 1)) !important;
+  left: auto !important;
+  top: auto !important;
+  position: static !important;
+  margin: auto !important;
+}
