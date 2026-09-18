@@ -1,0 +1,4425 @@
+{
+  "partial": false,
+  "rows": [
+    {
+      "title": "Attack on Titan",
+      "id": 16498,
+      "malId": 16498,
+      "slug": "attack-on-titan-2jqd0",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 12384,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 12377,
+          "subs": 5
+        }
+      ]
+    },
+    {
+      "title": "Kono Oto Tomare!: Sounds of Life Season 2",
+      "id": 108891,
+      "malId": 38889,
+      "slug": "kono-oto-tomare-sounds-of-life-season-2-d5c08",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 9253,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 9249,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Donkikko",
+      "id": 19901,
+      "malId": 19901,
+      "slug": "donkikko-krddi",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 11408,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3638,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7507,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3509,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4104,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3993,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3528,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3839,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 4213,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7268,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3585,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3565,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3607,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4583,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3508,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 6091,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Demon Slayer: Kimetsu no Yaiba",
+      "id": 101922,
+      "malId": 38000,
+      "slug": "demon-slayer-kimetsu-no-yaiba-j2hzd",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 12244,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 12241,
+          "subs": 11
+        }
+      ]
+    },
+    {
+      "title": "Sound! Euphonium 2",
+      "id": 21460,
+      "malId": 31988,
+      "slug": "sound-euphonium-2-8gwoz",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 16843,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 16840,
+          "subs": 8
+        }
+      ]
+    },
+    {
+      "title": "Hua Jianghu: Buliang Ren 6",
+      "id": 146914,
+      "malId": 51897,
+      "slug": "hua-jianghu-buliang-ren-6-k0moe",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 3,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 0,
+      "chipIndexInChain": null,
+      "chipsTried": 3,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7381,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 288,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 295,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "JUJUTSU KAISEN",
+      "id": 113415,
+      "malId": 40748,
+      "slug": "jujutsu-kaisen-6acxd",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 6883,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 6878,
+          "subs": 16
+        }
+      ]
+    },
+    {
+      "title": "Kamisama Kiss◎ OVA",
+      "id": 21186,
+      "malId": 30709,
+      "slug": "kamisama-kiss-ova-hnm8k",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 19552,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 19547,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Fujiko F. Fujio no Sukoshi Fushigi Tanpen Theater",
+      "id": 19899,
+      "malId": 19899,
+      "slug": "fujiko-f-fujio-no-sukoshi-fushigi-tanpen-theater-k1qe0",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9682,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8220,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7295,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3524,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3702,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4109,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3503,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3506,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8046,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4678,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4124,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3513,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4133,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3631,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3511,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 5569,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Death Note",
+      "id": 1535,
+      "malId": 1535,
+      "slug": "death-note-eihql",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 11292,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 11289,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Bakuman. 3",
+      "id": 12365,
+      "malId": 12365,
+      "slug": "bakuman-3-w92du",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 4082,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 4077,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Shin Dokonjou Gaeru",
+      "id": 126865,
+      "malId": 21487,
+      "slug": "shin-dokonjou-gaeru-2gx42",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 19550,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 5448,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3578,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4109,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3564,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3570,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4051,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3692,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 3566,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8533,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3562,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3871,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3568,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3576,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3779,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 6323,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "My Hero Academia",
+      "id": 21459,
+      "malId": 31964,
+      "slug": "my-hero-academia-uggi8",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 6941,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 6938,
+          "subs": 3
+        }
+      ]
+    },
+    {
+      "title": "DAN DA DAN Season 2",
+      "id": 185660,
+      "malId": 60543,
+      "slug": "dan-da-dan-season-2-od6gt",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3618,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3613,
+          "subs": 25
+        }
+      ]
+    },
+    {
+      "title": "Hunter x Hunter (2011)",
+      "id": 11061,
+      "malId": 11061,
+      "slug": "hunter-x-hunter-2011-kr5xd",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 9739,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 9732,
+          "subs": 5
+        }
+      ]
+    },
+    {
+      "title": "That Time I Got Reincarnated as a Slime Season 4",
+      "id": 182205,
+      "malId": 59970,
+      "slug": "that-time-i-got-reincarnated-as-a-slime-season-4-fstwa",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 58875,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 27849,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Shen Lan Qi Yu Wushuang Zhu: Tianmo Pian",
+      "id": 166409,
+      "malId": 55740,
+      "slug": "shen-lan-qi-yu-wushuang-zhu-tianmo-pian-9ww5b",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 9,
+      "chipIndexInChain": 1,
+      "chipsTried": 9,
+      "msToPlay": 131188,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 2399,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 2149,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3461,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 2429,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3726,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3583,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3570,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3571,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 2949,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "One-Punch Man",
+      "id": 21087,
+      "malId": 30276,
+      "slug": "one-punch-man-jbksu",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1720,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1717,
+          "subs": 21
+        }
+      ]
+    },
+    {
+      "title": "Neon Genesis Evangelion",
+      "id": 30,
+      "malId": 30,
+      "slug": "neon-genesis-evangelion-up58q",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1549,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1546,
+          "subs": 30
+        }
+      ]
+    },
+    {
+      "title": "Fabulous Beasts 5",
+      "id": 204394,
+      "malId": 62955,
+      "slug": "fabulous-beasts-5-rs62m",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3692,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3689,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "ONE PIECE",
+      "id": 21,
+      "malId": 21,
+      "slug": "one-piece-p8k27",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 7,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1899,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 1895,
+          "subs": 4
+        }
+      ]
+    },
+    {
+      "title": "Girls Band Cry",
+      "id": 164212,
+      "malId": 55102,
+      "slug": "girls-band-cry-lsqma",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3930,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3927,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Shenguo Zhi Shang",
+      "id": 195883,
+      "malId": 61564,
+      "slug": "shenguo-zhi-shang-yuc2m",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2871,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 2867,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Tokyo Ghoul",
+      "id": 20605,
+      "malId": 22319,
+      "slug": "tokyo-ghoul-iwc49",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1439,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1437,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Scissor Seven Season 3",
+      "id": 127595,
+      "malId": 45556,
+      "slug": "scissor-seven-season-3-p5q0e",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 10373,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 10370,
+          "subs": 63
+        }
+      ]
+    },
+    {
+      "title": "Serendipity the Pink Dragon",
+      "id": 3201,
+      "malId": 3201,
+      "slug": "serendipity-the-pink-dragon-s19sa",
+      "primaryTrack": "dub",
+      "dubListed": 1,
+      "subListed": 0,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2129,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 2127,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Season 2",
+      "id": 20958,
+      "malId": 25777,
+      "slug": "attack-on-titan-season-2-imj4l",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 11708,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 11703,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Chihayafuru 2",
+      "id": 14397,
+      "malId": 14397,
+      "slug": "chihayafuru-2-u1fsq",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 18268,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 18265,
+          "subs": 3
+        }
+      ]
+    },
+    {
+      "title": "Momotaro Densetsu",
+      "id": 11533,
+      "malId": 11533,
+      "slug": "momotaro-densetsu-xzjmi",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 16781,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4456,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6604,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3528,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3716,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3857,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3502,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3774,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7356,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 5836,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3534,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3516,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3569,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3533,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3849,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7574,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Fullmetal Alchemist: Brotherhood",
+      "id": 5114,
+      "malId": 5114,
+      "slug": "fullmetal-alchemist-brotherhood-v3mzo",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 6405,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 6403,
+          "subs": 21
+        }
+      ]
+    },
+    {
+      "title": "Mushoku Tensei: Jobless Reincarnation Season 2 Part 2",
+      "id": 166873,
+      "malId": 55888,
+      "slug": "mushoku-tensei-jobless-reincarnation-season-2-part-2-a08yf",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1311,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1308,
+          "subs": 21
+        }
+      ]
+    },
+    {
+      "title": "Pink Lady Monogatari: Eikou no Tenshi-tachi",
+      "id": 17423,
+      "malId": 17423,
+      "slug": "pink-lady-monogatari-eikou-no-tenshi-tachi-q7w6o",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7353,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 11283,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4512,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3574,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3624,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3750,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3664,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3570,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8199,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4584,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3598,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3910,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4192,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3599,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4004,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4308,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Naruto",
+      "id": 20,
+      "malId": 20,
+      "slug": "naruto-oe7a3",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 10342,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 10337,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Kaguya-sama: Love is War",
+      "id": 101921,
+      "malId": 37999,
+      "slug": "kaguya-sama-love-is-war-3ehh5",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 21754,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 21746,
+          "subs": 7
+        }
+      ]
+    },
+    {
+      "title": "Shen Lan Qi Yu Wushuang Zhu 2",
+      "id": 155839,
+      "malId": 53367,
+      "slug": "shen-lan-qi-yu-wushuang-zhu-2-6rkla",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 2,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 0,
+      "chipIndexInChain": null,
+      "chipsTried": 2,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 2608,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 1910,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Sword Art Online",
+      "id": 11757,
+      "malId": 11757,
+      "slug": "sword-art-online-9kt70",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": true,
+      "servedBy": "anidap-sora",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 4,
+      "chipIndexInChain": 4,
+      "chipsTried": 4,
+      "msToPlay": 130300,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 34160,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 31483,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 32287,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1864,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Puella Magi Madoka Magica",
+      "id": 9756,
+      "malId": 9756,
+      "slug": "puella-magi-madoka-magica-f7wdv",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 15634,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 15629,
+          "subs": 20
+        }
+      ]
+    },
+    {
+      "title": "Edokko Boy: Gatten Tasuke",
+      "id": 9028,
+      "malId": 9028,
+      "slug": "edokko-boy-gatten-tasuke-jndes",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8320,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7586,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3513,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3518,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4046,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3498,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3510,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 4008,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7105,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 5551,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3638,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3494,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3830,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3701,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3485,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4807,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "A Silent Voice",
+      "id": 20954,
+      "malId": 28851,
+      "slug": "a-silent-voice-jz6w2",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 4523,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 4521,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Medalist",
+      "id": 165171,
+      "malId": 55318,
+      "slug": "medalist-o62nu",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 5895,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 5891,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Adventure on the Gaboten Island",
+      "id": 8184,
+      "malId": 8184,
+      "slug": "adventure-on-the-gaboten-island-yjji3",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 22643,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9504,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7330,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7470,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7525,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 8918,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7460,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7146,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9155,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8456,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7673,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7776,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7515,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 8641,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8120,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7498,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Your Name.",
+      "id": 21519,
+      "malId": 32281,
+      "slug": "your-name-h4ym2",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2370,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 2368,
+          "subs": 15
+        }
+      ]
+    },
+    {
+      "title": "SPY x FAMILY",
+      "id": 140960,
+      "malId": 50265,
+      "slug": "spy-x-family-pxi3a",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 15004,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 15001,
+          "subs": 12
+        }
+      ]
+    },
+    {
+      "title": "Beyond Time's Gaze 2",
+      "id": 213356,
+      "malId": 64398,
+      "slug": "213356",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7815,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 12232,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 8918,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 9815,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 9252,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 12936,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 10388,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 9917,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 18804,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 11556,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 8587,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 11093,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 11943,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 12547,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 11014,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 12890,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Season 3",
+      "id": 99147,
+      "malId": 35760,
+      "slug": "attack-on-titan-season-3-s4cl5",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3453,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3450,
+          "subs": 3
+        }
+      ]
+    },
+    {
+      "title": "Land of the Lustrous",
+      "id": 98707,
+      "malId": 35557,
+      "slug": "land-of-the-lustrous-sz831",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 18298,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 18295,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Big Brother 3",
+      "id": 182556,
+      "malId": 61730,
+      "slug": "big-brother-3-3vc3r",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 25584,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9407,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7329,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7233,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7568,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 8623,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7030,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7312,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7582,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 11981,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7275,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7199,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7343,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9309,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7853,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7203,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "My Hero Academia Season 2",
+      "id": 21856,
+      "malId": 33486,
+      "slug": "my-hero-academia-season-2-ro4vn",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2204,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 2202,
+          "subs": 3
+        }
+      ]
+    },
+    {
+      "title": "March comes in like a lion",
+      "id": 21366,
+      "malId": 31646,
+      "slug": "march-comes-in-like-a-lion-1id62",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3269,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3266,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Seton Animal Chronicles",
+      "id": 7845,
+      "malId": 7845,
+      "slug": "seton-animal-chronicles-05wha",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 17982,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7641,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7967,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7547,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7297,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7366,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7178,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7198,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7734,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9100,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7305,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7613,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7349,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 8531,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7685,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 8188,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Final Season",
+      "id": 110277,
+      "malId": 40028,
+      "slug": "attack-on-titan-final-season-5ugtv",
+      "primaryTrack": "dub",
+      "dubListed": 1,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-sora",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2318,
+      "attempts": [
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 2316,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Nichijou - My Ordinary Life",
+      "id": 10165,
+      "malId": 10165,
+      "slug": "nichijou-my-ordinary-life-4geqp",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3498,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3494,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "The Promised Neverland",
+      "id": 101759,
+      "malId": 37779,
+      "slug": "the-promised-neverland-8nczw",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3209,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3206,
+          "subs": 5
+        }
+      ]
+    },
+    {
+      "title": "Slam Dunk",
+      "id": 170,
+      "malId": 170,
+      "slug": "slam-dunk-g08xb",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1718,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1715,
+          "subs": 4
+        }
+      ]
+    },
+    {
+      "title": "Gozonji! Gekkou Kamen-kun",
+      "id": 5477,
+      "malId": 5477,
+      "slug": "gozonji-gekkou-kamen-kun-0a5eo",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9633,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3588,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4029,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3912,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3632,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3676,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3721,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3854,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7271,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7559,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3647,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3752,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3829,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3681,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4127,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4022,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Chainsaw Man",
+      "id": 127230,
+      "malId": 44511,
+      "slug": "chainsaw-man-mzlim",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3374,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3371,
+          "subs": 14
+        }
+      ]
+    },
+    {
+      "title": "Dr. STONE SCIENCE FUTURE Cour 3",
+      "id": 199221,
+      "malId": 62568,
+      "slug": "dr-stone-science-future-cour-3-bmj65",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3972,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3969,
+          "subs": 15
+        }
+      ]
+    },
+    {
+      "title": "Bug tte Honey",
+      "id": 10210,
+      "malId": 10210,
+      "slug": "bug-tte-honey-b7b6x",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 26649,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 13953,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3991,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4120,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3592,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3945,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3638,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3577,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 4348,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6846,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4033,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3582,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3576,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4279,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3673,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 5601,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Assassination Classroom",
+      "id": 20755,
+      "malId": 24833,
+      "slug": "assassination-classroom-9ig44",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2481,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2477,
+          "subs": 3
+        }
+      ]
+    },
+    {
+      "title": "DAN DA DAN",
+      "id": 171018,
+      "malId": 57334,
+      "slug": "dan-da-dan-khp5m",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3247,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3245,
+          "subs": 24
+        }
+      ]
+    },
+    {
+      "title": "Shounen Tokugawa Ieyasu",
+      "id": 20223,
+      "malId": 20223,
+      "slug": "shounen-tokugawa-ieyasu-4uktr",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 6056,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8917,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 941,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7362,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 1578,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3459,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 1047,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2539,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8742,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4375,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 1501,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 1978,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4456,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3632,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3211,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 5677,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Mob Psycho 100",
+      "id": 21507,
+      "malId": 32182,
+      "slug": "mob-psycho-100-lix2f",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 11270,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 11267,
+          "subs": 12
+        }
+      ]
+    },
+    {
+      "title": "86 EIGHTY-SIX",
+      "id": 116589,
+      "malId": 41457,
+      "slug": "86-eighty-six-mfto2",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 11960,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 11957,
+          "subs": 7
+        }
+      ]
+    },
+    {
+      "title": "Tomatoman",
+      "id": 5201,
+      "malId": 5201,
+      "slug": "tomatoman-ecomg",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 10988,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 1588,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4071,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3879,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 1906,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9170,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8356,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7812,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9079,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9762,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 8515,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7951,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 8376,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9093,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8721,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 8787,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Re:ZERO -Starting Life in Another World-",
+      "id": 21355,
+      "malId": 31240,
+      "slug": "re-zero-starting-life-in-another-world-bl851",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2137,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2135,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "given",
+      "id": 108430,
+      "malId": 39533,
+      "slug": "given-nrb4p",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-neko",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 2,
+      "chipIndexInChain": 2,
+      "chipsTried": 2,
+      "msToPlay": 40249,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 25043,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 15044,
+          "subs": 16
+        }
+      ]
+    },
+    {
+      "title": "Your lie in April",
+      "id": 20665,
+      "malId": 23273,
+      "slug": "your-lie-in-april-omrku",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 11400,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 11397,
+          "subs": 21
+        }
+      ]
+    },
+    {
+      "title": "Space Brothers",
+      "id": 12431,
+      "malId": 12431,
+      "slug": "space-brothers-93k8z",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 5603,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 5601,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Chou Supercar Gattiger",
+      "id": 9881,
+      "malId": 9881,
+      "slug": "chou-supercar-gattiger-b61um",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7403,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6552,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3405,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 6125,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3596,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3847,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3646,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3589,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 3725,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8517,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3588,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3685,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3990,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3394,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4115,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4406,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Season 3 Part 2",
+      "id": 104578,
+      "malId": 38524,
+      "slug": "attack-on-titan-season-3-part-2-wkye9",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3899,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3896,
+          "subs": 3
+        }
+      ]
+    },
+    {
+      "title": "The Ramparts of Ice",
+      "id": 186497,
+      "malId": 60852,
+      "slug": "the-ramparts-of-ice-1enhi",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 11765,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 11762,
+          "subs": 34
+        }
+      ]
+    },
+    {
+      "title": "Xian Di Guilai",
+      "id": 185858,
+      "malId": 60583,
+      "slug": "xian-di-guilai-txlq1",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 8236,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 8233,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Naruto: Shippuden",
+      "id": 1735,
+      "malId": 1735,
+      "slug": "naruto-shippuden-c20p8",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2266,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2263,
+          "subs": 7
+        }
+      ]
+    },
+    {
+      "title": "Link Click: Bridon Arc",
+      "id": 170166,
+      "malId": 56752,
+      "slug": "link-click-bridon-arc-sbuma",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 8971,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 8969,
+          "subs": 8
+        }
+      ]
+    },
+    {
+      "title": "Yao Shen Ji 9",
+      "id": 195916,
+      "malId": 62026,
+      "slug": "yao-shen-ji-9-tvwv7",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 2,
+      "chipIndexInChain": 2,
+      "chipsTried": 2,
+      "msToPlay": 57690,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 54800,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2706,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "ERASED",
+      "id": 21234,
+      "malId": 31043,
+      "slug": "erased-xcac4",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-neko",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 3,
+      "chipIndexInChain": 3,
+      "chipsTried": 3,
+      "msToPlay": 105668,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 6170,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8564,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 3592,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Dou Po Cangqiong: San Nian Zhi Yue",
+      "id": 137729,
+      "malId": 49701,
+      "slug": "dou-po-cangqiong-san-nian-zhi-yue-ukfcv",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7544,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6812,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4587,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3639,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3599,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3575,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3612,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 4118,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7019,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 5752,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3597,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3593,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3739,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3620,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3618,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4933,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Fei Ren Zai: Lichun Pian",
+      "id": 120055,
+      "malId": 42455,
+      "slug": "fei-ren-zai-lichun-pian-x1tbb",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8093,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9072,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3659,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3587,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4109,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3680,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3396,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3591,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7683,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 5738,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3808,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3688,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3609,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3919,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3607,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4517,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "My Hero Academia Season 3",
+      "id": 100166,
+      "malId": 36456,
+      "slug": "my-hero-academia-season-3-61wp8",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 6,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3326,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3324,
+          "subs": 7
+        }
+      ]
+    },
+    {
+      "title": "IDOLiSH7 Third BEAT! Part 2",
+      "id": 128890,
+      "malId": 46654,
+      "slug": "idolish7-third-beat-part-2-3k6xv",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 24727,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 24725,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Dr. Fabre is a Detective",
+      "id": 5088,
+      "malId": 5088,
+      "slug": "dr-fabre-is-a-detective-euq5m",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 19161,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 12760,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7909,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7372,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7398,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7403,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7378,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7413,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8343,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8804,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7376,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7182,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7490,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7354,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8820,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 9075,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Steins;Gate",
+      "id": 9253,
+      "malId": 9253,
+      "slug": "steins-gate-1emx1",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1508,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1506,
+          "subs": 7
+        }
+      ]
+    },
+    {
+      "title": "Non Non Biyori Nonstop",
+      "id": 109403,
+      "malId": 39808,
+      "slug": "non-non-biyori-nonstop-k4l04",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1105,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1103,
+          "subs": 4
+        }
+      ]
+    },
+    {
+      "title": "One Way or Another",
+      "id": 156084,
+      "malId": 59916,
+      "slug": "one-way-or-another-es3zl",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 4443,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 4441,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Black Clover",
+      "id": 97940,
+      "malId": 34572,
+      "slug": "black-clover-qnddj",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3729,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3727,
+          "subs": 9
+        }
+      ]
+    },
+    {
+      "title": "Re:ZERO -Starting Life in Another World- Season 2",
+      "id": 108632,
+      "malId": 39587,
+      "slug": "re-zero-starting-life-in-another-world-season-2-pwp89",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 11198,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 11195,
+          "subs": 13
+        }
+      ]
+    },
+    {
+      "title": "OKAWARI-BOY Starzan S",
+      "id": 8799,
+      "malId": 8799,
+      "slug": "okawari-boy-starzan-s-sr070",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 28700,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7883,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4698,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4034,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3918,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4797,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3664,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3691,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7867,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6255,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3758,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 10385,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 12459,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4603,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4996,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 5189,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "HAIKYU!!",
+      "id": 20464,
+      "malId": 20583,
+      "slug": "haikyu-99ezs",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 6605,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 6603,
+          "subs": 6
+        }
+      ]
+    },
+    {
+      "title": "Run with the Wind",
+      "id": 101903,
+      "malId": 37965,
+      "slug": "run-with-the-wind-yaorr",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 36656,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 6627,
+          "subs": 9
+        }
+      ]
+    },
+    {
+      "title": "Manga Mitokoumon",
+      "id": 11829,
+      "malId": 11829,
+      "slug": "manga-mitokoumon-br8h0",
+      "primaryTrack": "dub",
+      "dubListed": 10,
+      "subListed": 13,
+      "played": false,
+      "servedBy": null,
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 8,
+      "chipIndexInChain": null,
+      "chipsTried": 16,
+      "msToPlay": null,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 11939,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4686,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3747,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3407,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3594,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3662,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3592,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3614,
+          "subs": 0
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7496,
+          "subs": 0
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4982,
+          "subs": 0
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3909,
+          "subs": 0
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3624,
+          "subs": 0
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3620,
+          "subs": 0
+        },
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3599,
+          "subs": 0
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3711,
+          "subs": 0
+        },
+        {
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4575,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Rascal Does Not Dream of Bunny Girl Senpai",
+      "id": 101291,
+      "malId": 37450,
+      "slug": "rascal-does-not-dream-of-bunny-girl-senpai-vm8uc",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 7547,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 7545,
+          "subs": 8
+        }
+      ]
+    },
+    {
+      "title": "YAT Anshin! Uchuu Ryokou 2",
+      "id": 1892,
+      "malId": 1892,
+      "slug": "yat-anshin-uchuu-ryokou-2-ktc9z",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 1,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 4245,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 4243,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Revolutionary Girl Utena",
+      "id": 440,
+      "malId": 440,
+      "slug": "revolutionary-girl-utena-2g826",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1690,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1688,
+          "subs": 2
+        }
+      ]
+    },
+    {
+      "title": "Fabulous Beasts 4",
+      "id": 179845,
+      "malId": 59385,
+      "slug": "fabulous-beasts-4-h6462",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 4,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 2075,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 2072,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Yu Yu Hakusho: Ghostfiles",
+      "id": 392,
+      "malId": 392,
+      "slug": "yu-yu-hakusho-ghostfiles-rwi7y",
+      "primaryTrack": "dub",
+      "dubListed": 4,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3003,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3001,
+          "subs": 3
+        }
+      ]
+    },
+    {
+      "title": "Chikkun Takkun",
+      "id": 16303,
+      "malId": 16303,
+      "slug": "chikkun-takkun-l7jaf",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 1,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3608,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3606,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Dr. STONE",
+      "id": 105333,
+      "malId": 38691,
+      "slug": "dr-stone-dfi0n",
+      "primaryTrack": "dub",
+      "dubListed": 2,
+      "subListed": 3,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 9132,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 9130,
+          "subs": 9
+        }
+      ]
+    },
+    {
+      "title": "Hunter x Hunter",
+      "id": 136,
+      "malId": 136,
+      "slug": "hunter-x-hunter-f2fxr",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-loli",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1841,
+      "attempts": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 1839,
+          "subs": 1
+        }
+      ]
+    },
+    {
+      "title": "Wu Dong Qiankun 6",
+      "id": 202660,
+      "malId": 62249,
+      "slug": "wu-dong-qiankun-6-bg6l5",
+      "primaryTrack": "dub",
+      "dubListed": 0,
+      "subListed": 2,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "sub",
+      "crossedTracks": true,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 1521,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1519,
+          "subs": 0
+        }
+      ]
+    },
+    {
+      "title": "Violet Evergarden",
+      "id": 21827,
+      "malId": 33352,
+      "slug": "violet-evergarden-44k1v",
+      "primaryTrack": "dub",
+      "dubListed": 3,
+      "subListed": 5,
+      "played": true,
+      "servedBy": "anidap-yuki",
+      "servedTrack": "dub",
+      "crossedTracks": false,
+      "chipPosition": 1,
+      "chipIndexInChain": 1,
+      "chipsTried": 1,
+      "msToPlay": 3128,
+      "attempts": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3126,
+          "subs": 21
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "titles": 100,
+    "resolved": 100,
+    "played": 78,
+    "crossTrackSaved": 17,
+    "neverPlayed": 22,
+    "msToPlay": {
+      "mean": 13323.74358974359,
+      "p50": 4523,
+      "p90": 24727
+    }
+  }
+}

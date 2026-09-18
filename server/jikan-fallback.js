@@ -4,6 +4,7 @@
 // so the existing frontend components continue to work without changes.
 
 import axios from 'axios'
+import { acquireAniListSlot, openAniListBreaker } from './lib/anilist-budget.js'
 
 const ANILIST_GQL = 'https://graphql.anilist.co'
 
@@ -16,25 +17,23 @@ const ANILIST_GQL = 'https://graphql.anilist.co'
 //   • MIN_INTERVAL paces calls so bursts stay under AniList's budget.
 //   • The 429 breaker pauses ALL fallback calls for 15s after a 429 so
 //     AniList can recover instead of being hammered while throttled.
-const MIN_ANILIST_INTERVAL_MS = 700   // ≈ ≤85 req/min — headroom under 90
-const ANILIST_BREAKER_MS = 15_000     // pause after a 429
-let lastAnilistCallAt = 0
-let anilistBreakerUntil = 0
-
-async function paceAniList() {
-  // Circuit breaker: if AniList just 429'd us, don't pile on — fail fast.
-  if (Date.now() < anilistBreakerUntil) {
-    const err = new Error('AniList rate-limited (breaker active)')
-    err.status = 429
-    throw err
+// fixes: this used to be a strict 700ms interval between calls, which
+// serialized every fallback. One browse page load can need 3–4 AniList
+// answers at once (season + upcoming + A–Z + a rail), so the last one waited
+// 3 × 700ms + RTT — measured 3.3s for a single /seasons/:y/:season request
+// while other rails were in flight, vs 0.6s when called alone. The budget is
+// now shared with the GraphQL relay in lib/anilist-budget.js (one rolling
+// window for both callers, so the pair can no longer overrun AniList).
+async function anilistRequest(query, variables = {}, { maxRetries = 3 } = {}) {
+  const releaseSlot = await acquireAniListSlot()
+  try {
+    return await anilistRequestInner(query, variables, maxRetries)
+  } finally {
+    releaseSlot()
   }
-  const wait = lastAnilistCallAt + MIN_ANILIST_INTERVAL_MS - Date.now()
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait))
-  lastAnilistCallAt = Date.now()
 }
 
-async function anilistRequest(query, variables = {}, { maxRetries = 3 } = {}) {
-  await paceAniList()
+async function anilistRequestInner(query, variables, maxRetries) {
   let lastError = null
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -56,7 +55,7 @@ async function anilistRequest(query, variables = {}, { maxRetries = 3 } = {}) {
       if (data?.errors && !data?.data) {
         // 429 error bodies come through the errors array — open the breaker.
         if (data.errors.some((er) => er.status === 429)) {
-          anilistBreakerUntil = Date.now() + ANILIST_BREAKER_MS
+          openAniListBreaker()
           const err = new Error(data.errors[0]?.message || 'AniList rate-limited')
           err.status = 429
           throw err
@@ -69,7 +68,7 @@ async function anilistRequest(query, variables = {}, { maxRetries = 3 } = {}) {
       // 429 — never retry from the fallback: opening the breaker is enough,
       // and retrying only deepens the storm.
       if (status === 429) {
-        anilistBreakerUntil = Date.now() + ANILIST_BREAKER_MS
+        openAniListBreaker()
         throw e
       }
       lastError = e
@@ -344,12 +343,14 @@ export async function getAnimeByLetterFromAniList(letter = '', page = 1, limit =
 
   // AniList search is relevance-ranked, not alphabetical — and for a single
   // letter the top page is still dominated by genuine prefix matches. Pull a
-  // pool of up to 4 pages (200 candidates) in parallel, keep only true
-  // prefix matches, sort alphabetically, then slice for the requested Jikan
-  // page. Parallel is ~3-4× faster than the previous sequential loop.
+  // pool of 3 pages (150 candidates) in parallel, keep only true prefix
+  // matches, sort alphabetically, then slice for the requested Jikan page.
+  // Parallel is ~3-4× faster than the previous sequential loop, and 3 pages
+  // (down from 4) trims one heavy query off the shared AniList budget — the
+  // A–Z picker fires this on every letter tap.
   const matched = []
   const seen = new Set()
-  const pages = [1, 2, 3, 4]
+  const pages = [1, 2, 3]
   const settled = await Promise.allSettled(
     pages.map((alPage) => anilistRequest(query, { q: ch, page: alPage, perPage: 50 })),
   )
@@ -407,10 +408,90 @@ export async function getAnimeByLetterFromAniList(letter = '', page = 1, limit =
   }
 }
 
+/** The season a date falls in, on AniList's/MAL's calendar. */
+function seasonOf(date) {
+  const m = date.getMonth() + 1
+  return {
+    season: m <= 3 ? 'WINTER' : m <= 6 ? 'SPRING' : m <= 9 ? 'SUMMER' : 'FALL',
+    year: date.getFullYear(),
+  }
+}
+
+/**
+ * Jikan-shaped /seasons/* list from AniList.
+ *
+ * fixes: cold /seasons/<year>/<season> took 6.9s during a MAL outage
+ * (cause: tryAniListFallback returned null for every /seasons/* path, so the
+ * request fell past the 6s race cap and only then reached the Kitsu stage).
+ * AniList answers the same question in ~1.4s, so it becomes a real racer for
+ * the seasonal surfaces (Browse "This Season"/"Upcoming", Seasonal page).
+ *
+ *   /seasons/now        → the current calendar season, most popular first
+ *   /seasons/upcoming   → NOT_YET_RELEASED, most popular first
+ *   /seasons/:y/:season → that explicit season, most popular first
+ *
+ * Returns null for an unrecognised path or an empty season (an empty season
+ * is never truthful — every season has titles — so the caller keeps racing).
+ */
+export async function getSeasonalFromAniList(targetPath, query) {
+  const page = Math.max(1, Number.isFinite(Number(query?.page)) ? Number(query.page) : 1)
+  const limit = Math.max(1, Math.min(50, Number.isFinite(Number(query?.limit)) ? Number(query.limit) : 24))
+
+  let mediaArgs
+  if (targetPath === '/seasons/now') {
+    const { season, year } = seasonOf(new Date())
+    mediaArgs = `season: ${season}, seasonYear: ${year}, type: ANIME, isAdult: false, sort: POPULARITY_DESC`
+  } else if (targetPath === '/seasons/upcoming') {
+    mediaArgs = 'status: NOT_YET_RELEASED, type: ANIME, isAdult: false, sort: POPULARITY_DESC'
+  } else {
+    const m = targetPath.match(/^\/seasons\/(\d{4})\/(winter|spring|summer|fall)$/i)
+    if (!m) return null
+    mediaArgs = `season: ${m[2].toUpperCase()}, seasonYear: ${Number(m[1])}, type: ANIME, isAdult: false, sort: POPULARITY_DESC`
+  }
+
+  const gql = `query ($page: Int, $perPage: Int) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { hasNextPage currentPage lastPage total }
+      media(${mediaArgs}) {
+        id idMal
+        title { romaji english native }
+        description(asHtml: false)
+        bannerImage
+        coverImage { extraLarge large }
+        episodes duration averageScore popularity format status season seasonYear genres
+        studios(isMain: true) { nodes { name } }
+        trailer { id site }
+      }
+    }
+  }`
+
+  const data = await anilistRequest(gql, { page, perPage: limit })
+  if (data?.errors?.length) {
+    throw new Error(data.errors[0]?.message || 'AniList GraphQL error')
+  }
+  const pageInfo = data?.data?.Page?.pageInfo || { hasNextPage: false, currentPage: 1, lastPage: 1 }
+  const media = data?.data?.Page?.media || []
+  if (!media.length) return null
+
+  return {
+    data: media.map(mapMedia),
+    pagination: {
+      has_next_page: pageInfo.hasNextPage,
+      current_page: pageInfo.currentPage,
+      last_visible_page: pageInfo.lastPage,
+      items: {
+        count: media.length,
+        total: pageInfo.total ?? media.length,
+        per_page: limit,
+      },
+    },
+  }
+}
+
 /**
  * Route-level dispatcher: try to satisfy a Jikan-style request from AniList
  * when Jikan itself is down or returns a 504. Returns Jikan-shaped data for
- * /anime search, /anime/:id, and /top/anime endpoints, or null for
+ * /anime search, /anime/:id, /top/anime and /seasons/* endpoints, or null for
  * unsupported paths.
  */
 export async function tryAniListFallback(targetPath, query) {
@@ -434,6 +515,14 @@ export async function tryAniListFallback(targetPath, query) {
   if (targetPath === '/top/anime') {
     const rawFilter = Array.isArray(query.filter) ? query.filter[0] : query.filter
     return await getTopAnimeFromAniList(page, limit, rawFilter ? String(rawFilter) : '')
+  }
+
+  // Seasonal browse (/seasons/now | /seasons/upcoming | /seasons/:year/:season).
+  // Previously unsupported here, which is why a MAL outage made "This Season"
+  // wait for the 6s race cap before the Kitsu stage answered.
+  if (targetPath === '/seasons/now' || targetPath === '/seasons/upcoming' ||
+      /^\/seasons\/\d{4}\/(winter|spring|summer|fall)$/i.test(targetPath)) {
+    return await getSeasonalFromAniList(targetPath, query)
   }
 
   const animeIdMatch = targetPath.match(/^\/anime\/(\d+)(?:\/full)?$/)

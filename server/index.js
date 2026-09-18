@@ -92,6 +92,13 @@ import {
   getAniListAnimeByMalAsJikan,
   tryAniListFallback,
 } from './jikan-fallback.js'
+import {
+  acquireAniListSlot,
+  aniListBreakerActive,
+  openAniListBreaker,
+  aniListBudgetSnapshot,
+} from './lib/anilist-budget.js'
+import { isMalDown, noteMalDown } from './lib/mal-outage.js'
 
 import {
   buildProxyConfig,
@@ -451,8 +458,35 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
     // list; this cap just needs to survive the chad timeout.
     // skipFailCache: a transient chad 429 / slow upstream must NOT poison
     // this key (the picker would 502 even after chad recovers).
-    const data = await cached(cacheKey, TTL, () =>
-      routedGetProviders(anilistId, slug, Number(ep), title), { timeoutMs: 12_000, skipFailCache: true })
+    // ── Chad deadline: NEVER make the picker wait 12s for a server list ──
+    // Measured (watch_load_probe, Sep 2026): this stage averaged 7.04s and hit
+    // its full 12s cap on the long tail ("27 listed" = the roster fallback),
+    // and it is STRICTLY SEQUENTIAL — the client cannot even request a stream
+    // until it lands, so the wait is added directly to the user's 20s.
+    // `routedGetProviders` already falls back to the roster when chad can't
+    // answer; it just has to sit through chad's timeout first. Racing the real
+    // call against a short deadline means we serve the roster immediately and
+    // the genuine chad answer still populates the cache in the background
+    // (Promise.race does not cancel the loser), so the next request gets the
+    // real per-episode list with no extra wait.
+    const SERVERS_FIRST_LIST_DEADLINE_MS = 4_000
+    // `cached(...)` resolves with the real list (and fills the cache for the
+    // next request). If the deadline wins we substitute the roster below — the
+    // real call is NOT cancelled, so its result lands in the cache for the
+    // next visit either way.
+    let data = await Promise.race([
+      cached(cacheKey, TTL, () =>
+        routedGetProviders(anilistId, slug, Number(ep), title), { timeoutMs: 12_000, skipFailCache: true }),
+      new Promise((r) => setTimeout(() => r(null), SERVERS_FIRST_LIST_DEADLINE_MS)),
+    ]).catch(() => null)
+    // Chad missed the deadline (or failed) — serve the roster NOW rather than
+    // blocking the user. Zero servers is the only unacceptable answer, and the
+    // verification pass below still runs, so the returned list is annotated
+    // exactly like any other.
+    if (!data || !Array.isArray(data.providers) || data.providers.length === 0) {
+      const { getRosterProviders } = await import('./anidap.js')
+      data = { providers: getRosterProviders(), _rosterFast: true }
+    }
     // ── Empty-list protection ──
     // When anidap is briefly rate-limited / bot-blocked, the provider list
     // comes back EMPTY and the generic cache would lock that in for the
@@ -1931,6 +1965,12 @@ const JIKAN_STALE_TTL = 30 * 60 * 1000
 const JIKAN_FAIL_TTL = 30 * 1000
 const JIKAN_MIN_INTERVAL = 160 // ~6 req/sec burst; queue still paces, but initial cold loads parallelize
 const JIKAN_MAX_CONCURRENT = 5
+// fixes: a Jikan 504 means "failed to connect to MyAnimeList" — an upstream
+// state that affects EVERY Jikan endpoint, not one request. Without this flag
+// each page load paid a doomed Jikan round trip (400ms–1.8s) before the
+// AniList/Kitsu racers could be consulted, and those doomed calls also held
+// the Jikan queue slots that healthy requests needed. The flag lives in
+// lib/mal-outage.js so anikage-episodes.js (the filler-flag loop) shares it.
 const jikanCache = new Map()
 const jikanFailCache = new Map()
 const jikanInFlight = new Map()
@@ -1972,6 +2012,18 @@ function pruneJikanCache() {
 
 // Periodic prune every 60s so stale entries don't linger
 setInterval(pruneJikanCache, 60_000)
+
+/** Paths the Kitsu fallback stage can actually answer (see kitsu-feed.js).
+ *  Used to decide whether arming the Kitsu racer can possibly pay off. */
+function kitsuCanServe(targetPath, query) {
+  if (targetPath === '/top/anime' || targetPath === '/seasons/now' || targetPath === '/seasons/upcoming') return true
+  if (/^\/seasons\/\d{4}\/(winter|spring|summer|fall)$/i.test(targetPath)) return true
+  if (/^\/anime\/\d+(\/full)?$/.test(targetPath)) return true
+  if (targetPath === '/anime') {
+    return Boolean(query?.q) || query?.genres != null || query?.letter != null
+  }
+  return false
+}
 
 function enqueueJikanRequest(task) {
   const run = jikanQueueTail.then(async () => {
@@ -2026,8 +2078,21 @@ async function fetchJikanWithRetry(targetUrl, query, maxRetries = 1) {
         continue
       }
 
-      // Gateway timeout / server error — retry with backoff
-      if ((status === 504 || status >= 500) && attempt < maxRetries) {
+      // Gateway timeout / server error — retry with backoff.
+      //
+      // fixes: a MAL outage (Jikan 504 on EVERY request) used to cost every
+      // caller 1s of backoff + a second 1.8s round trip before the AniList /
+      // Kitsu fallbacks could win — measured 6.9s cold on /seasons/2026/summer.
+      // A 504 from Jikan means "MyAnimeList is unreachable", which is a
+      // deterministic upstream state, not a blip: fail fast and let the
+      // fallback chain (already racing in parallel) serve the request. 5xx
+      // without the gateway-timeout meaning is still retried normally.
+      if (status === 504) {
+        noteMalDown()
+        console.warn(`[jikan-proxy] 504 on ${targetUrl} — MAL unreachable, failing fast to fallbacks`)
+        return { data, status }
+      }
+      if (status >= 500 && attempt < maxRetries) {
         const waitMs = Math.min(1000 * Math.pow(2, attempt), 8000)
         console.warn(`[jikan-proxy] ${status} on ${targetUrl}, retrying after ${waitMs}ms`)
         await new Promise((r) => setTimeout(r, waitMs))
@@ -2175,31 +2240,64 @@ app.get('/api/jikan/*', async (req, res) => {
     const fallbackReq = tryAniListFallback(targetPath, req.query)
       .catch(() => null)
 
+    // fixes: the Kitsu list stage used to run ONLY after this race settled
+    // (winner === null), so a dual outage paid the full Jikan round trip +
+    // the 6s race cap before Kitsu was even asked. It is now a third racer
+    // with a head start for Jikan/AniList: if either answers normally
+    // (~0.4–1.5s) Kitsu never fires at all; if both are slow or down, Kitsu's
+    // ~0.9s response wins instead of waiting behind them.
+    //
+    // 1800ms (not 1100ms): AniList is the preferred fallback — its pagination
+    // is exact (24/page) while Kitsu clamps to 20 — so it gets the extra
+    // window to land first. A real dual outage still paints in ~2.7s.
+    const KITSU_RACE_DELAY_MS = 1_800
+    let raceSettled = false
+    const kitsuReq = !kitsuCanServe(targetPath, req.query)
+      // Only arm the racer for paths Kitsu actually implements. Arming it for
+      // anything else (e.g. /schedules, /genres/anime) would make the route
+      // wait the whole delay + cap before its honest 502 — the schedule's
+      // 7-day fallback paid that on every request.
+      ? Promise.resolve(null)
+      : new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            if (raceSettled) return resolve(null)
+            getKitsuFeedAsJikan(targetPath, req.query).then(resolve, () => resolve(null))
+          }, KITSU_RACE_DELAY_MS)
+          // Don't hold the event loop open on shutdown.
+          if (typeof timer.unref === 'function') timer.unref()
+        })
+
     // Queued Jikan request (deduped across concurrent callers). The map
     // stores the RAW { data, status } promise; each caller reshapes it
     // locally so concurrent callers can't mis-destructure a reshaped value.
-    let jikanRaw = jikanInFlight.get(cacheKey)
-    if (!jikanRaw) {
+    //
+    // While a MAL outage is known, skip the racer entirely — the fallbacks
+    // (already firing in parallel) are the only sources that can answer.
+    let jikanRaw = isMalDown() ? null : jikanInFlight.get(cacheKey)
+    if (!jikanRaw && !isMalDown()) {
       jikanRaw = enqueueJikanRequest(() => fetchJikanWithRetry(targetUrl, req.query))
       jikanInFlight.set(cacheKey, jikanRaw)
       jikanRaw.finally(() => jikanInFlight.delete(cacheKey))
     }
     const jikanReq = jikanRaw
-      .then(({ data, status }) => (status >= 200 && status < 300 ? data : null))
-      .catch(() => null)
+      ? jikanRaw
+          .then(({ data, status }) => (status >= 200 && status < 300 ? data : null))
+          .catch(() => null)
+      : Promise.resolve(null)
 
     const winner = await new Promise((resolve) => {
       let done = false
-      const win = (v) => { if (!done && v && isUsable(v)) { done = true; resolve(v) } }
+      const win = (v) => { if (!done && v && isUsable(v)) { done = true; raceSettled = true; resolve(v) } }
       jikanReq.then(win)
       fallbackReq.then(win)
-      // Once both settle with no winner, resolve null (fail fast).
-      Promise.allSettled([jikanReq, fallbackReq]).then(() => {
-        if (!done) { done = true; resolve(null) }
+      kitsuReq.then(win)
+      // Once every racer has settled with no winner, resolve null (fail fast).
+      Promise.allSettled([jikanReq, fallbackReq, kitsuReq]).then(() => {
+        if (!done) { done = true; raceSettled = true; resolve(null) }
       })
       // Hard cap — never let a stalled Jikan queue hold the UI.
       setTimeout(() => {
-        if (!done) { done = true; resolve(null) }
+        if (!done) { done = true; raceSettled = true; resolve(null) }
       }, JIKAN_ROUTE_TIMEOUT_MS)
     })
 
@@ -2319,6 +2417,26 @@ const anilistCache = new Map()
 const anilistFailCache = new Map()
 const anilistInFlight = new Map()
 
+/**
+ * Single funnel for outbound AniList GraphQL calls, so the relay and the
+ * Jikan fallback share one rate-limit budget (lib/anilist-budget.js).
+ * Without this the two callers each believed they had headroom and together
+ * tripped AniList's limiter — the schedule week then came back 429 on 5 of 6
+ * pages, each after a 4s sleep.
+ */
+async function aniListUpstreamPost(query, variables, headers) {
+  const release = await acquireAniListSlot()
+  try {
+    return await axios.post(
+      'https://graphql.anilist.co',
+      { query, variables: variables || {} },
+      { headers, timeout: 15_000, validateStatus: () => true },
+    )
+  } finally {
+    release()
+  }
+}
+
 function getAnilistCacheKey(query, variables, token) {
   // Normalize whitespace in the query so semantically identical queries
   // (e.g. the boot-time feed warm-up vs. the client's formatted copy) hash
@@ -2362,11 +2480,7 @@ app.post('/api/anilist-gql', async (req, res) => {
       if (!anilistInFlight.has(cacheKey)) {
         const refresh = (async () => {
           try {
-            const { data, status } = await axios.post(
-              'https://graphql.anilist.co',
-              { query, variables: variables || {} },
-              { headers: reqHeaders, timeout: 15_000, validateStatus: () => true },
-            )
+            const { data, status } = await aniListUpstreamPost(query, variables, reqHeaders)
             if (status >= 200 && status < 300) {
               anilistCache.set(cacheKey, { at: Date.now(), data })
               console.log('[anilist-gql] refreshed stale cache')
@@ -2409,11 +2523,7 @@ app.post('/api/anilist-gql', async (req, res) => {
       inFlight = (async () => {
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
-            const { data, status, headers: respHeaders } = await axios.post(
-              'https://graphql.anilist.co',
-              { query, variables: variables || {} },
-              { headers: reqHeaders, timeout: 15_000, validateStatus: () => true },
-            )
+            const { data, status, headers: respHeaders } = await aniListUpstreamPost(query, variables, reqHeaders)
 
             // Success — cache and return
             if (status >= 200 && status < 300) {
@@ -2421,16 +2531,21 @@ app.post('/api/anilist-gql', async (req, res) => {
               return { data, status }
             }
 
-            // 429 — respect Retry-After (real response header), retry at
-            // most ONCE with a bounded wait, then fail fast. The old path
-            // retried 3 extra times with exponential backoff — when Jikan
-            // is also down and every rail fires fallback queries, that 4x
-            // amplification turned one 429 into a full request storm that
-            // locked the app in negative-cache 502s for minutes.
+            // 429 — open the SHARED breaker and retry at most once with a
+            // short wait, then fail fast so the client can fall back to its
+            // own stale cache.
+            //
+            // fixes: this waited up to 4000ms per attempt, so one schedule
+            // week (6 pages fired together) blocked the UI for 10-23s per
+            // page while every one of them burned a 4s sleep. A 4s sleep is
+            // never worth it in an interactive path — the shared
+            // lib/anilist-budget.js window now prevents the burst that caused
+            // the 429 in the first place.
             if (status === 429) {
+              openAniListBreaker()
               const retryAfter = parseInt(respHeaders?.['retry-after'] || '0', 10)
               const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.pow(2, attempt) * 1000
-              const capped = Math.min(waitMs, 4000)
+              const capped = Math.min(waitMs, 800)
 
               if (attempt === 0) {
                 console.warn(`[anilist-gql] 429 rate-limited (attempt 1/2), waiting ${capped}ms...`)
@@ -2446,6 +2561,17 @@ app.post('/api/anilist-gql', async (req, res) => {
             return { data, status }
           } catch (e) {
             lastError = e
+            // A 429 (including the shared-budget breaker refusing the call) is
+            // NOT a transport blip: retrying it cost 1s + 2s + 4s of dead time
+            // per request — measured 7.4s for one schedule page while the
+            // breaker was open. Fail fast so the client falls back to its own
+            // stale cache instead of holding the UI.
+            if (e?.status === 429) {
+              return {
+                data: { data: null, errors: [{ message: 'AniList is rate-limiting — please wait a moment and try again.' }] },
+                status: 429,
+              }
+            }
             if (attempt < MAX_RETRIES) {
               const waitMs = Math.pow(2, attempt) * 1000
               console.warn(`[anilist-gql] transport error (attempt ${attempt + 1}/${MAX_RETRIES + 1}): ${e.message}, waiting ${waitMs}ms`)
@@ -2866,6 +2992,10 @@ app.get('/api/health', async (_req, res) => {
         manifestCache: manifestCache.size,
         inFlight: inFlight.size,
       },
+    // Additive diagnostic: the shared AniList budget the relay and the
+    // Jikan fallback draw from (see lib/anilist-budget.js). Makes a
+    // "everything is slow" report instantly diagnosable.
+    anilistBudget: aniListBudgetSnapshot(),
     healthCheck: getHealthStats(),
     browserReady,
     isRateLimited,
@@ -4016,11 +4146,7 @@ async function warmAnilistFeeds() {
       const existing = anilistCache.get(cacheKey)
       if (existing && Date.now() - existing.at < ANILIST_STALE_TTL) continue
 
-      const { data, status } = await axios.post(
-        'https://graphql.anilist.co',
-        { query, variables },
-        { headers, timeout: 15_000, validateStatus: () => true },
-      )
+      const { data, status } = await aniListUpstreamPost(query, variables, headers)
       const label = filter.split(',')[0].trim()
       if (status >= 200 && status < 300 && data?.data?.Page?.media?.length) {
         anilistCache.set(cacheKey, { at: Date.now(), data })
@@ -4036,6 +4162,22 @@ async function warmAnilistFeeds() {
     await new Promise((r) => setTimeout(r, 300))
   }
   console.log('[anilist-warm] feed warm-up complete')
+}
+
+/**
+ * Warm the TVDB session token after boot.
+ * The TVDB login measures ~1.0s and used to land on the critical path of the
+ * first anime the user opened (every episode list is TVDB-critical-path now
+ * that it uses short=true). Same pattern as warmAnilistFeeds above:
+ * non-blocking, failures logged and ignored.
+ */
+async function warmTvdb() {
+  try {
+    const { warmTvdbToken } = await import('./tvdb-episodes.js')
+    await warmTvdbToken()
+  } catch (err) {
+    console.warn('[tvdb-warm] error:', err?.message || err)
+  }
 }
 
 const server = app.listen(PORT, () => {
@@ -4055,6 +4197,10 @@ const server = app.listen(PORT, () => {
   // FIRST visitor paints the hero + feed rows instantly instead of waiting
   // ~4s of GraphQL latency. Non-blocking; failures are logged and ignored.
   setTimeout(() => warmAnilistFeeds(), 300)
+
+  // Warm the TVDB token a little later so it never competes with the AniList
+  // feed warm-up for the same startup window.
+  setTimeout(() => warmTvdb(), 2500)
 
   // Pre-warm the Puppeteer browser bridge on startup so the first user
   // click doesn't wait 10-15s for Chrome cold-launch. The warmUp() call

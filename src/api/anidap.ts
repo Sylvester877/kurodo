@@ -64,8 +64,13 @@ export interface AnidapProvider {
   tip?: string | null
   /** Which scraper provider owns this server ('anidap', 'miruro', etc.) */
   _provider?: string
-  /** Health-check result: true if the server passed the probe. */
-  _healthy?: boolean
+  /** Live per-title probe verdict:
+   *    true  → verified working for this episode
+   *    false → verified dead for this episode (still shown + clickable)
+   *    null  → not probed yet (unverified; also still clickable)
+   *  Nothing in the UI is ever disabled from this field — it only picks the
+   *  dot colour/badge and the sort order. */
+  _healthy?: boolean | null
   /** Health-check probe latency in ms (null if not probed). */
   _healthMs?: number | null
   /** Health-check error string (null unless probe failed). */
@@ -174,13 +179,17 @@ export const fetchAnidapStream = (
   ep: number,
   provider: string,
   type: string,
-  opts: { anilistId?: number | null; malId?: number | null; forceSource?: string | null; signal?: AbortSignal; titles?: { english?: string | null; romaji?: string | null } } = {},
+  opts: { anilistId?: number | null; malId?: number | null; forceSource?: string | null; signal?: AbortSignal; titles?: { english?: string | null; romaji?: string | null }; explicitPick?: boolean } = {},
 ) => {
   const params = new URLSearchParams()
   if (opts.anilistId) params.set('anilistId', String(opts.anilistId))
   // The watch route param IS the MAL id — lets the megavid fast path skip
   // its server-side AniList lookup (seconds saved on cold titles).
   if (opts.malId) params.set('malId', String(opts.malId))
+  // pick=1 = the USER clicked this server chip. Tells the server to honor the
+  // named provider for real instead of letting the automatic megavid route
+  // substitute its single stream (which made every chip identical).
+  if (opts.explicitPick) params.set('pick', '1')
   if (opts.forceSource) params.set('source', opts.forceSource)
   if (opts.titles?.english) params.set('title_english', opts.titles.english)
   if (opts.titles?.romaji) params.set('title_romaji', opts.titles.romaji)

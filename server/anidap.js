@@ -90,14 +90,34 @@ function pruneNoStreamCache() {
 // Legacy names are kept LAST so an old cached stream or a server that
 // comes back can still be used, without letting dead names crowd out the
 // working ones.
-const ALL_SUB_SERVERS = ['sora', 'kiwi', 'neko', 'beep', 'mimi', 'yuki', 'nuri', 'kami', 'koto', 'mochi', 'miku', 'shiro']
-const ALL_DUB_SERVERS = ['mimi', 'yuki', 'neko', 'kiwi', 'sora', 'nuri', 'kami', 'koto', 'miku']
+//
+// ── ORDER IS MEASURED CAPABILITY, NOT TASTE (Sep 2026) ──────────────
+// `servers_bench.mjs` (20 obscure titles) and `dub_bench.mjs` (100 titles,
+// pick=1 = the real chip path) both score each server against the ACTUAL
+// title. The roster is the fallback list the long tail gets when chad can't
+// answer, so its order decides which server the player tries FIRST — and the
+// old order was actively harmful: dub led with `mimi` at **8%** while the
+// best dub server (`loli`, **92%**) was not in the roster at all.
+//
+// Measured per-chip capability (dub / sub):
+//   loli 92% / 80%   yuki 70% / 29%   neko 68% / 35%   sora 58% / 21%
+//   miku 13% /  —    mimi  8% /  8%   kiwi  8% /  8%   nuri  8%
+//   kami  8%         koto  8%
+// Nothing is dropped — a server that is weak today can come back upstream,
+// and the picker must never hide one — every name stays in the list, just
+// ordered so auto-selection hits a winner first.
+const ALL_SUB_SERVERS = ['loli', 'neko', 'yuki', 'sora', 'mimi', 'kiwi', 'beep', 'nuri', 'kami', 'koto', 'mochi', 'miku', 'shiro']
+const ALL_DUB_SERVERS = ['loli', 'yuki', 'neko', 'sora', 'miku', 'kiwi', 'mimi', 'nuri', 'kami', 'koto']
 const ALL_HSUB_SERVERS = ['kiwi', 'mochi', 'wave', 'shiro']
 
 // Live tips from the chad /servers API (Aug 2026). Used when chad itself
 // can't be reached for the real per-episode list — keeps the picker's
 // quality badges truthful instead of showing stale "1080p • Fastest" text.
 const PROVIDER_TIPS = {
+  // `loli` deliberately has NO tip: we have never seen chad publish one for
+  // it (dub_bench recorded none), and inventing a quality claim for the
+  // server we now try FIRST would be the same class of dishonesty as the
+  // old "25/25 healthy" read-out. Absent tip → neutral label in the picker.
   sora: 'Soft sub, Fast, High quality',
   kiwi: 'Hard sub, Fast, High quality',
   neko: 'Hard sub, Fast, High quality',
@@ -481,9 +501,28 @@ const slugResolveInFlight = new Map() // anilistId -> Promise<string|null>
 /** Drop a cached slug (and any in-flight resolve) so the next request
  *  re-resolves fresh. Called when chad reports the slug is gone, so a
  *  stale 12h cache entry can never trap the fast path in a 404 loop. */
+// Slug-invalidation throttle.
+//
+// fixes: "obscure titles pay a fresh AniList lookup on every server click".
+// chad answers 404 for a provider that simply has no sources for the title,
+// and the old code treated that as "the slug is stale" and wiped the 12h slug
+// cache. On a title with no streams, EVERY provider 404ed, so each of the 6
+// picker clicks re-ran GraphQL slug resolution + a chad round trip (observed
+// as repeated `Resolved slug (graphql): #19901 -> donkikko-krddi` in the
+// server log — the same slug over and over). A stale slug is a per-title
+// condition, not a per-provider one, so invalidating at most once per 5 min
+// keeps the genuine "anidap regenerated the slug" recovery path working
+// while removing the churn.
+const slugInvalidateAt = new Map() // anilistId -> timestamp
+const SLUG_INVALIDATE_MIN_GAP = 5 * 60 * 1000
+
 function invalidateSlug(anilistId) {
+  const last = slugInvalidateAt.get(anilistId) || 0
+  if (Date.now() - last < SLUG_INVALIDATE_MIN_GAP) return false
+  slugInvalidateAt.set(anilistId, Date.now())
   slugResolveCache.delete(anilistId)
   slugResolveInFlight.delete(anilistId)
+  return true
 }
 
 /** Pull the real anidap text slug out of the watch page's SSR HTML.
@@ -912,6 +951,22 @@ function pruneProviderListCache() {
   }
 }
 
+// The current roster as provider objects — a GUESS, not upstream truth (each
+// item is flagged `_roster: true`). Exported so the /servers route can answer
+// the user INSTANTLY when chad is slow instead of waiting out its timeout: the
+// route races chad against a short deadline and serves this if chad loses,
+// while chad's real answer keeps filling the cache in the background.
+// Measured (watch_load_probe, Sep 2026): the servers stage averaged 7.04s and
+// hit its 12s cap on the long tail — all of it BEFORE the client could even
+// begin resolving a stream, so it was pure added latency.
+export function getRosterProviders() {
+  return [
+    ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
+    ...ALL_DUB_SERVERS.map(name => ({ name, type: 'dub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
+    ...ALL_HSUB_SERVERS.map(name => ({ name, type: 'hsub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
+  ]
+}
+
 export async function getProviders(slug, ep, anilistId, titles = {}) {
   const id = await resolveAnilistId(slug, anilistId, titles)
   if (!id) return []
@@ -969,11 +1024,7 @@ export async function getProviders(slug, ep, anilistId, titles = {}) {
     // NOTE: this roster is a GUESS, not upstream truth — each item is
     // flagged `_roster: true` so the /servers route caches it briefly and
     // the real list appears the moment chad answers again.
-    return [
-      ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
-      ...ALL_DUB_SERVERS.map(name => ({ name, type: 'dub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
-      ...ALL_HSUB_SERVERS.map(name => ({ name, type: 'hsub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
-    ]
+    return getRosterProviders()
   })()
 
   providerListInFlight.set(cacheKey, attempt)
@@ -1181,9 +1232,9 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
         // NOTE: a 404 with the NUMERIC id means upstream genuinely has no
         // such stream (the id shape is valid for chad) — confirmed absence,
         // cached below via the normal no-stream path.
-        if (chadSlug) invalidateSlug(id)
+        const invalidated = chadSlug ? invalidateSlug(id) : false
         setNoStream(noStreamKey, NO_STREAM_TTL_FAILURE)
-        console.log(`[anidap] chad 404 for ${chadSlug ? 'slug (invalidating)' : 'numeric id'}: ${id}:${epNum}/${bareProvider}/${type}`)
+        console.log(`[anidap] chad 404 for ${chadSlug ? (invalidated ? 'slug (invalidating)' : 'slug (throttled)') : 'numeric id'}: ${id}:${epNum}/${bareProvider}/${type}`)
         return null
       } else if (data._error === 403) {
         // bot_detected — the chad API is temporarily blocking our Node

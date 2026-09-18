@@ -18,6 +18,10 @@
 // Resolution chain: MAL id → AniZip (tvdbShowId) → TVDB v4 login → extended
 // episodes → map by absolute episode number. Cached in-memory 24h.
 import axios from 'axios'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import crypto from 'node:crypto'
 // Shared AniZip mapping layer (mem + disk + single-flight) — the mapping
 // for this MAL id may already be cached by anikage-episodes or the client
 // mapping endpoint, so TVDB never pays a duplicate upstream round-trip.
@@ -35,11 +39,74 @@ const getApiKey = () => (process.env.TVDB_API_KEY || '').trim()
 let token = null
 let tokenAt = 0
 const TOKEN_TTL = 24 * 60 * 60 * 1000 // 24h
+let loginInFlight = null
+
+/**
+ * Warm the TVDB session token ahead of the first episode request.
+ * The login itself measures ~1.0s (see the probe in scripts-perf/tvdb_probe.mjs)
+ * and used to sit on the critical path of whichever anime the user opened
+ * first. Called once, shortly after boot, so the first episode list skips it.
+ * Never throws.
+ */
+export async function warmTvdbToken() {
+  try {
+    const t = await getToken()
+    console.log(t ? '[tvdb] token pre-warmed' : '[tvdb] token pre-warm skipped (no API key)')
+  } catch { /* offline — the first real request will retry */ }
+}
 
 // ── Episode map cache: malId → { at, eps: Map<absNumber, { image, title, overview, airDate, runtime, seasonNumber }> } ──
 const cache = new Map()
 const TTL = 24 * 60 * 60 * 1000
 const EMPTY_TTL = 6 * 60 * 60 * 1000
+
+// ── Disk tier (survives restarts — the real win for a desktop app) ──
+// The in-memory map above is lost on every Electron launch, so each session
+// paid the full TVDB round trip again (One Piece: ~1.8-2.0s / 908KB) for shows
+// the user had already browsed. TVDB artwork is effectively immutable, so the
+// resolved map is mirrored to disk for 14 days. Same pattern as
+// server/anizip-cache.js (tmp dir + size-capped pruning).
+const DISK_DIR = process.env.KURODO_TVDB_CACHE_DIR || path.join(os.tmpdir(), 'kurodo-tvdb')
+const DISK_TTL = 14 * 24 * 60 * 60 * 1000
+const DISK_MAX_BYTES = 120 * 1024 * 1024
+
+function diskPaths(key) {
+  const h = crypto.createHash('sha1').update(key).digest('hex')
+  return path.join(DISK_DIR, h + '.json')
+}
+
+/** Rehydrate a Map<abs, episodeArt> from disk. Null on miss/stale/corrupt. */
+function diskReadEps(key) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(diskPaths(key), 'utf-8'))
+    if (!raw || !Array.isArray(raw.rows) || Date.now() - raw.at > DISK_TTL) return null
+    return new Map(raw.rows)
+  } catch { return null }
+}
+
+function diskWriteEps(key, eps) {
+  try {
+    fs.mkdirSync(DISK_DIR, { recursive: true })
+    fs.writeFileSync(diskPaths(key), JSON.stringify({ at: Date.now(), rows: [...eps] }))
+    let total = 0
+    const files = []
+    for (const f of fs.readdirSync(DISK_DIR)) {
+      const fp = path.join(DISK_DIR, f)
+      try {
+        const s = fs.statSync(fp)
+        files.push({ p: fp, mtime: s.mtimeMs, size: s.size })
+        total += s.size
+      } catch { /* raced delete */ }
+    }
+    if (total > DISK_MAX_BYTES) {
+      files.sort((a, b) => a.mtime - b.mtime)
+      for (const f of files) {
+        if (total <= DISK_MAX_BYTES * 0.85) break
+        try { fs.unlinkSync(f.p); total -= f.size } catch { /* ignore */ }
+      }
+    }
+  } catch { /* disk full / locked — memory cache still serves */ }
+}
 
 // ── TVDB series id cache: malId → { at, id } (from AniZip) ──
 const seriesIdCache = new Map()
@@ -49,6 +116,10 @@ async function getToken() {
   if (token && Date.now() - tokenAt < TOKEN_TTL) return token
   const TVDB_API_KEY = getApiKey()
   if (!TVDB_API_KEY) return null
+  // Single-flight: several episode requests can land together on a cold
+  // server, and without this each one fired its own ~1s login.
+  if (loginInFlight) return loginInFlight
+  loginInFlight = (async () => {
   try {
     const { data } = await axios.post(
       `${API_BASE}/login`,
@@ -61,7 +132,11 @@ async function getToken() {
   } catch (e) {
     console.warn('[tvdb] login failed:', e?.message || e)
     return null
+  } finally {
+    loginInFlight = null
   }
+  })()
+  return loginInFlight
 }
 
 /** Resolve a MAL id → TVDB series id via AniZip's mapping endpoint. */
@@ -103,8 +178,14 @@ export async function getTvdbEpisodesBySeriesId(seriesId) {
   const eps = new Map()
 
   const fetchExtended = async (bearerToken) => {
+    // short=true — the SAME episode fields we read (image, absoluteNumber,
+    // name, aired, runtime, seasonNumber, overview) without the unused
+    // translation maps. Measured on TVDB series 81797 (One Piece):
+    //   1363ms / 1143KB  →  589ms / 908KB  (~2.3× faster cold)
+    // Bleach TYBW: 553ms → 421ms. TVDB is the critical path of every cold
+    // episode list, so this is the cheapest second we can win.
     const { data } = await axios.get(
-      `${API_BASE}/series/${seriesId}/extended?meta=episodes&short=false`,
+      `${API_BASE}/series/${seriesId}/extended?meta=episodes&short=true`,
       {
         headers: { Authorization: `Bearer ${bearerToken}`, 'User-Agent': 'Mozilla/5.0' },
         timeout: 20_000,
@@ -166,6 +247,15 @@ export async function getTvdbEpisodes(malId) {
     if (Date.now() - hit.at < ttl) return hit.eps
   }
 
+  // Disk tier before any network work: a restarted server still knows the
+  // artwork for shows the user has already opened (see diskReadEps above).
+  const diskKey = `m:${malId}`
+  const diskEps = diskReadEps(diskKey)
+  if (diskEps && diskEps.size > 0) {
+    cache.set(malId, { at: Date.now(), eps: diskEps })
+    return diskEps
+  }
+
   const seriesId = await getSeriesIdFromMal(malId)
   if (!seriesId) {
     // No series id — either AniZip is down (transient, don't cache) or the
@@ -184,8 +274,10 @@ export async function getTvdbEpisodes(malId) {
 
   /** Fetch the extended episode list and fold its artwork into `eps`. */
   const fetchExtended = async (bearerToken) => {
+    // short=true — same fields we read, without the unused translation maps
+    // (One Piece: 1363ms/1143KB → 589ms/908KB). See the note above.
     const { data } = await axios.get(
-      `${API_BASE}/series/${seriesId}/extended?meta=episodes&short=false`,
+      `${API_BASE}/series/${seriesId}/extended?meta=episodes&short=true`,
       {
         headers: { Authorization: `Bearer ${bearerToken}`, 'User-Agent': 'Mozilla/5.0' },
         timeout: 20_000,
@@ -241,6 +333,7 @@ export async function getTvdbEpisodes(malId) {
   }
 
   cache.set(malId, { at: Date.now(), eps: eps.size > 0 ? eps : null })
+  if (eps.size > 0) diskWriteEps(diskKey, eps)
   if (cache.size > 200) {
     const n = Date.now()
     for (const [k, v] of cache) if (n - v.at > TTL) cache.delete(k)

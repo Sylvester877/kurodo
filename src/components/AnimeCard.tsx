@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { preloadHandlers } from '../lib/routePreloaders'
-import { Star, Play } from 'lucide-react'
+import { Star, Play, Captions } from 'lucide-react'
 import { getImageUrl, formatScore, proxifyWithFallback, pickTitle, getBackendOrigin } from '../lib/utils'
 import { useSettings } from '../store/useSettings'
 import { prefetchAnimeDetails, prefetchAnimeEpInfo } from '../lib/prefetch'
@@ -175,6 +175,16 @@ export default memo(function AnimeCard({ anime, badge, hoverPreview = true, magn
               </div>
             ) : null}
           </div>
+
+          {/* ── Bottom-left: CC subtitle badge — every anime section signals captions ── */}
+          {!badge && (
+            <div className="absolute bottom-2 left-2 z-[2]">
+              <span className="glass-pill py-0.5 px-1.5 bg-black/75 border-white/15 text-[8px] font-bold uppercase tracking-wider text-white/90 flex items-center gap-1 shadow-md backdrop-blur-md">
+                <Captions className="h-3 w-3 text-white/80" />
+                CC
+              </span>
+            </div>
+          )}
 
           {/* ── Hover: keep the artwork visible (aniclover-style) — soft bottom
                  vignette + play disc + quick actions; no full-cover blackout ── */}

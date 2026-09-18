@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { proxifyImgUrl } from '../lib/utils'
 
 /**
  * Sample the dominant (average) colour of an image and return it as
@@ -61,7 +62,14 @@ export function useDominantColor(
     imgEl.onerror = () => {
       if (!cancelled) setColor(null)
     }
-    imgEl.src = url
+    // fixes: callers pass the raw CDN URL (AniList/MAL), and re-requesting it
+    // with crossOrigin='anonymous' is refused by those CDNs — the console filled
+    // with "Access to image ... has been blocked by CORS policy" and the canvas
+    // read produced no colour, so the ambient glow silently never appeared.
+    // The same-origin /img proxy serves identical bytes with CORS allowed,
+    // which makes the canvas readable (and is already a warm cache hit
+    // because the poster itself is rendered through it).
+    imgEl.src = proxifyImgUrl(url)
     return () => {
       cancelled = true
     }

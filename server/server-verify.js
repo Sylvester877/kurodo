@@ -25,12 +25,38 @@ import { routedGetStream } from './providers/router.js'
 const PROBE_TTL_OK = 15 * 60 * 1000   // verified working — trust 15 min
 const PROBE_TTL_FAIL = 3 * 60 * 1000  // failed — retry in 3 min (servers recover)
 const PROBE_TIMEOUT_MS = 12_000       // per-server hard cap
+// fixes: "the picker says UNVERIFIED on a show whose servers are actually
+// fine". With a cap of 3 and a serial queue only ~1 probe landed inside the
+// route's wait window, so a freshly-opened title painted 1 verified chip and
+// 5 amber ones (measured on One Piece: verified 1 · unverified 5). The verdict
+// is still honest — but it is also less useful than it could be. The cap is
+// now 6 (a full typical per-type list) and the queue runs 2 wide, which fits
+// ~3-4 verdicts in the same wait window without changing response latency
+// (the route still returns after FAST_WAIT_MS). Probes are additionally paced
+// by chadGet's own limiter, which is what actually protects the chad budget.
+// Cut 6 → 3 and 2 → 1 (Sep 2026). Probes and the user's actual stream request
+// compete for the SAME cf-harvester browser mutex, and the probe batch runs in
+// the background — so a wide batch delays the one extraction the user is
+// waiting for. Measured after the servers route stopped blocking on probes:
+// first-stream extraction went 14.6s → 28.7s because 6 background probes were
+// queued ahead of it. Verdicts are a nicety (the client orders the chain by
+// measured capability, so it does not need them to pick well); the user's
+// stream is the product. Narrow and serial keeps the picker informative
+// without ever making the episode wait.
 const MAX_PROBES_PER_TICK = 3         // cap per request so one cold title
                                       // doesn't drain the chad API budget
                                       // (probes are also paced by chadGet)
-const PROBE_CONCURRENCY = 1           // serial — smoothest possible probing
-const FAST_WAIT_MS = 4_000            // route blocks at most this long for
-                                      // probes; the rest finish in background
+const PROBE_CONCURRENCY = 1           // serial — the user's stream always wins
+                                      // the mutex next
+// Route blocks at most this long for probes; the rest finish in background.
+// Cut 4000 → 1200 (Sep 2026): this wait sits on the STRICTLY SEQUENTIAL
+// Watch-load path (info → servers → stream), and the client no longer needs
+// verdicts to choose well — it orders the chain by measured capability, so the
+// first chip it tries is a winner regardless (failover bench: 74/78 plays came
+// from chain position #1). The window still catches the fast chad-path probes
+// (~0.5-1s), which is what it was for; the slow ones land in the verdict map
+// for the next request exactly as before.
+const FAST_WAIT_MS = 1_200
 const probeInFlight = new Map()        // `${slug}:${ep}` -> batch promise
 
 const verdicts = new Map() // `${slugOrId}:${ep}:${name}:${type}` -> { ok, at }
@@ -154,7 +180,13 @@ export async function verifyProviders(providers, { anilistId, slug, ep, titles =
     const { isChadBlocked, isChad429Blocked } = await import('./anidap.js')
     if (isChadBlocked() || isChad429Blocked()) {
       for (const p of needsProbe) {
-        p._healthy = true
+        // UNVERIFIED, not healthy. During a chad block we cannot know whether
+        // this server has the title, so claiming `true` painted a green
+        // "working" dot on 25 chips that mostly 404 (servers_bench: 15/20
+        // obscure titles returned no stream at all while the picker showed
+        // 25/25 healthy). `null` stays clickable and keeps the provider in
+        // the race pool — it only stops the UI from promising success.
+        p._healthy = null
         p._healthError = null
       }
       return providers
@@ -192,6 +224,25 @@ export async function verifyProviders(providers, { anilistId, slug, ep, titles =
       }
     }
 
+    // ── A GUESSED roster is not worth probing AT ALL ──
+    // `_roster: true` means chad never answered, so these names are our own
+    // guess, not an upstream per-episode list. Probing a guess burns the
+    // harvester mutex (~12s per server) to learn that an obscure title has
+    // nothing — and because the probes run in the background, that mutex is
+    // exactly what the user's real stream request is queued behind. So for a
+    // guessed list we return immediately, all chips UNVERIFIED/null (which is
+    // precisely what they are), and leave the browser free for playback. The
+    // failover bench needed all 23 chips to fail before declaring a title
+    // dead — so the picker was never going to learn anything useful from
+    // probing it anyway.
+    if (providers.every((p) => p._roster)) {
+      for (const p of providers) {
+        p._healthy = null
+        p._healthError = null
+      }
+      return providers
+    }
+
     // ── Non-blocking probing (ROOT speed fix) ──
     // The old code AWAITED the whole batch (3 × 12s worst case = 36s) before
     // the picker could paint anything. Now the batch runs in the BACKGROUND
@@ -226,10 +277,13 @@ export async function verifyProviders(providers, { anilistId, slug, ep, titles =
     )
   }
 
-  // Anything still unprobed: optimistic (clickable), the router will try it.
+  // Anything still unprobed stays UNVERIFIED (null): clickable and racy, but
+  // not advertised as working. Only a real probe (or a cached verdict) may
+  // produce `true`. The picker renders null as an amber "unverified" dot and
+  // still sorts verified servers above it (src/lib/providers.ts healthRank).
   for (const p of providers) {
-    if (p._healthy === null || p._healthy === undefined) {
-      p._healthy = true
+    if (p._healthy === undefined) {
+      p._healthy = null
       p._healthError = null
     }
   }

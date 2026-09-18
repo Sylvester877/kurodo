@@ -35,6 +35,15 @@ export interface MangaDexChapter {
   data: string[]
   dataSaver: string[]
   scanGroup: string | null
+  /** Publisher's own platform (null for fan scanlations). */
+  publisher?: string | null
+  /** MangaDex account is a publisher/licensor account. */
+  official?: boolean
+  /** Where the publisher hosts it — the only place this chapter can be read. */
+  externalUrl?: string | null
+  isUnavailable?: boolean
+  /** False when MangaDex only has a link-out/notice for it (see lib/mangaChapter). */
+  readable?: boolean
 }
 
 export interface MangaDexPage {

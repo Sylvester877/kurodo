@@ -8,11 +8,16 @@
 // internal AniZip call for the series id — this is intentional because
 // making TVDB wait for the shared AniZip would add ~3s to cold load.
 import axios from 'axios'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import crypto from 'node:crypto'
 import { getTvdbEpisodes } from './tvdb-episodes.js'
 // Shared AniZip mapping layer (mem + disk + single-flight). TVDB's internal
 // series-id resolution now reads from the SAME store, so a cold request no
 // longer fires two identical ani.zip round-trips in parallel.
 import { getAnizipMapping } from './anizip-cache.js'
+import { isMalDown, noteMalDown } from './lib/mal-outage.js'
 
 const cache = new Map()
 const TTL = 60 * 60 * 1000; // 1 hour
@@ -25,6 +30,35 @@ const NEGATIVE_TTL = 3 * 60 * 1000;
 
 function ok(res, data) {
   res.json({ ok: true, data });
+}
+
+// ── Disk cache for the Jikan filler/recap flags ──────────────────────────
+// These flags are static MAL metadata, but they were re-fetched (up to 3
+// sequential Jikan pages, capped at 1.2s) on EVERY cold episode request —
+// after the TVDB + AniZip disk tiers landed, this stage became the only
+// remaining cost of an episode list (~1.2s for every anime, every launch).
+// Only COMPLETE result sets are persisted: a loop that broke early on a
+// failure must not freeze "no filler badges" for 30 days.
+const FLAG_DIR = process.env.KURODO_TVDB_CACHE_DIR || path.join(os.tmpdir(), 'kurodo-tvdb')
+const FLAG_TTL = 30 * 24 * 60 * 60 * 1000
+
+function flagPath(malId) {
+  return path.join(FLAG_DIR, 'flags-' + crypto.createHash('sha1').update(`f:${malId}`).digest('hex') + '.json')
+}
+
+function readFlagDisk(malId) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(flagPath(malId), 'utf-8'))
+    if (!raw || !raw.flags || Date.now() - raw.at > FLAG_TTL) return null
+    return raw.flags
+  } catch { return null }
+}
+
+function writeFlagDisk(malId, flags) {
+  try {
+    fs.mkdirSync(FLAG_DIR, { recursive: true })
+    fs.writeFileSync(flagPath(malId), JSON.stringify({ at: Date.now(), flags }))
+  } catch { /* disk full / locked — the in-memory path still works */ }
 }
 
 function fail(res, err) {
@@ -42,6 +76,13 @@ export async function register(app) {
       const ttl = cached?.negative ? NEGATIVE_TTL : TTL;
       if (cached && Date.now() - cached.at < ttl) return ok(res, cached.data);
 
+      // Per-stage timing: this endpoint is the cold-load cost of every
+      // episode list, so keep the breakdown visible in the server log
+      // (ELECTRON_TIMING-style) instead of guessing which upstream is slow.
+      const tStart = Date.now()
+      const tPhase1 = []
+      const mark = (name) => { tPhase1.push(`${name} ${Date.now() - tStart}ms`) }
+
       // ── Phase 1: TVDB + AniZip + Jikan in PARALLEL (cold ~max(6s), not 9s) ──
       const [tvdbSettled, anizipSettled, jikanSettled] = await Promise.allSettled([
         // TVDB v4 real episode screenshots — Tier 1 (anikage.cc source).
@@ -49,6 +90,7 @@ export async function register(app) {
         // wait for the shared AniZip fetch. One request returns all artwork.
         (async () => {
           const map = await getTvdbEpisodes(malId);
+          mark('tvdb')
           if (map) console.log(`[anikage-episodes] TVDB artworks for MAL ${malId}: ${map.size} episodes`);
           return map;
         })(),
@@ -58,36 +100,62 @@ export async function register(app) {
         // single-flight dedupes against TVDB's internal series-id lookup and
         // the client mapping endpoint, and disk keeps it across restarts.
         (async () => {
-          return (await getAnizipMapping({ malId })) || null;
+          const m = (await getAnizipMapping({ malId })) || null;
+          mark('anizip')
+          return m;
         })(),
 
-        // Jikan filler/recap flags — hard-capped at ~3.5s TOTAL. Filler
-        // badges are a nice-to-have; a rate-limited Jikan (its pages are
-        // sequential, so the old 8s×3 worst case was ~24s) must never hold
-        // up the episode list. On timeout we return the partial flags and
-        // episodes render with filler=false (thumbnails/titles unaffected).
+        // Jikan filler/recap flags — hard-capped at ~1.8s TOTAL. Filler
+        // badges are a nice-to-have; a rate-limited Jikan must never hold up
+        // the episode list. On timeout we return the partial flags and the
+        // episodes render with isFiller=false (thumbnails/titles unaffected).
+        //
+        // fixes: the budget was 3.5s, which made Jikan the critical path for
+        // long shows once TVDB got fast (One Piece: tvdb 1761ms, jikan
+        // 2112ms → the whole request waited on filler badges). It also hit
+        // api.jikan.moe directly, so it re-discovered a MAL outage that the
+        // proxy had already recorded — isMalDown() now short-circuits it.
         (async () => {
+          const diskFlags = readFlagDisk(malId);
+          if (diskFlags) { mark('jikan-disk'); return diskFlags; }
+
           const flags = {};
-          const deadline = Date.now() + 3500;
+          if (isMalDown()) { mark('jikan-skipped-mal-down'); return flags; }
+
+          // Hard-bounded: a request started at the deadline used to run for
+          // another `max(700, …)` on top, which is how a 1800ms budget
+          // measured 2209ms and stayed the critical path on long shows.
+          const deadline = Date.now() + 1200;
+          let complete = false;
           for (let page = 1; page <= 3; page++) {
-            if (Date.now() > deadline) break;
+            const remain = deadline - Date.now();
+            if (remain < 300) break;
             try {
               const { data } = await axios.get(`https://api.jikan.moe/v4/anime/${malId}/episodes`, {
                 params: { page },
-                timeout: Math.max(1500, Math.min(4000, deadline - Date.now())),
+                timeout: remain,
               });
               const list = data?.data;
-              if (!Array.isArray(list) || list.length === 0) break;
+              if (!Array.isArray(list) || list.length === 0) { complete = true; break; }
               for (const e of list) {
                 const num = Number(e.episode ?? e.mal_id);
                 if (num > 0) flags[num] = { filler: !!e.filler, recap: !!e.recap };
               }
-              if (!data?.pagination?.has_next_page) break;
-            } catch { break; /* Jikan down/limited — proceed without flags */ }
+              if (!data?.pagination?.has_next_page) { complete = true; break; }
+            } catch (e) {
+              // 504 = MAL is unreachable for every Jikan endpoint — let the
+              // proxy and this loop agree on that instead of each paying its
+              // own doomed round trip.
+              if (e?.response?.status === 504) noteMalDown();
+              break;
+            }
           }
+          mark(complete ? 'jikan-complete' : 'jikan-partial')
+          if (complete && Object.keys(flags).length > 0) writeFlagDisk(malId, flags)
           return flags;
         })(),
       ]);
+      mark('phase1-done')
 
       const tvdbMap = tvdbSettled.status === 'fulfilled' ? tvdbSettled.value : null;
       const anizipData = anizipSettled.status === 'fulfilled' ? anizipSettled.value : null;
@@ -110,14 +178,25 @@ export async function register(app) {
       // authoritative absoluteEpisodeNumber per episode, so the
       // completeness check (and the merge below) must use it — otherwise
       // every sequel show gets the PREQUEL's thumbnails.
-      const tvdbComplete = !!tvdbMap && tvdbMap.size > 0 &&
-        rawEpisodes.length > 0 &&
-        rawEpisodes.every(e => tvdbMap.has(Number(e.absoluteEpisodeNumber ?? e.episode)));
+      // Coverage instead of "all-or-nothing": requiring EVERY AniZip episode
+      // in tvdbMap meant one missing episode (One Piece: 1178/1184) dropped
+      // into TMDB's 4 season fetches for 700ms of extra cold load to fill a
+      // handful of gaps. Above 90% the remaining holes are episodes TVDB
+      // simply doesn't list yet (unaired/specials) — the same ones TMDB
+      // lacks, and AniZip's own image still covers them.
+      const tvdbCovered = (tvdbMap && rawEpisodes.length > 0)
+        ? rawEpisodes.reduce(
+            (n, e) => n + (tvdbMap.has(Number(e.absoluteEpisodeNumber ?? e.episode)) ? 1 : 0),
+            0,
+          )
+        : 0;
+      const tvdbComplete = rawEpisodes.length > 0 && tvdbCovered / rawEpisodes.length >= 0.9;
       const tmdbSeriesId = tvdbComplete
         ? null
         : (anizipData?.mappings?.themoviedb_id || null);
       const tmdbKey = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '';
       let tmdbEps = {};
+      if (!tmdbSeriesId) mark('tmdb-skipped')
       if (tmdbKey && tmdbSeriesId) {
         // Phase 2 was SEQUENTIAL — worst case 4 × 10s timeout = ~40s holding
         // up the episode list. Fire all four season fetches in parallel
@@ -151,10 +230,26 @@ export async function register(app) {
         }
       }
 
+      mark('phase2-tmdb-done')
+
+      // Drop null/'' fields per episode instead of emitting them. A long show
+      // carries ~120 bytes of `"titleJp":null,"description":null,...` per
+      // episode — 140KB+ of pure noise on One Piece — and the renderer only
+      // ever reads these with a falsy check, so an absent key behaves
+      // identically to null.
+      const compact = (o) => {
+        const out = {};
+        for (const [k, v] of Object.entries(o)) {
+          if (v === null || v === undefined || v === '') continue;
+          out[k] = v;
+        }
+        return out;
+      };
+
       let episodes = [];
       try {
         episodes = rawEpisodes
-          .map(e => ({
+          .map(e => compact({
             number: Number(e.episode),
             absoluteNumber: Number(e.absoluteEpisodeNumber) || null,
             title: e.title?.en || e.title?.['x-jat'] || null,
@@ -178,12 +273,11 @@ export async function register(app) {
       //    the local number for single-season shows where abs isn't set.
       episodes = episodes.map(ep => {
         const jikan = jikanFlags[ep.number] || {};
-        const tmdbImage = tmdbEps[ep.number];
         const tvdb = tvdbMap?.get(ep.absoluteNumber ?? ep.number);
-        return {
+        return compact({
           ...ep,
           // TVDB artwork = real episode screenshot (anikage.cc source)
-          image: tvdb?.image || ep.image || tmdbImage || null,
+          image: tvdb?.image || ep.image || tmdbEps[ep.number] || null,
           // English title from AniZip wins (TVDB's default name is often
           // Japanese and it doesn't ship translations in the list response)
           title: ep.title || tvdb?.title,
@@ -191,28 +285,31 @@ export async function register(app) {
           airDate: tvdb?.airDate || ep.airDate,
           runtime: tvdb?.runtime ?? ep.runtime,
           seasonNumber: tvdb?.seasonNumber ?? ep.seasonNumber,
-          isFiller: jikan.filler || false,
-          isRecap: jikan.recap || false,
-        };
+          // Explicit booleans — the client reads these directly.
+          isFiller: !!jikan.filler,
+          isRecap: !!jikan.recap,
+        });
       });
 
       // Also surface episodes that only TVDB knows about (AniZip gaps)
       if (tvdbMap && episodes.length === 0) {
         for (const [num, tvdb] of tvdbMap) {
-          episodes.push({
+          episodes.push(compact({
             number: num,
             title: tvdb.title,
-            titleJp: null,
             description: tvdb.overview,
             image: tvdb.image,
             airDate: tvdb.airDate,
             runtime: tvdb.runtime,
             isFiller: false,
-            rating: null,
             seasonNumber: tvdb.seasonNumber,
-          });
+          }));
         }
         episodes.sort((a, b) => a.number - b.number);
+      }
+
+      if (process.env.KURODO_TIMING !== '0') {
+        console.log(`[anikage-episodes] MAL ${malId}: ${episodes.length} eps · ${tPhase1.join(' · ')} · total ${Date.now() - tStart}ms${episodes.length > 0 && tvdbMap ? ` · tvdb ${tvdbMap.size}` : ''}`)
       }
 
       const result = { episodes, total: episodes.length, malId, source: 'tvdb+anizip+tmdb+jikan' };

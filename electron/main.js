@@ -176,10 +176,37 @@ app.on('child-process-gone', (_event, details) => {
   writeDiag(msg)
 })
 
+// ── Fault tracking: a close during a fault is NOT a user quit ──────
+// The window `close` handler below treats every close as a user clicking X
+// (it sets `quitting` and calls app.quit()). That assumption is the
+// "recurring window death": when a teardown happens on its own — GPU process
+// death, renderer death, a failed load — `close` fires too, so the app helpfully
+// quits and NONE of the recovery paths run (they all bail on `quitting`).
+// Forensics for exactly that: no Crashpad report, no Windows Application Error
+// event, no render-process-gone line and no recovery diag entry — just an exit.
+// So: record fault signals, and let the close handler consult them.
+let lastFaultAt = 0
+const FAULT_WINDOW_MS = 20_000
+function noteFault(what) {
+  lastFaultAt = Date.now()
+  writeDiag(`fault noted: ${what}`)
+}
+
+// GPU / utility process death is the usual precursor to a window teardown
+// (this machine logs "GPU state invalid after WaitForGetOffsetInRange").
+app.on('child-process-gone', (_event, details) => {
+  const type = details?.type || 'unknown'
+  if (type !== 'GPU' && type !== 'Utility' && type !== 'Network') return
+  const msg = `[electron] child-process-gone: ${type} ${details?.reason || ''} ${details?.exitCode ?? ''}`
+  console.error(msg)
+  noteFault(msg)
+})
+
 app.on('render-process-gone', (_event, webContents, details) => {
   const msg = `[electron] render-process-gone: ${details.reason} ${details.exitCode}`
   console.error(msg)
   writeDiag(msg)
+  noteFault(msg)
 
   // Only recover the MAIN app window. The hidden harvester window crashes
   // are handled by the harvester itself (it recreates its window on demand).
@@ -464,8 +491,31 @@ function createMainWindow() {
   // 2. If the window/webContents is DESTROYED without a close (renderer or
   //    GPU-process death — the "app crashes when opening an episode" bug),
   //    automatically recreate it so the user is never left with a dead app.
-  win.on('close', () => {
+  win.on('close', (e) => {
     if (!quitting) {
+      // ── Crash-driven close? Recover instead of quitting ──
+      // If something died shortly before this close, the close is a teardown,
+      // not the user asking to quit. Recover the window and keep the app (and
+      // the embedded backend) alive; a genuine X-click is never preceded by a
+      // GPU/renderer/network fault.
+      if (Date.now() - lastFaultAt < FAULT_WINDOW_MS) {
+        e.preventDefault()
+        console.error('[electron] window close during a recent GPU/renderer fault — recovering instead of quitting')
+        writeDiag('window close during recent fault — recovering instead of quitting')
+        try {
+          if (win.webContents && !win.webContents.isDestroyed()) {
+            win.webContents.reload()
+          } else {
+            // destroy() does not fire 'close', so the 'closed' handler picks
+            // this up and recreates the window in-process.
+            win.destroy()
+          }
+        } catch (err) {
+          console.error('[electron] fault-close recovery failed:', err?.message || err)
+          try { win.destroy() } catch { /* already gone */ }
+        }
+        return
+      }
       quitting = true
       app.quit()
       // Belt-and-braces: if quit is ever blocked (pending async work, a stuck
@@ -483,6 +533,12 @@ function createMainWindow() {
   win.webContents.on('destroyed', () => {
     if (!quitting) scheduleMainWindowRecovery('webContents destroyed unexpectedly')
   })
+  // More fault signals that can precede a spontaneous teardown.
+  win.on('unresponsive', () => noteFault('window unresponsive'))
+  win.webContents.on('did-fail-load', (_e, code, desc, url) =>
+    noteFault(`did-fail-load ${code} ${desc} ${String(url || '').slice(0, 60)}`),
+  )
+  win.webContents.on('render-process-gone', () => noteFault('main renderer gone'))
 
   return win
 }

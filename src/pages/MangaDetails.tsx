@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, BookOpen, Hash, Star, Globe, Calendar, Loader2, Search, X, Heart, ChevronDown, ChevronUp, Library, TrendingUp, Palette, Play, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BookOpen, Hash, Star, Globe, Calendar, Loader2, Search, X, Heart, ChevronDown, ChevronUp, Library, TrendingUp, Palette, Play, RefreshCw, Info } from 'lucide-react'
 import { cn, proxifyImgUrl } from '../lib/utils'
+import { isReadableChapter } from '../lib/mangaChapter'
 import { getMangaInfo, getChapterFeed, searchManga as searchMangaDex, type MangaDexManga, type MangaDexChapter } from '../api/mangadex'
 import { resolveManga, type ResolvedManga } from '../api/anilistManga'
 import { searchManga as searchMangaAtsu, getChapterFeed as getChapterFeedAtsu, type AtsuChapter } from '../api/atsu'
@@ -123,13 +124,16 @@ export default function MangaDetails() {
 
   const manga: MangaDexManga | null = mdQuery.data ?? null
   const allMdChapters: MangaDexChapter[] = chaptersQuery.data?.chapters ?? []
-  // Filter out MangaPlus chapters with 0 pages (metadata-only, no images)
+  // Keep only chapters MangaDex can actually serve. Publisher chapters
+  // (Manga UP!, MANGA Plus, …) carry a link-out and a single notice image
+  // instead of pages — listing them as chapters is what made every chapter of
+  // a licensed title open a "requires a paid subscription" card.
   const mdChapters = useMemo(
-    () => allMdChapters.filter((c) => c.pages > 0),
+    () => allMdChapters.filter((c) => isReadableChapter(c)),
     [allMdChapters],
   )
   const hasMdChapters = mdChapters.length > 0
-  const mdMangaPlusCount = allMdChapters.length - mdChapters.length
+  const mdPublisherOnlyCount = allMdChapters.length - mdChapters.length
 
   const isInWatchlist = useWatchListStore((s) => s.isInWatchlist)
   const addToWatchlist = useWatchListStore((s) => s.addToWatchlist)
@@ -763,7 +767,29 @@ export default function MangaDetails() {
                 </div>
               )}
             </div>
-          )}              {/* Chapters */}
+          )}
+
+          {/* Chapters */}
+          {/* Say WHY MangaDex's own chapters are missing instead of silently
+              swapping sources — the user should never have to guess. */}
+          {mdPublisherOnlyCount > 0 && (
+            <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 py-3 flex gap-3">
+              <Info className="h-4 w-4 text-amber-400/80 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-relaxed text-amber-100/70">
+                {hasMdChapters
+                  ? `${mdPublisherOnlyCount} chapter${mdPublisherOnlyCount !== 1 ? 's' : ''} here ${mdPublisherOnlyCount !== 1 ? 'are' : 'is'} published on the publisher's own app, so MangaDex can only link out — they can't be read in-app.`
+                  : `MangaDex only links out to the publisher for this title — all ${mdPublisherOnlyCount} of its English chapters are published on the publisher's own app.`}
+                {!hasMdChapters && hasAtsuSource && (
+                  <>
+                    {' '}
+                    The chapters below are from{' '}
+                    <span className="text-amber-200/90 font-medium">atsu.moe</span>, where they are readable.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+
           {/* ── atsu.moe (primary) ── */}
           {hasAtsuSource && (atsuChaptersQuery.isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -879,7 +905,11 @@ export default function MangaDetails() {
             <div className={hasAtsuSource ? 'space-y-3 pt-4' : 'space-y-6'}>
               <h4 className="text-[10px] font-semibold text-primary/50 uppercase tracking-wider mb-2">
                 MangaDex
-                {mdMangaPlusCount > 0 && <span className="font-normal text-white/25 ml-1">({mdMangaPlusCount} MangaPlus hidden)</span>}
+                {mdPublisherOnlyCount > 0 && (
+                  <span className="font-normal text-white/25 ml-1">
+                    ({mdPublisherOnlyCount} publisher-only)
+                  </span>
+                )}
               </h4>
               {volumeGroups.length > 1 ? (
                 volumeGroups.map(([vol, chs]) => (

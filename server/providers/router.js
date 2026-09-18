@@ -232,10 +232,48 @@ export async function routedGetProviders(anilistId, slug, ep, title) {
   }
 }
 
+// ── megavid fast-path budget + hang breaker ──────────────────────────
+// megavid is a plain HTTP API that answers in ~1.5-2s when it works, but the
+// router used to give ONE attempt a 20s budget on the critical path of every
+// cold sources call. On obscure/old titles megavid has no source, and on a
+// slow megavid day the request simply sat there: measured 20s (budget) +
+// 4-13s (anidap provider) = 25-34s per server click on the long tail
+// (servers_bench, Sep 2026: anidap-sora avg 12.0s, worst 34.1s).
+// 5s keeps every genuinely-fast win (p99 real success ≤ 2.5s) and drops the
+// dead wait by 15s. After a timeout we also trip a short breaker so a hanging
+// megavid is not re-tried on every click.
+const MEGAVID_BUDGET_MS = 5_000
+// While the breaker is open megavid is still CALLED, but with a tiny budget:
+// an in-memory cache hit answers in <1ms (so rows of instant wins for titles
+// megavid genuinely has are preserved — a blanket skip lost those), while a
+// live fetch that is hanging gives up almost immediately.
+const MEGAVID_BUDGET_COOLDOWN_MS = 1_500
+const MEGAVID_BREAKER_MS = 90_000
+let megavidHangUntil = 0
+
+function megavidBudgetMs() {
+  return Date.now() < megavidHangUntil ? MEGAVID_BUDGET_COOLDOWN_MS : MEGAVID_BUDGET_MS
+}
+
+function markMegavidHang(reason) {
+  if (Date.now() < megavidHangUntil) return
+  megavidHangUntil = Date.now() + MEGAVID_BREAKER_MS
+  console.warn(`[router] megavid hang breaker tripped for ${MEGAVID_BREAKER_MS / 1000}s: ${reason}`)
+}
+
 export async function routedGetStream(anilistId, slug, ep, providerName, type, _query, title, signal) {
   const normalized = normalizeProviderName(providerName)
   const effectiveSlug = slug || String(anilistId || '')
   const tried = new Set()
+  // ── Explicit server pick ──────────────────────────────────────────
+  // The picker sends `pick=1` when the USER clicked a server chip. megavid is
+  // an automatic substitute (it is MAL-keyed and serves ONE stream per
+  // episode), and its router-level stream cache is keyed by (malId, ep, type)
+  // only — so whenever megavid had the title, EVERY chip returned the exact
+  // same stream. "Choose a different server" therefore did nothing. Honor the
+  // pick: the named provider is tried for real, megavid stays an auto-route
+  // fallback (which is where its speed still pays off).
+  const explicitPick = _query?.pick === '1' || _query?.pick === 1 || _query?.pick === true
 
   // Site-wide chad 429 (IP rate-limit): every anidap provider will 429
   // together, and each would otherwise burn seconds in the race pool before
@@ -250,25 +288,52 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
   // it FIRST means most requests resolve before touching chad at all:
   // fewer chad calls → less rate-limit pressure → fewer 429 windows.
   // An explicit gogoanime- pick keeps its dedicated path below.
-  if (!providerName?.startsWith('gogoanime-') && !providerName?.startsWith('megavid')) {
-    try {
-      const megavidData = await Promise.race([
-        megavidProvider.getStream(anilistId, ep, type, title, { signal, malId: _query?.malId }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('megavid timeout')), 20_000),
-        ),
-      ])
-      if (megavidData) {
-        console.log(`[router] megavid fast path won for #${anilistId} ep${ep} ${type}`)
-        return { ...megavidData, source: 'megavid' }
-      }
-    } catch (e) {
-      console.warn(`[router] megavid fast path failed: ${e?.message || e}`)
-    }
-  }
+  // ── megavid fast path: STARTED here, but no longer AWAITED here ────
+  // It used to be awaited SERIALLY for up to 5s before the provider the user
+  // actually asked for was even tried, so every cold Watch load paid a flat
+  // ~5s tax whenever megavid missed (measured: watch_load_probe, Sep 2026).
+  // The attempt is still made — megavid is plain HTTP, chad-independent and
+  // resolves in ~2s when it has the title — but it now runs CONCURRENTLY with
+  // the real provider pool and the first genuine stream wins. Nothing is
+  // weakened: same provider, same budget, same hang breaker, same cache.
+  const megavidFast = (!providerName?.startsWith('gogoanime-') &&
+      !providerName?.startsWith('megavid') &&
+      !explicitPick)
+    ? (async () => {
+        try {
+          const megavidData = await Promise.race([
+            megavidProvider.getStream(anilistId, ep, type, title, { signal, malId: _query?.malId }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('megavid timeout')), megavidBudgetMs()),
+            ),
+          ])
+          if (megavidData) {
+            console.log(`[router] megavid fast path won for #${anilistId} ep${ep} ${type}`)
+            return { ...megavidData, source: 'megavid' }
+          }
+        } catch (e) {
+          // A timeout means megavid is stuck, not that this title is missing —
+          // its own miss cache deliberately ignores network errors. Trip the
+          // breaker so the next clicks skip it instead of paying 5s each.
+          if (e?.message === 'megavid timeout') markMegavidHang(`#${anilistId} ep${ep} ${type}`)
+          else console.warn(`[router] megavid fast path failed: ${e?.message || e}`)
+        }
+        return null
+      })()
+    : null
 
   const chad429Sec = isChad429Blocked() ? getChad429Remaining() : 0
   if (chad429Sec > 0 && !providerName?.startsWith('gogoanime-')) {
+    // megavid does not touch chad, so it is the CHEAPEST answer during a chad
+    // window. Give it a short head start before falling back to gogoanime's
+    // much heavier slug-search + extraction chain.
+    if (megavidFast) {
+      const mv = await Promise.race([
+        megavidFast,
+        new Promise((r) => setTimeout(() => r(null), 2_500)),
+      ])
+      if (mv) return mv
+    }
     console.warn(`[router] chad site-wide rate-limit — trying gogoanime fallback (~${chad429Sec}s remaining)`)
     try {
       const gogoInfo = await Promise.race([
@@ -405,7 +470,11 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
   // instead of blocking the entire request. This means if yuki gets 429'd,
   // kami/koto/neko/vee/uwu all still race and one of them will win.
   try {
-    const anidapResult = await Promise.race([
+    // ── Race the pool against megavid ──
+    // Both are independent sources; whichever produces a real stream first
+    // wins. This is what removes the old serial megavid wait (~5s) from the
+    // cold-load path without giving up megavid's fast wins.
+    const poolRacers = [
       (async () => {
         const providerList = await anidapProvider.getProviders(effectiveSlug, ep, anilistId, title)
         const sameTypeAll = (Array.isArray(providerList) ? providerList : [])
@@ -553,7 +622,13 @@ export async function routedGetStream(anilistId, slug, ep, providerName, type, _
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error('anidap provider racing timeout')), 25_000),
       ),
-    ])
+    ]
+    // A `null` megavid answer must not win the race, so it is swapped for a
+    // never-settling promise; the pool's own promise then decides the race.
+    if (megavidFast) {
+      poolRacers.push(megavidFast.then((d) => (d ? d : new Promise(() => {}))))
+    }
+    const anidapResult = await Promise.race(poolRacers)
 
     if (anidapResult) return anidapResult
   } catch (e) {

@@ -87,6 +87,26 @@ export default function Watch() {
   const showDubBadges = useSettings((s) => s.showDubBadges)
   const ambientMode = useSettings((s) => s.ambientMode)
   const reduceQuality = useSettings((s) => s.reduceQuality)
+  // Player-menu settings (gear → More). These live in the store so the menu can
+  // actually change them at runtime — skipFiller used to be a useState with no
+  // setter, so its toggle was decorative.
+  const skipFiller = useSettings((s) => s.skipFiller)
+  const autoplayVideo = useSettings((s) => s.autoplayVideo)
+  const incognito = useSettings((s) => s.incognito)
+
+  // Say it out loud the moment incognito goes on: "nothing is being recorded"
+  // is not something anyone should have to infer from a motionless progress
+  // bar. Seeded with the current value so a persisted incognito session does
+  // not toast on every page load.
+  const incognitoAnnounced = useRef(incognito)
+  useEffect(() => {
+    if (incognito && !incognitoAnnounced.current) {
+      incognitoAnnounced.current = true
+      toast.info('Incognito on — progress, history and tracker sync are paused', 3200)
+    } else if (!incognito) {
+      incognitoAnnounced.current = false
+    }
+  }, [incognito])
   const [providers, setProviders] = useState<AnidapProvider[]>([])
   const [providersUnavailable, setProvidersUnavailable] = useState(false)
   const [streamType, setStreamType] = useState<StreamType>(audio as StreamType)
@@ -106,14 +126,17 @@ export default function Watch() {
   // Without this, VideoPlayer's useOffsetSubtitles hook re-runs on every
   // parent render, leaking Blob URLs and flickering captions.
   const playerSubtitles = useMemo(() => {
-    if (!stream?.subtitles) return []
-    return stream.subtitles
+    const s = stream as any
+    const raw = s?.subtitles ?? s?.tracks ?? null
+    if (!raw) return []
+    const headers = s?.headers
+    return (raw as any[])
       .filter((t) => t.file && (t.kind === 'captions' || t.kind === 'subtitles' || !t.kind))
-      .map((t) => {
+      .map((t: any) => {
         let hSuffix = ''
-        if (stream.headers && Object.keys(stream.headers).length > 0) {
+        if (headers && Object.keys(headers).length > 0) {
           try {
-            hSuffix = '&h=' + encodeURIComponent(safeBase64(JSON.stringify(stream.headers)))
+            hSuffix = '&h=' + encodeURIComponent(safeBase64(JSON.stringify(headers)))
           } catch {
             // safeBase64 can throw on non-ASCII headers
           }
@@ -125,7 +148,7 @@ export default function Watch() {
           lang: t.lang || undefined,
         }
       })
-  }, [stream?.subtitles, stream?.headers])
+  }, [(stream as any)?.subtitles, (stream as any)?.tracks, (stream as any)?.headers])
 
   // ═══ PERFORMANCE: atomic selectors instead of destructuring the whole
   // store. setEpisodeProgress fires every 5 s during playback — a full
@@ -153,14 +176,7 @@ export default function Watch() {
   // Local UI state
   const [epQuery, setEpQuery] = useState('')
   const [hideWatched, setHideWatched] = useState(false)
-  const [skipFiller] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.localStorage.getItem('kurodo-skip-filler') !== '0'
-  })
   const [showShortcuts, setShowShortcuts] = useState(false)
-  useEffect(() => {
-    safeSetItem('kurodo-skip-filler', skipFiller ? '1' : '0')
-  }, [skipFiller])
   /** Theater mode hides the right episode-list sidebar and stretches the
    *  player to the full content width. Toggled from within the player or
    *  via the 'T' keyboard shortcut. Persisted in localStorage so the
@@ -485,7 +501,8 @@ export default function Watch() {
   // Record "continue watching" + keep ?ep= URL in sync
   useEffect(() => {
     if (!anime || !currentEp) return
-    setLastWatched(anime, currentEp)
+    // Incognito: no history entry.
+    if (!incognito) setLastWatched(anime, currentEp)
 
     // Update the URL without forcing a React Router state update/re-render
     const url = new URL(window.location.href)
@@ -507,11 +524,13 @@ export default function Watch() {
   // the reliable "finished" signal: mark immediately when it fires.
   const onPlayerNearEndMarkWatched = useCallback(() => {
     if (!malId || !anime) return
+    // Incognito: pause the watched mark + tracker sync.
+    if (incognito) return
     if (isEpisodeWatched(anime.mal_id, currentEp)) return
     if (!isInWatchlist(anime.mal_id)) addToWatchlist(anime)
     markEpisodeWatched(anime.mal_id, currentEp)
     toast.success(`✓ EP ${currentEp} completed`, 2000)
-  }, [malId, anime, currentEp, isEpisodeWatched, isInWatchlist, addToWatchlist, markEpisodeWatched])
+  }, [malId, anime, currentEp, incognito, isEpisodeWatched, isInWatchlist, addToWatchlist, markEpisodeWatched])
 
   // ───── Autoplay next ─────
   // When the player fires onNearEnd, start a countdown the user can cancel.
@@ -637,8 +656,9 @@ export default function Watch() {
   // this callback, which updates Zustand, which re-renders Watch.tsx… loop.
   const onVideoEnded = useCallback(() => {
     if (!malId || !anime) return
-    // Auto-mark as watched (skip the toast for replays of already-watched eps)
-    if (!isEpisodeWatched(anime.mal_id, currentEp)) {
+    // Auto-mark as watched (skip the toast for replays of already-watched eps).
+    // Incognito pauses the mark entirely — see onPlayerNearEndMarkWatched.
+    if (!incognito && !isEpisodeWatched(anime.mal_id, currentEp)) {
       // Add to watchlist if not already there (needed for AniList sync)
       if (!inList) addToWatchlist(anime)
       markEpisodeWatched(anime.mal_id, currentEp)
@@ -656,13 +676,15 @@ export default function Watch() {
       // Feature OFF: surface the Up Next card so auto-next is discoverable.
       setEpEndedCard(true)
     }
-  }, [malId, anime, currentEp, inList, isEpisodeWatched, addToWatchlist, markEpisodeWatched, autoplayNext, episodes.length, goToNextEpisode])
+  }, [malId, anime, currentEp, incognito, inList, isEpisodeWatched, addToWatchlist, markEpisodeWatched, autoplayNext, episodes.length, goToNextEpisode])
 
   // ── CRITICAL: must be memoized so VideoPlayer's progress effect doesn't
   // re-run on every render, which triggers save() in cleanup, which calls
   // this callback, which updates Zustand, which re-renders Watch.tsx… loop.
   const onProgressTick = useCallback((time: number, duration: number) => {
     if (!malId) return
+    // Incognito: never record or rewrite a resume position.
+    if (incognito) return
     // Auto-clear when very close to the end so we don't pop
     // a resume banner for an episode the user just finished.
     if (duration > 0 && time >= duration - 30) {
@@ -670,7 +692,7 @@ export default function Watch() {
     } else {
       setEpisodeProgress(malId, currentEp, time, duration)
     }
-  }, [malId, currentEp, clearEpisodeProgress, setEpisodeProgress])
+  }, [malId, currentEp, incognito, clearEpisodeProgress, setEpisodeProgress])
 
   // Cancel any in-flight prefetch if the user manually jumps episodes.
   useEffect(() => {
@@ -726,6 +748,16 @@ export default function Watch() {
   // providers-list effect consults this instead of blindly re-picking a
   // default (which snapped the user's server back to yuki mid-playback).
   const userPickedRef = useRef<{ ep: number; slug: string; name: string } | null>(null)
+  // Episode whose audio track we already crossed over once after every
+  // server of the requested track failed. Keyed by EPISODE ONLY (not by
+  // type) on purpose — a type-keyed guard would flip back and forth forever
+  // once `streamType` changed, which is the ping-pong the guard exists to
+  // prevent.
+  const crossTypeTriedRef = useRef<number | null>(null)
+  // How many times we have re-fetched the server list and re-walked the whole
+  // chain for THIS episode (see the exhausted-chain branch below). Capped at
+  // 1 so a genuinely dead title cannot loop.
+  const chainRetryRef = useRef(0)
   const [providersLoading, setProvidersLoading] = useState(true)
   // Identity of the last loaded stream (slug:ep:server:type) — see the
   // identity-flip guard in the stream effect below.
@@ -736,6 +768,8 @@ export default function Watch() {
   streamRef.current = stream
   useEffect(() => {
     userPickedRef.current = null
+    crossTypeTriedRef.current = null
+    chainRetryRef.current = 0
   }, [currentEp, anidapSlug])
 
   // ---- When episode or slug changes, load providers ----
@@ -892,10 +926,16 @@ export default function Watch() {
     setStreamError(null)
     setStream(null)
     void (async function tryGetStream(providerName: string, attemptNum: number) {
-      // Safety valve: don't loop forever. Max 10 attempts per episode.
-      if (attemptNum > 10) {
+      // Safety valve: don't loop forever — but the ceiling must never be
+      // LOWER than the number of servers we are willing to show the user.
+      // It was a flat 10 while the sub roster became 13 names, so a title
+      // whose only working server sat at position 11+ could never be reached
+      // automatically and the player stopped on an error even though a
+      // stream existed. The cap now always covers the full same-type list.
+      const attemptCeiling = Math.max(10, (aliveByType[streamType] ?? []).length + 2)
+      if (attemptNum > attemptCeiling) {
         setStreamLoading(false)
-        setStreamError('All servers exhausted after 10 attempts — try again later.')
+        setStreamError('All servers exhausted for this episode — try another server or audio type.')
         toast.error('All servers exhausted for this episode.')
         return
       }
@@ -908,6 +948,13 @@ export default function Watch() {
           malId,
           forceSource: curPObj?._provider,
           titles: { english: anime?.title_english, romaji: anime?.title },
+          // True only when the user clicked this exact chip for this episode.
+          // The server then honors the named provider instead of letting the
+          // automatic megavid route substitute its one stream, which returned
+          // the same URL for every chip and made "switch server" a no-op.
+          explicitPick:
+            userPickedRef.current?.ep === currentEp &&
+            userPickedRef.current?.name === providerName,
         })
         if (cancelled) return
         setStream(data)
@@ -941,8 +988,31 @@ export default function Watch() {
         newFailed.add(providerName)
         setFailedProviders(newFailed)
 
-        // Find next available provider of the same type
-        const sameType = (providersByType[streamType] ?? []).filter(
+        // ── An EXPLICIT pick is honoured FIRST, then fails forward ──
+        // The click is real: `explicitPick` above makes the server actually try
+        // the named provider (not the megavid substitute), so "switch server"
+        // means something. What it must NOT do is dead-end. It used to stop on
+        // an error card and wait for another manual click, which is exactly
+        // what made obscure titles feel like "every server is broken" — a
+        // 5–8s wait, then an error, then another 5–8s wait. A title with one
+        // working server in a 13-server roster never played at all unless the
+        // user found that server by hand.
+        //
+        // The pick is cleared on failure ON PURPOSE: leaving it set made the
+        // provider-list reload snap the selection back to the dead server (the
+        // "it jumps back to yuki after 2s" bug). The server is still listed in
+        // the picker, still clickable, and its badge says NO STREAM — nothing
+        // is hidden, we just keep looking for a stream instead of stopping.
+        const wasExplicitPick =
+          userPickedRef.current?.ep === currentEp &&
+          userPickedRef.current?.name === providerName
+        if (wasExplicitPick) userPickedRef.current = null
+
+        // Find next available provider of the same type. Reads the ALIVE pool
+        // (verified servers first) so auto-advance doesn't burn 30s on a
+        // server the backend just verified dead — every server is still shown
+        // and clickable in the picker.
+        const sameType = (aliveByType[streamType] ?? []).filter(
           (p) => !newFailed.has(p.name),
         )
 
@@ -950,12 +1020,66 @@ export default function Watch() {
           const nextProvider = sameType[0]
           const cleanFailed = providerName.replace(/^anidap-/, '')
           const cleanNext = nextProvider.name.replace(/^anidap-/, '')
-          toast.info(`${cleanFailed} failed — auto-switching to ${cleanNext}…`, 3000)
+          // The switch is never silent — the toast names the server that
+          // failed AND the one being tried, so the picker changing under the
+          // user is explained rather than mysterious.
+          toast.info(
+            wasExplicitPick
+              ? `${cleanFailed} has no stream for this episode — trying ${cleanNext}…`
+              : `${cleanFailed} failed — auto-switching to ${cleanNext}…`,
+            3000,
+          )
           fallbackCount.current = attemptNum
           // Trigger next attempt via state update (separate from setFailedProviders)
           setActiveProvider(nextProvider.name)
         } else {
-          // All servers exhausted for this type
+          // ── Cross-track last resort ──
+          // Every server of THIS audio type failed. A dual-audio title very
+          // often has a working dub when every sub server is missing (and the
+          // reverse), so before showing an error card we try the other track
+          // exactly ONCE for this episode. That is the difference between
+          // "this episode does not play at all" and a playing episode, on the
+          // long tail where 12/20 obscure titles have nothing on the
+          // requested track. Announced, never silent.
+          const otherType: StreamType = streamType === 'dub' ? 'sub' : 'dub'
+          const otherPool = aliveByType[otherType] ?? []
+          if (otherPool.length > 0 && crossTypeTriedRef.current !== currentEp) {
+            crossTypeTriedRef.current = currentEp
+            toast.info(
+              `No ${streamType.toUpperCase()} stream for this episode — trying ${otherType.toUpperCase()}…`,
+              4000,
+            )
+            fallbackCount.current = 0
+            userPickedRef.current = null
+            setStreamType(otherType)
+            setActiveProvider(otherPool[0].name)
+            return
+          }
+          // ── Exhausted chain: refresh the server list and re-walk once ──
+          // Measured (failover_redo.mjs, Sep 2026): re-probing the titles that
+          // had "never played" with a FRESH `/servers` lookup and no chain cap
+          // revived a real share of them on a server the first pass reported
+          // as dead — chad's per-episode list is built on the fly and its
+          // answers are not perfectly repeatable, and a transient upstream
+          // hiccup is indistinguishable from a dead server inside a single
+          // pass. One automatic second pass therefore converts a chunk of
+          // "this episode does not play" into a playing episode, and it costs
+          // the user nothing extra: the error card is already on screen while
+          // it runs. Capped at one retry per episode so a genuinely dead title
+          // (19/100 in that bench had no stream on EITHER track, across all
+          // 23 listed chips) still reaches a stable error state.
+          if (chainRetryRef.current < 1) {
+            chainRetryRef.current += 1
+            toast.info('Refreshing the server list and trying once more…', 4000)
+            fallbackCount.current = 0
+            crossTypeTriedRef.current = null
+            userPickedRef.current = null
+            setFailedProviders(new Set())
+            setStreamError(null)
+            setServerReloadKey((k) => k + 1)
+            setStreamRetryKey((k) => k + 1)
+            return
+          }
           setStreamLoading(false)
           setStreamError(errMsg)
           toast.error(`All ${streamType.toUpperCase()} servers exhausted — try another audio type.`)
@@ -982,20 +1106,70 @@ export default function Watch() {
   }, [anime?.mal_id, anime?.title_english])
 
   // Group providers by type for the selector chips AND the auto-fallback
-  // chain. VERIFIED-DEAD servers (_healthy === false) are excluded from the
-  // fallback pool: the auto-switcher used to cycle into kiwi/yuki-dub —
-  // servers the backend just verified dead — and burn 30s per failure on
-  // every single attempt, producing the "loads 30s then errors" loop.
+  // chain.
+  //
+  // NOTHING IS EVER REMOVED HERE. This map used to `continue` on
+  // `_healthy === false`, which deleted verified-dead servers from every
+  // consumer: the type counts, the availability flags, the fallback chain and
+  // anything reading `providersByType` — the server was still in the picker
+  // but invisible to the rest of the page, so a "dead" verdict silently
+  // shrank what the user could reach. Every listed server now stays in the
+  // map. Ordering still puts verified servers first, and the AUTO-fallback
+  // chain reads `aliveByType` below so it can't burn 30s cycling into a
+  // server the backend just verified has nothing (that guard is about speed,
+  // not about hiding: the tile is still there, still clickable).
   const providersByType = useMemo(() => {
     const g: Record<string, AnidapProvider[]> = { sub: [], dub: [], hsub: [] }
-    for (const p of providers) {
-      if (p._healthy === false) continue // verified dead for this title
-      ;(g[p.type] ||= []).push(p)
-    }
+    for (const p of providers) (g[p.type] ||= []).push(p)
     return g
   }, [providers])
 
-  // Quick dub/sub toggle — shows when both types are available
+  // ── The player must NEVER unmount during an episode change ──────────
+  // This is the fix for "auto next doesn't work in fullscreen". The player
+  // render below used to swap to a placeholder whenever `stream` went null —
+  // and `stream` goes null on EVERY episode switch (the stream effect clears
+  // it before fetching). The fullscreen element lives INSIDE VideoPlayer, so
+  // unmounting it made the browser exit fullscreen: auto-next advanced the
+  // episode, the user got thrown out of fullscreen, and the next episode
+  // loaded into a small window (or looked like it never played).
+  // The last successfully loaded stream is kept here so the player stays
+  // mounted with a frozen frame while the next episode resolves; a loading
+  // overlay covers it, and the new src swaps in underneath. Fullscreen,
+  // the audio track and the controls all survive.
+  const [lastShownStream, setLastShownStream] = useState<AnidapStream | null>(null)
+  useEffect(() => {
+    if (stream) setLastShownStream(stream)
+  }, [stream])
+  // A different anime means a genuinely new player — drop the stale frame so
+  // the placeholder (and the poster art) is shown for the new title.
+  useEffect(() => {
+    setLastShownStream(null)
+  }, [anidapSlug])
+  const shownStream = stream ?? lastShownStream
+
+  // Auto-fallback pool: same list minus servers verified dead for THIS title.
+  // Falls back to the full list when every server is dead, so the chain can
+  // never end up empty.
+  const aliveByType = useMemo(() => {
+    const g: Record<string, AnidapProvider[]> = { sub: [], dub: [], hsub: [] }
+    // Verified-working first, unverified next, verified-dead last. This list
+    // drives BOTH the default pick and the auto-failover chain, so the order
+    // is the single biggest lever on user-felt success: it turns "some server
+    // in this roster has the episode" into "the first one we try does".
+    // Sorting is stable, so servers of equal verdict keep the roster order
+    // (which is itself ordered by measured per-chip capability).
+    const rank = (p: AnidapProvider) =>
+      p._healthy === true ? 0 : p._healthy == null ? 1 : 2
+    for (const [t, list] of Object.entries(providersByType)) {
+      const alive = list.filter((p) => p._healthy !== false).sort((a, b) => rank(a) - rank(b))
+      g[t] = alive.length > 0 ? alive : [...list].sort((a, b) => rank(a) - rank(b))
+    }
+    return g
+  }, [providersByType])
+
+  // Quick dub/sub toggle — shows whenever the list CONTAINS that type, even
+  // if every server of that type is currently unverified/dead, so the option
+  // is never hidden from the user.
   const hasDubAvailable = providersByType.dub.length > 0
   const hasSubAvailable = providersByType.sub.length > 0
   const hasHsubAvailable = providersByType.hsub.length > 0
@@ -1343,7 +1517,7 @@ export default function Watch() {
                 </div>
               </div>
             </div>
-          ) : streamLoading || !stream ? (
+          ) : !shownStream ? (
             <div className="aspect-video w-full rounded-xl bg-gradient-to-b from-zinc-900 via-zinc-900/90 to-black/70 grid place-items-center overflow-hidden relative border border-white/10">
               {getImageUrl(anime) && (
                 <img
@@ -1504,12 +1678,14 @@ export default function Watch() {
                 onProgressTick={onProgressTick}
                 onEnded={onVideoEnded}
                 onResumeDismiss={() => {
-                  if (malId) clearEpisodeProgress(malId, currentEp)
+                  // Incognito must not erase a position saved by an earlier,
+                  // non-incognito session.
+                  if (malId && !incognito) clearEpisodeProgress(malId, currentEp)
                 }}
-                src={stream.proxiedUrl}
-                fallbackSrc={stream.fallbackProxiedUrl}
+                src={shownStream.proxiedUrl}
+                fallbackSrc={shownStream.fallbackProxiedUrl}
                 initialTime={timeParam}
-                autoPlay={!recoveredPaused}
+                autoPlay={!recoveredPaused && autoplayVideo}
                 poster={buildEpisodeImageUrl(currentEpisodeMeta, {
                   showCover: getImageUrl(anime),
                   label: currentEp,
@@ -1540,7 +1716,7 @@ export default function Watch() {
                 })
                 const newFailed = new Set(failedProviders)
                 newFailed.add(activeProvider)
-                const sameType = (providersByType[streamType] ?? []).filter(
+                const sameType = (aliveByType[streamType] ?? []).filter(
                   (p) => !newFailed.has(p.name),
                 )
                 if (sameType.length > 0) {
@@ -1559,6 +1735,34 @@ export default function Watch() {
                 streamType={streamType}
               />
               </Suspense>
+              {/* Episode-change overlay.
+                  The player stays MOUNTED underneath (so fullscreen, the
+                  audio track and the controls survive auto-next), which means
+                  the user would otherwise stare at a frozen frame from the
+                  previous episode. Non-blocking on purpose: keyboard
+                  shortcuts and Esc still reach the player. */}
+              {(streamLoading || !stream) && (
+                <div className="absolute inset-0 z-30 grid place-items-center bg-black/70 backdrop-blur-[2px] pointer-events-none">
+                  <PlayerLoadingStages
+                    stage="fetching"
+                    detail={`Loading episode ${currentEp}${
+                      activeProvider ? ` from ${String(activeProvider).replace(/^anidap-/, '')}` : ''
+                    }…`}
+                  />
+                </div>
+              )}
+              {/* A failed episode change is a banner, not a full cover — the
+                  player controls and the server picker below stay usable. */}
+              {!streamLoading && !stream && streamError && (
+                <div className="absolute inset-x-0 bottom-0 z-30 p-3 pointer-events-none">
+                  <div className="mx-auto max-w-lg rounded-xl bg-black/85 border border-amber-400/25 px-4 py-3 text-center">
+                    <p className="text-xs font-semibold text-amber-200">{streamError}</p>
+                    <p className="text-[11px] text-white/60 mt-1">
+                      Pick another server below — playback continues in fullscreen.
+                    </p>
+                  </div>
+                </div>
+              )}
               {/* Autoplay-next countdown */}
               {autoplayCountdown != null && (
                 <div className="absolute bottom-6 right-6 z-20 glass-card rounded-2xl px-5 py-4 flex items-center gap-4 shadow-lg border border-primary/30 animate-[fadeInUp_0.3s_ease]">
@@ -1707,11 +1911,11 @@ export default function Watch() {
                         let next = types[(idx + 1) % 3]
                         // Skip types that aren't available
                         let attempts = 0
-                        while ((!providersByType[next] || providersByType[next].length === 0) && attempts < 3) {
+                        while ((!aliveByType[next] || aliveByType[next].length === 0) && attempts < 3) {
                           next = types[(types.indexOf(next) + 1) % 3]
                           attempts++
                         }
-                        const list = providersByType[next] ?? []
+                        const list = aliveByType[next] ?? []
                         if (list.length > 0) {
                           setStreamType(next)
                           setActiveProvider(list[0].name)

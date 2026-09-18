@@ -4,7 +4,7 @@ import {
   Maximize, Minimize, Settings, Captions, RotateCcw, RotateCw,
   PictureInPicture2, Cast, Check, SkipBack, SkipForward,
   Type, SlidersHorizontal, ArrowLeft, RectangleHorizontal,
-  Camera, Link,
+  Camera, Link, Gauge, ChevronRight,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import SegmentedControl from './SegmentedControl'
@@ -100,6 +100,14 @@ function levelLabel(l: Level | undefined) {
   return 'Auto'
 }
 
+/** Back-header text for each gear-menu sub-page. */
+const SETTINGS_VIEW_LABEL: Record<'speed' | 'boost' | 'captions' | 'more', string> = {
+  speed: 'Playback speed',
+  boost: 'Audio boost',
+  captions: 'Caption styles',
+  more: 'More',
+}
+
 /**
  * Plyr/anidap-style custom control bar.
  *
@@ -125,6 +133,30 @@ export default function PlayerControls({
   hasNextEpisode, hasPrevEpisode, onNextEpisode, onPrevEpisode,
   episodeNumber, episodeTitle,
 }: Props) {
+  // ── Settings the gear menu owns ──
+  // Every one of these is a real, persisted setting — the menu rows are views
+  // onto the store, not local UI state.
+  const audioBoost = useSettings((s) => s.audioBoost)
+  const incognito = useSettings((s) => s.incognito)
+  const autoplayVideo = useSettings((s) => s.autoplayVideo)
+  const autoplayNext = useSettings((s) => s.autoplayNext)
+  const autoSkipIntro = useSettings((s) => s.autoSkipIntro)
+  const autoSkipOutro = useSettings((s) => s.autoSkipOutro)
+  const skipFiller = useSettings((s) => s.skipFiller)
+  const ambientMode = useSettings((s) => s.ambientMode)
+  const captionSize = useSettings((s) => s.captionSize)
+  const captionColor = useSettings((s) => s.captionColor)
+  const captionBgOpacity = useSettings((s) => s.captionBackgroundOpacity)
+  const setSetting = useSettings((s) => s.set)
+
+  // "Default" vs "Custom" for the Caption styles row. The reference player
+  // shows the current style name there; we show Default until one of the
+  // values actually differs from the store's default.
+  const captionStyleLabel =
+    captionSize === 1.04 && captionColor === '#ffffff' && captionBgOpacity === 0.26
+      ? 'Default'
+      : 'Custom'
+
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
   const [volume, setVolume] = useState(1)
@@ -140,6 +172,10 @@ export default function PlayerControls({
   const [hoveredPct, setHoveredPct] = useState<number | null>(null)
   const [menu, setMenu] = useState<'settings' | 'captions' | 'quality' | null>(null)
   const [captionsTab, setCaptionsTab] = useState<'tracks' | 'appearance'>('tracks')
+  // Which level of the gear menu is showing. The reference player's settings
+  // list is a root of four chevron rows that each drill into a page, with a
+  // "More" page for the on/off switches — this mirrors that shape.
+  const [settingsView, setSettingsView] = useState<'root' | 'speed' | 'boost' | 'captions' | 'more'>('root')
   const [speed, setSpeed] = useState(1)
   const [showRemaining, setShowRemaining] = useState(false)
 
@@ -770,26 +806,58 @@ export default function PlayerControls({
           <Menu open={menu === 'settings'} setOpen={(o) => setMenu(o ? 'settings' : null)}>
             <CtrlBtn
               label="Settings"
-              onClick={() => setMenu(menu === 'settings' ? null : 'settings')}
+              onClick={() => {
+                // Always reopen on the root page — landing on whatever sub-page
+                // was last visited is disorienting.
+                setSettingsView('root')
+                setMenu(menu === 'settings' ? null : 'settings')
+              }}
             >                <Settings />
             </CtrlBtn>
             {menu === 'settings' && (
-              <MenuPanel>
-                <MenuRow label="Speed" value={`${speed}x`}>
-                  <SegmentedControl<string>
-                    value={String(speed)}
-                    options={[
-                      { value: '0.5', label: '0.5x' },
-                      { value: '0.75', label: '0.75x' },
-                      { value: '1', label: '1x' },
-                      { value: '1.25', label: '1.25x' },
-                      { value: '1.5', label: '1.5x' },
-                      { value: '2', label: '2x' },
-                    ]}
-                    onChange={(v) => setPlaybackSpeed(Number(v))}
-                    size="sm"
-                  />
-                </MenuRow>
+              <MenuPanel header={settingsView !== 'root' ? (
+                <SubViewHeader
+                  label={SETTINGS_VIEW_LABEL[settingsView]}
+                  onBack={() => setSettingsView('root')}
+                />
+              ) : undefined}>
+                {settingsView === 'root' && (
+                  <>
+                    {/* ── Root rows: icon · label · current value · chevron ── */}
+                    <MenuNavRow
+                      icon={<Gauge className="h-4 w-4" />}
+                      label="Playback speed"
+                      value={`${speed}x`}
+                      onClick={() => setSettingsView('speed')}
+                    />
+                    <MenuNavRow
+                      icon={<Volume2 className="h-4 w-4" />}
+                      label="Audio boost"
+                      value={audioBoost > 0 ? `+${audioBoost}%` : '0%'}
+                      onClick={() => setSettingsView('boost')}
+                    />
+                    <MenuNavRow
+                      icon={<Type className="h-4 w-4" />}
+                      label="Caption styles"
+                      value={captionStyleLabel}
+                      onClick={() => setSettingsView('captions')}
+                    />
+                    <div className="my-1.5 border-t border-white/[0.08]" />
+                    <MenuNavRow
+                      icon={<SlidersHorizontal className="h-4 w-4" />}
+                      label="More"
+                      onClick={() => setSettingsView('more')}
+                    />
+                    <div className="my-1.5 border-t border-white/[0.08]" />
+                  </>
+                )}
+
+                {/* ── Kurodo's own playback controls, kept on the root page ──
+                    Speed / Copy link / Stats moved to their own pages above, so
+                    they are NOT duplicated here. Everything else stays exactly
+                    as it was — the reference layout is adopted, nothing is lost. */}
+                {settingsView === 'root' && (
+                  <>
                 {/* Quality — anikage keeps it inside the gear menu */}
                 {levels.length > 1 && (
                   <MenuRow
@@ -927,39 +995,144 @@ export default function PlayerControls({
                   </button>
                 </MenuRow>
 
-                {/* Copy link to this moment */}
-                <div className="px-3 py-2 border-t border-white/5">
-                  <button
-                    onClick={() => {
-                      const t = Math.floor(currentTime)
-                      const url = new URL(window.location.href)
-                      url.searchParams.set('t', String(t))
-                      navigator.clipboard.writeText(url.toString()).then(
-                        () => toast?.info?.('Link copied to clipboard', 2000),
-                        () => {},
-                      )
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white border border-white/8 transition-colors"
-                  >
-                    <Link className="h-3.5 w-3.5" />
-                    Copy link at {formatTime(currentTime)}
-                  </button>
-                </div>
+                  </>
+                )}
 
-                {/* Stats overlay toggle */}
-                <MenuRow label="Stats" value={statsOverlay ? 'Shown' : 'Hidden'}>
-                  <button
-                    onClick={() => onToggleStatsOverlay()}
-                    className={cn(
-                      'px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors',
-                      statsOverlay
-                        ? 'bg-primary text-white'
-                        : 'bg-white/8 text-white/70 hover:bg-white/15',
-                    )}
-                  >
-                    {statsOverlay ? 'On' : 'Off'}
-                  </button>
-                </MenuRow>
+                {/* ── Playback speed page ── */}
+                {settingsView === 'speed' && (
+                  <div className="px-3 py-2.5 space-y-2">
+                    <SegmentedControl<string>
+                      value={String(speed)}
+                      options={[
+                        { value: '0.5', label: '0.5x' },
+                        { value: '0.75', label: '0.75x' },
+                        { value: '1', label: '1x' },
+                        { value: '1.25', label: '1.25x' },
+                        { value: '1.5', label: '1.5x' },
+                        { value: '2', label: '2x' },
+                      ]}
+                      onChange={(v) => setPlaybackSpeed(Number(v))}
+                      size="sm"
+                    />
+                    <p className="text-[10px] leading-relaxed text-white/40">
+                      Applies right away. Remembered as your default in Settings.
+                    </p>
+                  </div>
+                )}
+
+                {/* ── Audio boost page ── */}
+                {settingsView === 'boost' && (
+                  <div className="px-3 py-2.5 space-y-2.5">
+                    <Field
+                      label="Boost"
+                      value={audioBoost > 0 ? `+${audioBoost}%` : 'Off'}
+                    >
+                      <input
+                        type="range"
+                        min={0}
+                        max={200}
+                        step={10}
+                        value={audioBoost}
+                        onChange={(e) => setSetting('audioBoost', Number(e.target.value))}
+                        className="w-full accent-primary"
+                        aria-label="Audio boost percentage"
+                      />
+                    </Field>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[0, 50, 100, 150, 200].map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => setSetting('audioBoost', v)}
+                          className={cn(
+                            'px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors',
+                            audioBoost === v
+                              ? 'bg-primary text-white'
+                              : 'bg-white/8 text-white/70 hover:bg-white/15',
+                          )}
+                        >
+                          {v === 0 ? 'Off' : `+${v}%`}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-white/40">
+                      Lifts quiet dialogue above the mix using a Web Audio gain
+                      stage. The volume slider cannot exceed 100%, so boost is
+                      applied separately and resets to Off when the player closes.
+                    </p>
+                  </div>
+                )}
+
+                {/* ── Caption styles page ── */}
+                {settingsView === 'captions' && <CaptionAppearancePanel />}
+
+                {/* ── More page: the on/off switches ── */}
+                {settingsView === 'more' && (
+                  <>
+                    <MenuSwitchRow
+                      label="Incognito"
+                      hint="Pause progress, history & tracker sync"
+                      checked={incognito}
+                      onChange={(v) => setSetting('incognito', v)}
+                    />
+                    <MenuSwitchRow
+                      label="Autoplay video"
+                      checked={autoplayVideo}
+                      onChange={(v) => setSetting('autoplayVideo', v)}
+                    />
+                    <MenuSwitchRow
+                      label="Autonext episode"
+                      checked={autoplayNext}
+                      onChange={(v) => setSetting('autoplayNext', v)}
+                    />
+                    <MenuSwitchRow
+                      label="Skip intro / outro"
+                      hint={
+                        autoSkipIntro === autoSkipOutro
+                          ? undefined
+                          : autoSkipIntro
+                            ? 'Intros only'
+                            : 'Outros only'
+                      }
+                      checked={autoSkipIntro && autoSkipOutro}
+                      onChange={(v) => {
+                        setSetting('autoSkipIntro', v)
+                        setSetting('autoSkipOutro', v)
+                      }}
+                    />
+                    <MenuSwitchRow
+                      label="Skip fillers"
+                      checked={skipFiller}
+                      onChange={(v) => setSetting('skipFiller', v)}
+                    />
+                    <MenuSwitchRow
+                      label="Ambient mode"
+                      checked={ambientMode}
+                      onChange={(v) => setSetting('ambientMode', v)}
+                    />
+                    <div className="my-1.5 border-t border-white/[0.08]" />
+                    <button
+                      onClick={() => {
+                        const t = Math.floor(currentTime)
+                        const url = new URL(window.location.href)
+                        url.searchParams.set('t', String(t))
+                        navigator.clipboard.writeText(url.toString()).then(
+                          () => toast?.info?.('Link copied to clipboard', 2000),
+                          () => {},
+                        )
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-white/70 hover:bg-white/[0.07] hover:text-white transition-colors"
+                    >
+                      <Link className="h-3.5 w-3.5" />
+                      Copy link at {formatTime(currentTime)}
+                    </button>
+                    <MenuSwitchRow
+                      label="Playback stats"
+                      hint="Bitrate, resolution and dropped frames"
+                      checked={statsOverlay}
+                      onChange={() => onToggleStatsOverlay()}
+                    />
+                  </>
+                )}
               </MenuPanel>
             )}
           </Menu>
@@ -1109,6 +1282,92 @@ function MenuItem({
     >
       <span className="truncate">{children}</span>
       {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+    </button>
+  )
+}
+
+/**
+ * Root-level row that drills into a sub-page: circular icon, label, the
+ * current value, then a chevron — the shape the reference player uses for
+ * Playback speed / Audio boost / Caption styles / More.
+ */
+function MenuNavRow({
+  icon, label, value, onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  value?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={value ? `${label}, ${value}` : label}
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.07] transition-colors"
+    >
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/12 text-white/70">
+        {icon}
+      </span>
+      <span className="flex-1 truncate text-[13px] font-medium text-white/90">{label}</span>
+      {value && (
+        <span className="shrink-0 text-[11px] font-mono text-white/50">{value}</span>
+      )}
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/35" />
+    </button>
+  )
+}
+
+/** Back button that turns the panel header into a sub-page title bar. */
+function SubViewHeader({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <button
+      onClick={onBack}
+      aria-label="Back to settings"
+      title="Back to settings"
+      className="w-full flex items-center gap-2 px-3 py-2 text-[10px] uppercase tracking-wider font-bold text-white/70 hover:text-white hover:bg-white/5 border-b border-white/5"
+    >
+      <ArrowLeft className="h-3 w-3" />
+      {label}
+    </button>
+  )
+}
+
+/** On/off row used by the "More" page. */
+function MenuSwitchRow({
+  label, hint, checked, onChange,
+}: {
+  label: string
+  hint?: string
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.07] transition-colors"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium text-white/90">{label}</span>
+        {hint && (
+          <span className="mt-0.5 block truncate text-[10px] text-white/40">{hint}</span>
+        )}
+      </span>
+      <span
+        className={cn(
+          'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+          checked ? 'bg-primary' : 'bg-white/15',
+        )}
+      >
+        <span
+          className={cn(
+            'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+            checked ? 'left-[18px]' : 'left-[2px]',
+          )}
+        />
+      </span>
     </button>
   )
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Settings2, Maximize, Minimize, MessageSquare, SlidersHorizontal, Bookmark, BookOpen, ChevronUp, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Maximize, Minimize, MessageSquare, SlidersHorizontal, Bookmark, BookOpen, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 interface Props {

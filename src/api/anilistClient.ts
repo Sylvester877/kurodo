@@ -16,12 +16,21 @@
 import axios from 'axios'
 import { getBackendOrigin } from '../lib/utils'
 
-// Uses /api/anilist-gql backend proxy in localhost dev to avoid CORS;
-// calls direct in browser/production where CORS is permissive.
-const ENDPOINT = () =>
-  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+// Uses the /api/anilist-gql backend relay whenever the page is served by the
+// backend (localhost AND 127.0.0.1 — the packaged Electron app loads
+// http://127.0.0.1:5173, which this check used to miss, so every rail and
+// schedule page called graphql.anilist.co directly and skipped the relay's
+// 5-minute cache + in-flight dedupe). Direct calls remain the fallback for
+// a real remote deployment where CORS is permissive.
+const ENDPOINT = () => {
+  if (typeof window === 'undefined') return 'https://graphql.anilist.co'
+  const host = window.location.hostname
+  const isLoopback =
+    host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]' || host === '0.0.0.0'
+  return isLoopback
     ? `${getBackendOrigin()}/api/anilist-gql`
     : 'https://graphql.anilist.co'
+}
 const MAX_RETRIES = 3
 const MAX_BACKOFF_MS = 30_000
 
@@ -35,7 +44,13 @@ const MAX_BACKOFF_MS = 30_000
 //     after 30-min caching and in-flight dedup is far below that).
 //   • On a 429, open a short breaker: fail fast (stale cache or error)
 //     instead of retrying, and give AniList 10s to recover.
-const MIN_REQUEST_INTERVAL_MS = 400
+// fixes: 400ms between request STARTS serialized every parallel read — the
+// Home rails (6 feed queries) and Schedule (up to 6 pages) each paid
+// ~2.4s of pure pacing before their first byte. The requests themselves go
+// through the backend relay, which caches for 5 min and dedupes, so the
+// client only needs light spacing; the 429 breaker below still protects the
+// shared AniList budget when it is actually tight.
+const MIN_REQUEST_INTERVAL_MS = 120
 const BREAKER_MS = 10_000
 let lastRequestAt = 0
 let breakerUntil = 0

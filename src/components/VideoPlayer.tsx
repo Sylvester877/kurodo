@@ -129,6 +129,121 @@ export default React.memo(function VideoPlayer({
   // Active src — starts as primary, swaps to fallback on first failure
   const [activeSrc, setActiveSrc] = useState(src)
 
+  // ── Audio boost (Web Audio gain stage) ──────────────────────────────
+  // `video.volume` cannot exceed 1, so lifting quiet dialogue above the mix
+  // needs a real gain node. Two hazards shape this implementation:
+  //   1. `createMediaElementSource` PERMANENTLY reroutes the element's audio
+  //      through the graph — so it must never be built for users who never
+  //      touch the setting (default playback stays byte-for-byte identical).
+  //   2. A SUSPENDED AudioContext would silence that routed audio completely.
+  //      An <AudioContext> built without a user gesture starts suspended, and
+  //      `audioBoost` is persisted — so a relaunch with boost already on would
+  //      otherwise come up silent. We therefore refuse to reroute unless the
+  //      context is actually running, and retry on the next real gesture.
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const gainRef = useRef<GainNode | null>(null)
+  const audioBoost = useSettings((s) => s.audioBoost)
+
+  useEffect(() => {
+    if (audioBoost <= 0 && !gainRef.current) return
+
+    const applyGain = () => {
+      const g = gainRef.current
+      // 0% → unity, 100% → 2x, 200% → 3x
+      if (g) g.gain.value = 1 + audioBoost / 100
+    }
+
+    const build = (): boolean => {
+      const v = videoRef.current
+      if (!v || gainRef.current) return !!gainRef.current
+      try {
+        const Ctx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        if (!Ctx) return false
+        const ctx = new Ctx()
+        if (ctx.state !== 'running') {
+          // No gesture yet — do NOT reroute, or playback goes silent.
+          void ctx.resume().catch(() => {})
+          // Compare through a widened view: TS keeps the `!== 'running'`
+          // narrowing applied to `ctx.state` after the check above.
+          if ((ctx.state as string) !== 'running') {
+            void ctx.close?.().catch(() => {})
+            return false
+          }
+        }
+        const source = ctx.createMediaElementSource(v)
+        const gain = ctx.createGain()
+        source.connect(gain)
+        gain.connect(ctx.destination)
+        audioCtxRef.current = ctx
+        gainRef.current = gain
+        return true
+      } catch (e) {
+        console.warn('[player] audio boost unavailable:', (e as Error)?.message)
+        return false
+      }
+    }
+
+    if (build()) {
+      applyGain()
+      void audioCtxRef.current?.resume?.().catch(() => {})
+      return
+    }
+
+    // Retry once the user gives us a gesture.
+    const retry = () => {
+      if (build()) {
+        applyGain()
+        document.removeEventListener('pointerdown', retry)
+        document.removeEventListener('keydown', retry)
+      }
+    }
+    document.addEventListener('pointerdown', retry)
+    document.addEventListener('keydown', retry)
+    return () => {
+      document.removeEventListener('pointerdown', retry)
+      document.removeEventListener('keydown', retry)
+    }
+  }, [audioBoost])
+
+
+  // ── Auto-play every NEW source ──────────────────────────────────────
+  // The `autoPlay` attribute only applies when the <video> element MOUNTS.
+  // Watch.tsx now keeps this component mounted across episode changes (that
+  // is what stops auto-next from dropping the user out of fullscreen), so the
+  // element is no longer remounted and the browser has nothing to act on —
+  // the next episode would load and sit there paused. Same trap for a
+  // server switch mid-episode. So: play explicitly, ONCE per source.
+  //
+  // `autoPlayedSrcRef` makes this fire exactly once per src, which matters
+  // because `canplay` also fires after a seek or a quality switch — without
+  // the guard, resuming playback would override a deliberate pause.
+  const autoPlayedSrcRef = useRef<string | null>(null)
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (autoPlay === false) return
+    if (autoPlayedSrcRef.current === activeSrc) return
+    const tryPlay = () => {
+      if (autoPlayedSrcRef.current === activeSrc) return
+      autoPlayedSrcRef.current = activeSrc
+      if (!v.paused) return
+      // Rejects when the platform blocks autoplay — not an error we can act
+      // on, the user still has the play button and the poster is visible.
+      void v.play().catch(() => {})
+    }
+    v.addEventListener('canplay', tryPlay)
+    v.addEventListener('loadeddata', tryPlay)
+    // Safety net: some CDNs report neither early; try anyway shortly after.
+    const t = window.setTimeout(tryPlay, 2_500)
+    return () => {
+      v.removeEventListener('canplay', tryPlay)
+      v.removeEventListener('loadeddata', tryPlay)
+      window.clearTimeout(t)
+    }
+  }, [activeSrc, autoPlay])
+
   // ── Auto-focus the player container once loading completes so keyboard
   // shortcuts (Space, arrows, etc.) work immediately without the user
   // having to click the player first. Prevents the classic "Space scrolls

@@ -50,6 +50,11 @@ function cleanServerName(name: string): string {
  * - Active tile gets a glowing border + soft radial highlight.
  * - Quality badge parsed from provider tip.
  * - Empty/unavailable states stay friendly and centered.
+ *
+ * HARD RULE: every server the backend returns is rendered, and every tile is
+ * clickable. Health is shown as information only — emerald "verified", amber
+ * "UNVERIFIED", red "NO STREAM" — never as a disabled state and never as a
+ * reason to drop a row. Clicking a red tile really does try that server.
  */
 export default function ServerPicker({
   providers, streamType, activeProvider,
@@ -71,6 +76,21 @@ export default function ServerPicker({
   const allTypes = ['sub', 'hsub', 'dub'] as const
 
   const currentList = byType[streamType] ?? []
+  // Type tabs are real filters, but they must never silently swallow a
+  // request: selecting a type with nothing listed shows this panel rather
+  // than an empty screen.
+  const emptyTypePanel = (
+    <div className="glass-card flex flex-col items-center justify-center rounded-2xl p-6 text-center border border-white/5 bg-black/20">
+      <Server className="h-5 w-5 text-white/30 mb-2" />
+      <p className="text-xs font-semibold text-white/70 mb-1">
+        No {TYPE_META[streamType]?.label ?? streamType.toUpperCase()} servers listed
+      </p>
+      <p className="text-[11px] text-white/40 max-w-[300px]">
+        The source didn't list any {streamType} server for this episode. Switch back to another type,
+        or open a different episode — nothing is hidden, there is simply nothing here yet.
+      </p>
+    </div>
+  )
 
   // Group current servers by provider family for section headers
   const grouped = useMemo(() => {
@@ -143,7 +163,9 @@ export default function ServerPicker({
             <button
               key={t}
               onClick={() => {
-                if (isEmpty) return
+                // Always selectable — no tab is ever greyed out. An empty
+                // type just shows its own "nothing listed" panel below
+                // instead of being unreachable.
                 onChangeType(t)
                 const list = byType[t] ?? []
                 if (list.length > 0) {
@@ -151,18 +173,17 @@ export default function ServerPicker({
                   onChangeProvider((def ?? list[0]).name)
                 }
               }}
-              disabled={isEmpty}
               title={
                 isEmpty
-                  ? `${meta.label} servers aren't available right now. This usually means the upstream source (chad.anidap.se) has no ${meta.label.toLowerCase()} stream for this title, or the family is unreachable.`
+                  ? `${meta.label}: nothing listed right now. This usually means the upstream source has no ${meta.label.toLowerCase()} stream for this title, or the family is unreachable.`
                   : `${meta.label} (${count} server${count === 1 ? '' : 's'})`
               }
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all z-10',
-                isEmpty
-                  ? 'opacity-30 cursor-not-allowed'
-                  : isActive
-                    ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/20'
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all z-10 cursor-pointer',
+                isActive
+                  ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/20'
+                  : isEmpty
+                    ? 'text-white/30 hover:bg-white/5 hover:text-white/60'
                     : 'text-white/50 hover:bg-white/5 hover:text-white/80',
               )}
             >
@@ -183,6 +204,7 @@ export default function ServerPicker({
 
       {/* ─── Server Card Grid grouped by Provider ─── */}
       <div className="space-y-4">
+        {currentList.length === 0 && emptyTypePanel}
         {grouped.map(({ family, servers }) => {
           const fam = PROVIDER_FAMILY[family]
           return (
@@ -200,17 +222,27 @@ export default function ServerPicker({
                   const quality = p.tip?.match(/(1080p|720p|\b4k\b|high quality|multi quality)/i)?.[1]?.toUpperCase()
 
                   return (
+                    /* Every server is ALWAYS clickable.
+                       No chip is ever disabled or hidden: a server the
+                       backend could not verify (or one that failed a probe
+                       for this episode) still gets a real attempt when the
+                       user clicks it. The dot + badge below are information,
+                       not a gate — the user decides which server to try. */
                     <button
                       key={p.name}
-                      onClick={() => { if (p._healthy !== false) onChangeProvider(p.name) }}
-                      disabled={p._healthy === false}
-                      className={cn(
-                        'relative flex flex-col p-3 rounded-xl border text-left transition-all overflow-hidden group',
+                      onClick={() => onChangeProvider(p.name)}
+                      title={
                         p._healthy === false
-                          ? 'opacity-20 cursor-not-allowed bg-white/[0.01] border-white/5'
-                          : isActive
-                            ? 'bg-primary/10 border-primary shadow-[0_0_15px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.12)]'
-                            : 'bg-white/[0.02] border-white/10 hover:border-white/20 hover:bg-white/[0.04]',
+                          ? 'No stream was found for this title on this server last time it was checked — click to try it anyway.'
+                          : p._healthy === true
+                            ? 'Verified working for this episode.'
+                            : 'Not checked yet for this episode — click to try it.'
+                      }
+                      className={cn(
+                        'relative flex flex-col p-3 rounded-xl border text-left transition-all overflow-hidden group cursor-pointer',
+                        isActive
+                          ? 'bg-primary/10 border-primary shadow-[0_0_15px_hsl(var(--theme-primary-h)_var(--theme-primary-s)_var(--theme-primary-l)/0.12)]'
+                          : 'bg-white/[0.02] border-white/10 hover:border-white/20 hover:bg-white/[0.04]',
                       )}
                     >
                       {/* Active radial glow */}
@@ -225,7 +257,22 @@ export default function ServerPicker({
                         <span className={cn('text-xs font-semibold truncate pr-2', isActive ? 'text-white' : 'text-white/70')}>
                           {cleanServerName(p.name)}
                         </span>
-                        <Activity className={cn('h-3.5 w-3.5 shrink-0', p._healthy === false ? 'text-red-500' : 'text-emerald-500')} />
+                        {/* Three honest states: verified working (emerald),
+                            NOT verified yet (amber), verified dead for this
+                            title (red). The amber state exists because the
+                            backend can only probe a few servers per request —
+                            showing those as "working" was a promise we could
+                            not keep on the long tail. */}
+                        <Activity
+                          className={cn(
+                            'h-3.5 w-3.5 shrink-0',
+                            p._healthy === false
+                              ? 'text-red-500'
+                              : p._healthy === true
+                                ? 'text-emerald-500'
+                                : 'text-amber-400',
+                          )}
+                        />
                       </div>
 
                       <div className="flex items-center gap-1.5 mt-auto relative z-10">
@@ -238,6 +285,15 @@ export default function ServerPicker({
                           </span>
                         )}
                         <span className="text-[10px] text-white/40">{p.type.toUpperCase()}</span>
+                        {p._healthy === false ? (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-500/10 text-red-300/80">
+                            NO STREAM
+                          </span>
+                        ) : p._healthy !== true ? (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300/80">
+                            UNVERIFIED
+                          </span>
+                        ) : null}
                       </div>
                     </button>
                   )

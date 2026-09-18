@@ -1,0 +1,3583 @@
+{
+  "partial": false,
+  "rows": [
+    {
+      "title": "Attack on Titan",
+      "malId": 16498,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 4914,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 3884,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 609,
+          "subs": 5,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Kono Oto Tomare!: Sounds of Life Season 2",
+      "malId": 38889,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2207,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 2072,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1688,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Donkikko",
+      "malId": 19901,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 6773,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6467,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4144,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7427,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3963,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4123,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 4246,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 4606,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3982,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Demon Slayer: Kimetsu no Yaiba",
+      "malId": 38000,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 17393,
+          "subs": 11,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 5497,
+          "subs": 11,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 902,
+          "subs": 11,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Sound! Euphonium 2",
+      "malId": 31988,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Hua Jianghu: Buliang Ren 6",
+      "malId": 51897,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "JUJUTSU KAISEN",
+      "malId": 40748,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3546,
+          "subs": 16,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 2331,
+          "subs": 16,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1185,
+          "subs": 16,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Kamisama Kiss◎ OVA",
+      "malId": 30709,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Fujiko F. Fujio no Sukoshi Fushigi Tanpen Theater",
+      "malId": 19899,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 22043,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 10445,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 5116,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3793,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4123,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3761,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3731,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 6275,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 9643,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Death Note",
+      "malId": 1535,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3923,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1124,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3390,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 439,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Bakuman. 3",
+      "malId": 12365,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Shin Dokonjou Gaeru",
+      "malId": 21487,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 18335,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6742,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 9329,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 1363,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 1133,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 883,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 825,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7071,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3928,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "My Hero Academia",
+      "malId": 31964,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 8958,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 4501,
+          "subs": 3,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "DAN DA DAN Season 2",
+      "malId": 60543,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 21738,
+          "subs": 25,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 12785,
+          "subs": 25,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 1198,
+          "subs": 25,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 574,
+          "subs": 25,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Hunter x Hunter (2011)",
+      "malId": 11061,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1645,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 2979,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 533,
+          "subs": 5,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Neon Genesis Evangelion",
+      "malId": 30,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 18332,
+          "subs": 30,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1063,
+          "subs": 30,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1015,
+          "subs": 30,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Shen Lan Qi Yu Wushuang Zhu: Tianmo Pian",
+      "malId": 55740,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "One-Punch Man",
+      "malId": 30276,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1941,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1060,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1772,
+          "subs": 21,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "That Time I Got Reincarnated as a Slime Season 4",
+      "malId": 59970,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 7129,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 2648,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 1760,
+          "subs": 5,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Fabulous Beasts 5",
+      "malId": 62955,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "ONE PIECE",
+      "malId": 21,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 14287,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~27s."
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3861,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~27s."
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 4116,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~23s."
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4768,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~19s."
+        }
+      ]
+    },
+    {
+      "title": "Girls Band Cry",
+      "malId": 55102,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 11370,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~12s."
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6129,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~28s."
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6692,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~28s."
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7504,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~21s."
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 8612,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~14s."
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 16914,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~5s."
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 25731,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~11s."
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 8825,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~11s."
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 5706,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~2s."
+        }
+      ]
+    },
+    {
+      "title": "Shenguo Zhi Shang",
+      "malId": 61564,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Tokyo Ghoul",
+      "malId": 22319,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3599,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~28s."
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3554,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~25s."
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3857,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~21s."
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3558,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~17s."
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3572,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~14s."
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4100,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~10s."
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3595,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~6s."
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3549,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~2s."
+        },
+        {
+          "name": "anidap-miku",
+          "ok": true,
+          "ms": 4206,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Scissor Seven Season 3",
+      "malId": 45556,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 10271,
+          "subs": 36,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 8877,
+          "subs": 63,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 3854,
+          "subs": 63,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Serendipity the Pink Dragon",
+      "malId": 3201,
+      "dubListed": 1,
+      "results": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 709,
+          "subs": 0,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Season 2",
+      "malId": 25777,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 15475,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 9301,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1965,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Chihayafuru 2",
+      "malId": 14397,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2567,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 15320,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 4079,
+          "subs": 0,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Momotaro Densetsu",
+      "malId": 11533,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9848,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4476,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4370,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3598,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4210,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3966,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3699,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 4001,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3888,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Fullmetal Alchemist: Brotherhood",
+      "malId": 5114,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 12564,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 8969,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 9283,
+          "subs": 21,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Mushoku Tensei: Jobless Reincarnation Season 2 Part 2",
+      "malId": 55888,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3370,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1403,
+          "subs": 15,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Pink Lady Monogatari: Eikou no Tenshi-tachi",
+      "malId": 17423,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 14522,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4531,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4062,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3590,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3625,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4037,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3571,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 22108,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4527,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Naruto",
+      "malId": 20,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 22133,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 3782,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 596,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 469,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Kaguya-sama: Love is War",
+      "malId": 37999,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2958,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1813,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 371,
+          "subs": 7,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Shen Lan Qi Yu Wushuang Zhu 2",
+      "malId": 53367,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Sword Art Online",
+      "malId": 11757,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 7076,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1685,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1017,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Puella Magi Madoka Magica",
+      "malId": 9756,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1416,
+          "subs": 20,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 3885,
+          "subs": 20,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 681,
+          "subs": 20,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Edokko Boy: Gatten Tasuke",
+      "malId": 9028,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 13173,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3609,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3593,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3978,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4082,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3591,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3589,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3602,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3592,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "A Silent Voice",
+      "malId": 28851,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 9222,
+          "subs": 0,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 4209,
+          "subs": 0,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Medalist",
+      "malId": 55318,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3003,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 2846,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 993,
+          "subs": 0,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 2775,
+          "subs": 20,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Adventure on the Gaboten Island",
+      "malId": 8184,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 18523,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8087,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7611,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7678,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7861,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 8041,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7972,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 8606,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 9599,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Your Name.",
+      "malId": 32281,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 11641,
+          "subs": 15,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7052,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~28s."
+        },
+        {
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7931,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~21s."
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7682,
+          "subs": 0,
+          "why": "Anidap is temporarily rate-limited. Retry in ~13s."
+        }
+      ]
+    },
+    {
+      "title": "SPY x FAMILY",
+      "malId": 50265,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": true,
+          "ms": 20115,
+          "subs": 0,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 10660,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 2244,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": true,
+          "ms": 3181,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 579,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": true,
+          "ms": 3866,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": true,
+          "ms": 2454,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": true,
+          "ms": 5845,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": true,
+          "ms": 4069,
+          "subs": 12,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Beyond Time's Gaze 2",
+      "malId": 64398,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 19736,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 11122,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 13827,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 11952,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 12933,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 18002,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 10816,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 17469,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 24052,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Season 3",
+      "malId": 35760,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 8777,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 15349,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 11145,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 8826,
+          "subs": 3,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Land of the Lustrous",
+      "malId": 35557,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 21410,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 14068,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Big Brother 3",
+      "malId": 61730,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 24300,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9454,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 8309,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7868,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 11059,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 12092,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 8011,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 9659,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 10289,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "My Hero Academia Season 2",
+      "malId": 33486,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 4444,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 8464,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 1393,
+          "subs": 3,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "March comes in like a lion",
+      "malId": 31646,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 13786,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 7254,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3736,
+          "subs": 0,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Seton Animal Chronicles",
+      "malId": 7845,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 15600,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9782,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7469,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7691,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7457,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 7943,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7450,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 8736,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7665,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Final Season",
+      "malId": 40028,
+      "dubListed": 1,
+      "results": [
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 4419,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Nichijou - My Ordinary Life",
+      "malId": 10165,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 20645,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 25395,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3854,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 883,
+          "subs": 0,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "The Promised Neverland",
+      "malId": 37779,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": true,
+          "ms": 5227,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 8605,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 9894,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": true,
+          "ms": 2551,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 581,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": true,
+          "ms": 476,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": true,
+          "ms": 2158,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": true,
+          "ms": 4117,
+          "subs": 5,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": true,
+          "ms": 1400,
+          "subs": 5,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Slam Dunk",
+      "malId": 170,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2416,
+          "subs": 4,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 7051,
+          "subs": 4,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Gozonji! Gekkou Kamen-kun",
+      "malId": 5477,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 17790,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 2259,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6424,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 2010,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3433,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 1245,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2233,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 2431,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 5333,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Chainsaw Man",
+      "malId": 44511,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 13112,
+          "subs": 14,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 12274,
+          "subs": 14,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 2586,
+          "subs": 14,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 782,
+          "subs": 14,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Dr. STONE SCIENCE FUTURE Cour 3",
+      "malId": 62568,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 5230,
+          "subs": 13,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1829,
+          "subs": 13,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 587,
+          "subs": 13,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Tomatoman",
+      "malId": 5201,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 6038,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9139,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 2531,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3906,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 1651,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3210,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 1316,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 2759,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 5381,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Assassination Classroom",
+      "malId": 24833,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3397,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1075,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 761,
+          "subs": 3,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "DAN DA DAN",
+      "malId": 57334,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 15054,
+          "subs": 24,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 7830,
+          "subs": 24,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 612,
+          "subs": 24,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 781,
+          "subs": 24,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Shounen Tokugawa Ieyasu",
+      "malId": 20223,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9858,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6698,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 2822,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 2490,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 2477,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 2493,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2474,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 2530,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 2490,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Mob Psycho 100",
+      "malId": 32182,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3784,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1588,
+          "subs": 12,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 175,
+          "subs": 12,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "86 EIGHTY-SIX",
+      "malId": 41457,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2057,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 1528,
+          "subs": 7,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Tomatoman",
+      "malId": 5201,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 17014,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7171,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6797,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 6213,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 6160,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 6551,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7766,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 8832,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7349,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Re:ZERO -Starting Life in Another World-",
+      "malId": 31240,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2139,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 390,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "given",
+      "malId": 39533,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2743,
+          "subs": 16,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 4949,
+          "subs": 16,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1997,
+          "subs": 16,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Your lie in April",
+      "malId": 23273,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2937,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 22184,
+          "subs": 0,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 21988,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 549,
+          "subs": 21,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Space Brothers",
+      "malId": 12431,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Chou Supercar Gattiger",
+      "malId": 9881,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 17027,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9574,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6913,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3556,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 2527,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 2493,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2484,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3029,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 2488,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Attack on Titan Season 3 Part 2",
+      "malId": 38524,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 3170,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 3297,
+          "subs": 3,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "The Ramparts of Ice",
+      "malId": 60852,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 9187,
+          "subs": 40,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 4103,
+          "subs": 34,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 245,
+          "subs": 40,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 2252,
+          "subs": 34,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Xian Di Guilai",
+      "malId": 60583,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Naruto: Shippuden",
+      "malId": 1735,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 14324,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 764,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 251,
+          "subs": 7,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Link Click: Bridon Arc",
+      "malId": 56752,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 6947,
+          "subs": 8,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 3651,
+          "subs": 8,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Yao Shen Ji 9",
+      "malId": 62026,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "ERASED",
+      "malId": 31043,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 18820,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 184,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 51,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Dou Po Cangqiong: San Nian Zhi Yue",
+      "malId": 49701,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 10447,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 5561,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 2490,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3061,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 2678,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 2487,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2476,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 2810,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 2478,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Fei Ren Zai: Lichun Pian",
+      "malId": 42455,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 13531,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 2490,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 2910,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 2542,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 2501,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 2498,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2525,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 2839,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3047,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "My Hero Academia Season 3",
+      "malId": 36456,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3982,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1771,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 241,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 2992,
+          "subs": 7,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "IDOLiSH7 Third BEAT! Part 2",
+      "malId": 46654,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Dr. Fabre is a Detective",
+      "malId": 5088,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 19418,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7271,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6388,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 6758,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 6213,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 6663,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 6545,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7385,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7361,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Steins;Gate",
+      "malId": 9253,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1489,
+          "subs": 7,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 10076,
+          "subs": 7,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Non Non Biyori Nonstop",
+      "malId": 39808,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "One Way or Another",
+      "malId": 59916,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Black Clover",
+      "malId": 34572,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 40007,
+          "subs": 0,
+          "why": "Stream extraction timed out"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 626,
+          "subs": 9,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 325,
+          "subs": 9,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Re:ZERO -Starting Life in Another World- Season 2",
+      "malId": 39587,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 5181,
+          "subs": 13,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 21477,
+          "subs": 13,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 40006,
+          "subs": 0,
+          "why": "Stream extraction timed out"
+        }
+      ]
+    },
+    {
+      "title": "OKAWARI-BOY Starzan S",
+      "malId": 8799,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3,
+          "subs": 0,
+          "why": "Not found on the source."
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4487,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 28180,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8328,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 2509,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 2500,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2479,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 2797,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 2499,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "HAIKYU!!",
+      "malId": 20583,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1654,
+          "subs": 6,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 830,
+          "subs": 6,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Run with the Wind",
+      "malId": 37965,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 12417,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 6195,
+          "subs": 9,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 1943,
+          "subs": 0,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Manga Mitokoumon",
+      "malId": 11829,
+      "dubListed": 9,
+      "results": [
+        {
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9645,
+          "subs": 0,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 2589,
+          "subs": 0,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 2989,
+          "subs": 0,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 11742,
+          "subs": 0,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 8722,
+          "subs": 0,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 2504,
+          "subs": 0,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 2501,
+          "subs": 0,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 21775,
+          "subs": 0,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3461,
+          "subs": 0,
+          "why": "No stream available for anidap-miku/dub"
+        }
+      ]
+    },
+    {
+      "title": "Rascal Does Not Dream of Bunny Girl Senpai",
+      "malId": 37450,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2101,
+          "subs": 8,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 10768,
+          "subs": 8,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "YAT Anshin! Uchuu Ryokou 2",
+      "malId": 1892,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Revolutionary Girl Utena",
+      "malId": 440,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 13646,
+          "subs": 2,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 12187,
+          "subs": 2,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 1294,
+          "subs": 2,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Fabulous Beasts 4",
+      "malId": 59385,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Yu Yu Hakusho: Ghostfiles",
+      "malId": 392,
+      "dubListed": 4,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 16724,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 13189,
+          "subs": 0,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 4137,
+          "subs": 3,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 13962,
+          "subs": 3,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Chikkun Takkun",
+      "malId": 16303,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Dr. STONE",
+      "malId": 38691,
+      "dubListed": 2,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1559,
+          "subs": 9,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 57,
+          "subs": 9,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Hunter x Hunter",
+      "malId": 136,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1470,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 861,
+          "subs": 1,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-loli",
+          "ok": true,
+          "ms": 240,
+          "subs": 1,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Wu Dong Qiankun 6",
+      "malId": 62249,
+      "dubListed": 0,
+      "results": []
+    },
+    {
+      "title": "Violet Evergarden",
+      "malId": 33352,
+      "dubListed": 3,
+      "results": [
+        {
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 1222,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-neko",
+          "ok": true,
+          "ms": 1467,
+          "subs": 21,
+          "why": "HTTP 200"
+        },
+        {
+          "name": "anidap-sora",
+          "ok": true,
+          "ms": 237,
+          "subs": 21,
+          "why": "HTTP 200"
+        }
+      ]
+    }
+  ],
+  "board": [
+    [
+      "anidap-yuki",
+      {
+        "ok": 55,
+        "fail": 24,
+        "msSum": 641272,
+        "msN": 79,
+        "subs": 54,
+        "okMs": 445341,
+        "errs": [
+          [
+            "No stream available for anidap-yuki/dub",
+            8
+          ],
+          [
+            "Stream extraction timed out",
+            1
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-neko",
+      {
+        "ok": 53,
+        "fail": 25,
+        "msSum": 489814,
+        "msN": 78,
+        "subs": 50,
+        "okMs": 306683,
+        "errs": [
+          [
+            "No stream available for anidap-neko/dub",
+            8
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-loli",
+      {
+        "ok": 24,
+        "fail": 2,
+        "msSum": 82575,
+        "msN": 26,
+        "subs": 19,
+        "okMs": 70528,
+        "errs": []
+      }
+    ],
+    [
+      "anidap-sora",
+      {
+        "ok": 35,
+        "fail": 25,
+        "msSum": 237685,
+        "msN": 60,
+        "subs": 34,
+        "okMs": 73728,
+        "errs": [
+          [
+            "No stream available for anidap-sora/dub",
+            8
+          ],
+          [
+            "Stream extraction timed out",
+            1
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-mimi",
+      {
+        "ok": 2,
+        "fail": 22,
+        "msSum": 323935,
+        "msN": 24,
+        "subs": 1,
+        "okMs": 25342,
+        "errs": [
+          [
+            "No stream available for anidap-mimi/dub",
+            7
+          ],
+          [
+            "Not found on the source.",
+            1
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-kiwi",
+      {
+        "ok": 2,
+        "fail": 22,
+        "msSum": 126338,
+        "msN": 24,
+        "subs": 2,
+        "okMs": 5732,
+        "errs": [
+          [
+            "No stream available for anidap-kiwi/dub",
+            8
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-nuri",
+      {
+        "ok": 2,
+        "fail": 22,
+        "msSum": 124439,
+        "msN": 24,
+        "subs": 2,
+        "okMs": 4342,
+        "errs": [
+          [
+            "No stream available for anidap-nuri/dub",
+            8
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-kami",
+      {
+        "ok": 2,
+        "fail": 22,
+        "msSum": 120647,
+        "msN": 24,
+        "subs": 2,
+        "okMs": 4612,
+        "errs": [
+          [
+            "No stream available for anidap-kami/dub",
+            8
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-koto",
+      {
+        "ok": 2,
+        "fail": 22,
+        "msSum": 171656,
+        "msN": 24,
+        "subs": 2,
+        "okMs": 9962,
+        "errs": [
+          [
+            "No stream available for anidap-koto/dub",
+            8
+          ]
+        ]
+      }
+    ],
+    [
+      "anidap-miku",
+      {
+        "ok": 3,
+        "fail": 21,
+        "msSum": 138433,
+        "msN": 24,
+        "subs": 3,
+        "okMs": 9675,
+        "errs": [
+          [
+            "No stream available for anidap-miku/dub",
+            8
+          ]
+        ]
+      }
+    ]
+  ],
+  "summary": {
+    "titles": 100,
+    "titlesWithDub": 82,
+    "titlesWithWorkingDub": 60,
+    "totalDubCalls": 387,
+    "totalDubOk": 180,
+    "totalDubFail": 207
+  }
+}

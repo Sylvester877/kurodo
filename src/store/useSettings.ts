@@ -4,7 +4,7 @@
 // applies on first load.
 
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 // Debounced localStorage wrapper — batches writes to avoid blocking the
 // main thread on every individual set() call. Zustand's persist middleware
@@ -116,6 +116,17 @@ export interface SettingsState {
   audioTrack: number
   /** Default playback speed (0.5–2.0). Applied on every video load. */
   defaultPlaybackSpeed: number
+  /** Audio boost, as a percentage above unity gain. 0 = off (default).
+   *  Applied with a Web Audio GainNode — `video.volume` cannot exceed 1, so a
+   *  real boost needs the audio graph. 0..200 → gain 1.0..3.0. */
+  audioBoost: number
+  /** Incognito: stop writing watch progress / history, and skip tracker sync.
+   *  Playback is untouched — this only silences the RECORDING of it. */
+  incognito: boolean
+  /** Start playing automatically when an episode loads. */
+  autoplayVideo: boolean
+  /** Skip filler episodes when auto-advancing to the next episode. */
+  skipFiller: boolean
   /** Auto-skip recap segments too (not just intro/outro). */
   autoSkipRecap: boolean
   /** Start videos in theater mode by default. */
@@ -154,9 +165,13 @@ const DEFAULTS: Omit<SettingsState, 'set' | 'reset'> = {
   server: 'yuki',
   quality: 'auto',
   defaultVolume: 1,
-  // v5: autoplay-next is now OPT-IN. Watching to 90% and having the app
-  // silently jump episodes was the top "the app has its own brain" complaint.
-  autoplayNext: false,
+  // v7: autoplay-next is ON by default again (owner request: "add auto next").
+  // It was made opt-in in v5 because the app "had its own brain" — but that
+  // was about SILENT jumping. This is not silent: an 8s "Up Next" countdown
+  // is on screen with a Cancel button, and finishing an episode continuing to
+  // the next one is what every other player does. The Settings toggle and the
+  // ⌘K action remain for anyone who wants it off.
+  autoplayNext: true,
   autoplayDelay: 8,
   pauseOnBlur: false,
   prefetchNext: true,
@@ -194,6 +209,10 @@ const DEFAULTS: Omit<SettingsState, 'set' | 'reset'> = {
   statsOverlay: false,
   audioTrack: -1,
   defaultPlaybackSpeed: 1,
+  audioBoost: 0,
+  incognito: false,
+  autoplayVideo: true,
+  skipFiller: true,
   // v6: recap auto-skip also became opt-in (same ask-first policy).
   autoSkipRecap: false,
   defaultTheaterMode: false,
@@ -219,9 +238,23 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: 'kurodo-settings',
-      version: 5,
+      // Bump BOTH the number and add the matching `version < N` branch below, or
+      // the migration silently never runs (the v6 branch sat dead here because
+      // this stayed at 5).
+      version: 8,
+      // ── createJSONStorage is NOT optional here ──────────────────────
+      // `debouncedStorage` is a STRING storage (getItem/setItem move plain
+      // strings). `persist` expects a PersistStorage, whose setItem receives
+      // the whole `{ state, version }` OBJECT — so passing the string storage
+      // straight in made localStorage hold the literal text "[object Object]".
+      // getItem then returned that, JSON.parse threw, and the store fell back
+      // to defaults… on EVERY launch. Every setting — server preference,
+      // volume, theme, auto-next, quality — silently reset each time the app
+      // started, and the migrations below never ran either (nothing parsed to
+      // migrate). Verified live before the fix: `localStorage.getItem(
+      // 'kurodo-settings') === '[object Object]'`.
       storage: typeof localStorage !== 'undefined'
-        ? debouncedStorage(localStorage, 300) as any
+        ? createJSONStorage(() => debouncedStorage(localStorage, 300))
         : undefined,
       // v1 → v2: anidap red was the default accent (indigo users migrated).
       // v2 → v3: violet became the default; old indigo/anidap users migrated.
@@ -253,6 +286,28 @@ export const useSettings = create<SettingsState>()(
           s.autoSkipOutro = false
           s.autoSkipRecap = false
           s.skipDelay = 3
+        }
+        if (version < 7) {
+          // v7: auto-next back ON by default (owner request). Existing installs
+          // are migrated too — someone on v5/v6 never opted OUT of anything,
+          // they just inherited the old default. It stays cancellable via the
+          // countdown and switchable in Settings.
+          s.autoplayNext = true
+        }
+        if (version < 8) {
+          // v8: four settings moved out of ad-hoc localStorage keys into the
+          // store so the player's "More" menu can own them.
+          //   · skipFiller was a `useState` in Watch.tsx with NO setter — it
+          //     read the legacy flag once and could never be changed at
+          //     runtime. Carry the user's existing choice over.
+          //   · audioBoost / incognito / autoplayVideo are new; defaults are
+          //     correct (off, off, on) so nothing to migrate.
+          try {
+            const legacy = typeof localStorage !== 'undefined'
+              ? localStorage.getItem('kurodo-skip-filler')
+              : null
+            if (legacy != null) s.skipFiller = legacy !== '0'
+          } catch { /* private mode — keep the default */ }
         }
         return s as SettingsState
       },

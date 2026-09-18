@@ -13,28 +13,54 @@ const JIKAN_BASE =
 
 const api = axios.create({
   baseURL: JIKAN_BASE,
-  timeout: 8000,
+  timeout: 6000,
 })
 
 // ─────────────────────────────────────────────────────────────────
-// Request queue: Jikan limit is 3 req/sec, 60 req/min.
-// We pace at 150ms (~6 req/sec burst, drops to 3/sec via 429 retry).
-// 400ms was WAY too conservative and made first paint 4+ seconds.
+// Request pool: Jikan limit is 3 req/sec, 60 req/min — but every call here
+// goes through the backend proxy (/api/jikan/*), which already paces,
+// dedupes and caches for Jikan. So the client only needs a light cap to stop
+// a burst of parallel rails from firing at once.
+//
+// fixes: this used to be a single serial promise chain, so each request
+// waited for the previous one to finish *including its retry loop* (8s
+// timeout × up to 3 attempts). Measured on /browse: the list request only
+// STARTED at +2.9s because the genres request held the chain, and the
+// schedule's 7 parallel /schedules calls were serialized the same way.
+// Now: N concurrent slots + a small gap between request STARTS.
 // ─────────────────────────────────────────────────────────────────
+const MAX_CONCURRENT = 4
+const START_GAP_MS = 40
 // Minimal SVG placeholder used when every upstream source fails.
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 600%22%3E%3Crect width=%22400%22 height=%22600%22 fill=%22%23222%22/%3E%3Ctext x=%22200%22 y=%22300%22 fill=%22%23888%22 text-anchor=%22middle%22 font-size=%2224%22%3ENo Image%3C/text%3E%3C/svg%3E'
 
-const MIN_INTERVAL = 150
-let queue: Promise<unknown> = Promise.resolve()
+let running = 0
+const waiters: Array<() => void> = []
+let nextStartAt = 0
 
-function enqueue<T>(task: () => Promise<T>): Promise<T> {
-  const run = queue.then(async () => {
-    const result = await task()
-    await new Promise((r) => setTimeout(r, MIN_INTERVAL))
-    return result
-  })
-  queue = run.catch(() => undefined)
-  return run as Promise<T>
+async function acquireSlot(): Promise<void> {
+  if (running >= MAX_CONCURRENT) {
+    await new Promise<void>((resolve) => waiters.push(resolve))
+  }
+  running++
+  const wait = nextStartAt - Date.now()
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+  nextStartAt = Date.now() + START_GAP_MS
+}
+
+function releaseSlot(): void {
+  running--
+  const next = waiters.shift()
+  if (next) next()
+}
+
+async function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  await acquireSlot()
+  try {
+    return await task()
+  } finally {
+    releaseSlot()
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -110,40 +136,44 @@ async function cachedGet<T>(url: string, params?: Record<string, unknown>): Prom
 
   // 3. Existing in-flight request → share it
   const existing = inFlight.get(key)
-  if (existing) return existing as Promise<T>    // 4. Fresh request
-    const p = enqueue(async () => {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const { data } = await api.get<T>(url, { params })
-          // Never cache placeholder stubs — they'd poison the cache
-          // and show grey boxes even after the upstream API recovers.
-          const s = JSON.stringify(data)
-          if (!s.includes(PLACEHOLDER_IMAGE) && !s.includes('Unable to load details')) {
-            memCache.set(key, { at: Date.now(), data })
-            saveToStorage(key, data)
-          }
-          return data
-        } catch (err: unknown) {
+  if (existing) return existing as Promise<T>
+
+  // 4. Fresh request (through the concurrency pool above)
+  const p = enqueue(async () => {
+    // 2 attempts (was 3): the backend proxy now retries + races Jikan,
+    // AniList and Kitsu and answers in ~1s even during a MAL outage, so a
+    // third client attempt only added dead time to a request that already
+    // had the answer. Timeout is 6s so a single hung attempt can never hold
+    // a slot for 8s while other rails wait.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data } = await api.get<T>(url, { params })
+        // Never cache placeholder stubs — they'd poison the cache
+        // and show grey boxes even after the upstream API recovers.
+        const s = JSON.stringify(data)
+        if (!s.includes(PLACEHOLDER_IMAGE) && !s.includes('Unable to load details')) {
+          memCache.set(key, { at: Date.now(), data })
+          saveToStorage(key, data)
+        }
+        return data
+      } catch (err: unknown) {
         const status = (err as { response?: { status?: number }; code?: string }).response?.status
         const code = (err as { code?: string }).code
-        // 429 — rate limited. Wait and retry.
-        if (status === 429) {
-          await new Promise((r) => setTimeout(r, 1500))
+        // 429 — rate limited. Wait briefly and retry once.
+        if (status === 429 && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 900))
           continue
         }
         // Network error / timeout — wait and retry once.
-        if (code === 'ECONNABORTED' || code === 'ERR_NETWORK' || code === 'ERR_BAD_RESPONSE') {
-          if (attempt === 0) {
-            await new Promise((r) => setTimeout(r, 1000))
-            continue
-          }
+        if ((code === 'ECONNABORTED' || code === 'ERR_NETWORK' || code === 'ERR_BAD_RESPONSE') && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 600))
+          continue
         }
         throw err
       }
     }
     throw new Error('Request failed after retries')
-  })
-    .finally(() => inFlight.delete(key))
+  }).finally(() => inFlight.delete(key))
 
   inFlight.set(key, p)
   return p

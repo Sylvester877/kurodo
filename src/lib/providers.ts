@@ -5,26 +5,37 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
   // ── Current chad roster (Aug 2026 re-shuffle) ──
   // The legacy multi-1080p fleet (nuri/kami/koto/mochi/vee/yume/uwu) is
   // GONE upstream — chad now serves sora/kiwi/neko/beep/mimi/yuki (verified
-  // live: sora/kiwi/neko/beep masters carry a 1920x1080 variant). Hints are
-  // updated from the live chad tips; priorities rank QUALITY first so the
-  // best-looking stream is the default, and chad's per-episode `default`
-  // flag is the tie-breaker inside a quality tier (sortProviders).
+  // live: sora/kiwi/neko/beep masters carry a 1920x1080 variant).
   // NOTE: the renderer no longer hardcodes this for new servers — the
   // server API now sends fresh `tip` strings from chad, and Unknown
   // servers (no entry here) get a neutral auto-derived label instead of a
   // stale one.
-  sora:   { name: 'sora',   label: 'Sora',     hint: 'Soft sub, Fast, High quality',       priority: 0, recommended: true },
-  kiwi:   { name: 'kiwi',   label: 'Kiwi',     hint: 'Hard sub, Fast, High quality',       priority: 0 },
-  neko:   { name: 'neko',   label: 'Neko',     hint: 'Hard sub, Fast, High quality',       priority: 0 },
-  beep:   { name: 'beep',   label: 'Beep',     hint: 'Soft sub, Fast',                     priority: 1 },
-  mimi:   { name: 'mimi',   label: 'Mimi',     hint: 'Soft sub, Fastest',                  priority: 2 },
-  yuki:   { name: 'yuki',   label: 'Yuki',     hint: 'Soft sub, Good, Multi quality',      priority: 3 },
+  //
+  // ── PRIORITY IS MEASURED CAPABILITY, NOT PICTURE QUALITY (Sep 2026) ──
+  // This table used to rank by quality (sora/kiwi/neko 0, mimi 2, yuki 3),
+  // which is exactly backwards for a default pick: `mimi` ranked 2 while
+  // being **8%** on dub, and `loli` — the single best server measured — was
+  // not in the table at all (no entry → priority 8 → tried LAST). Per-chip
+  // scores from dub_bench.mjs (100 titles, pick=1) and servers_bench.mjs
+  // (20 obscure titles):
+  //   dub/sub:  loli 92/80 · yuki 70/29 · neko 68/35 · sora 58/21
+  //             miku 13 · mimi 8 · kiwi 8/8 · beep 8 · legacy 8
+  // A 720p stream that plays beats a 1080p chip that 404s, so capability now
+  // leads and the upstream `tip` quality only breaks ties between UNKNOWN
+  // servers (all priority 8) — see sortProviders.
+  loli:   { name: 'loli',   label: 'Loli',     hint: 'Multi quality',                      priority: 0, recommended: true },
+  yuki:   { name: 'yuki',   label: 'Yuki',     hint: 'Soft sub, Good, Multi quality',      priority: 1 },
+  neko:   { name: 'neko',   label: 'Neko',     hint: 'Hard sub, Fast, High quality',       priority: 2 },
+  sora:   { name: 'sora',   label: 'Sora',     hint: 'Soft sub, Fast, High quality',       priority: 3 },
+  miku:   { name: 'miku',   label: 'Miku',     hint: 'Legacy',                             priority: 4 },
+  mimi:   { name: 'mimi',   label: 'Mimi',     hint: 'Soft sub, Fastest',                  priority: 5 },
+  kiwi:   { name: 'kiwi',   label: 'Kiwi',     hint: 'Hard sub, Fast, High quality',       priority: 6 },
+  beep:   { name: 'beep',   label: 'Beep',     hint: 'Soft sub, Fast',                     priority: 7 },
   // ── Legacy names, kept in case upstream revives them ──
   nuri:   { name: 'nuri',   label: 'Nuri',     hint: 'Legacy',                             priority: 9 },
   kami:   { name: 'kami',   label: 'Kami',     hint: 'Legacy',                             priority: 9 },
   koto:   { name: 'koto',   label: 'Koto',     hint: 'Legacy',                             priority: 9 },
   mochi:  { name: 'mochi',  label: 'Mochi',    hint: 'Legacy',                             priority: 9 },
-  miku:   { name: 'miku',   label: 'Miku',     hint: 'Legacy',                             priority: 9 },
   shiro:  { name: 'shiro',  label: 'Shiro',    hint: 'Legacy',                             priority: 9 },
   wave:   { name: 'wave',   label: 'Wave',     hint: 'Legacy',                             priority: 9 },
 }
@@ -67,22 +78,29 @@ function healthRank(p: { _healthy?: boolean | null }): number {
 export function sortProviders<T extends { name: string; default?: boolean; tip?: string | null; _healthy?: boolean | null }>(list: T[]): T[] {
   // Sort keys, in order:
   //   0. verified health (working servers first, verified-dead last)
-  //   1. tip quality ("High quality" servers first — 1080p-capable ones)
-  //   2. static PROVIDER_META priority (quality-ranked roster)
+  //   1. static PROVIDER_META priority — measured per-chip capability
+  //   2. tip quality ("High quality" first) — tie-breaker for UNKNOWN
+  //      servers only, since every known server has a distinct priority
   //   3. chad's per-episode `default` flag
   //   4. alphabetic name — makes the order deterministic across reloads
   //      (V8's sort is not guaranteed stable; without the tie-breaker two
   //      servers sharing all keys would "shuffle" on every page load).
+  //
+  // fixes: "success 100%, fail 0%" default selection. Quality used to lead
+  // capability, so the DEFAULT pick (and therefore the first thing the
+  // auto-failover chain tried) was the best-LOOKING chip rather than the most
+  // likely to actually have the episode. Verified health still outranks both,
+  // so a live probe always wins the pick.
   return [...list].sort((a, b) => {
     const ha = healthRank(a as T & { _healthy?: boolean | null })
     const hb = healthRank(b as T & { _healthy?: boolean | null })
     if (ha !== hb) return ha - hb
-    const qa = tipQualityRank((a as { tip?: string | null }).tip)
-    const qb = tipQualityRank((b as { tip?: string | null }).tip)
-    if (qa !== qb) return qa - qb
     const pa = getProviderMeta(a.name).priority
     const pb = getProviderMeta(b.name).priority
     if (pa !== pb) return pa - pb
+    const qa = tipQualityRank((a as { tip?: string | null }).tip)
+    const qb = tipQualityRank((b as { tip?: string | null }).tip)
+    if (qa !== qb) return qa - qb
     // Tie: default first, then alphabetic by lower-cased name.
     const da = a.default ? 0 : 1
     const db = b.default ? 0 : 1

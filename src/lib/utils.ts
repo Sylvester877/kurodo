@@ -206,7 +206,16 @@ export function getBackendOrigin(): string {
   // Fallback: when the page is served from the backend itself (single server
   // on :5173), the current origin is the backend; otherwise an empty string
   // keeps relative URLs working.
-  return window.location.origin.includes('localhost:5173')
+  //
+  // fixes: this only matched the literal hostname "localhost", but the
+  // packaged Electron app and the screenshot harness load http://127.0.0.1:5173
+  // — so every proxied image URL and API base fell back to a relative path,
+  // and the AniList transport decided it was NOT local and called
+  // graphql.anilist.co directly, skipping the backend's 5-minute cache and
+  // in-flight dedupe. Loopback is loopback.
+  const host = window.location.hostname
+  const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]' || host === '0.0.0.0'
+  return isLoopback && window.location.port === '5173'
     ? window.location.origin
     : ''
 }

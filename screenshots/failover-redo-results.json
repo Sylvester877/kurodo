@@ -1,0 +1,3575 @@
+{
+  "partial": false,
+  "rows": [
+    {
+      "title": "Donkikko",
+      "id": 19901,
+      "malId": 19901,
+      "slug": "donkikko-krddi",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 12800,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7359,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 28226,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3582,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3714,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3600,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3570,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3608,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3578,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3566,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7514,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4753,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3587,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3370,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3363,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4071,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7082,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3559,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3687,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 4323,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 4106,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4188,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 6133,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Hua Jianghu: Buliang Ren 6",
+      "id": 146914,
+      "malId": 51897,
+      "slug": "hua-jianghu-buliang-ren-6-k0moe",
+      "listedDub": 0,
+      "listedSub": 3,
+      "rosterOnly": false,
+      "chipsTried": 1,
+      "played": true,
+      "servedBy": "anidap-yuki (sub)",
+      "why": null,
+      "tried": [
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 3148,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Fujiko F. Fujio no Sukoshi Fushigi Tanpen Theater",
+      "id": 19899,
+      "malId": 19899,
+      "slug": "fujiko-f-fujio-no-sukoshi-fushigi-tanpen-theater-k1qe0",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 14323,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 12693,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 26421,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3604,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3608,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3857,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3776,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3721,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 4102,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 4035,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 10565,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4736,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4836,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3948,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 36030,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4520,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 8908,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3564,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3855,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3940,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 3562,
+          "why": "Anidap is temporarily rate-limited. Retry in ~29s."
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 5041,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 3644,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Shin Dokonjou Gaeru",
+      "id": 126865,
+      "malId": 21487,
+      "slug": "shin-dokonjou-gaeru-2gx42",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 17694,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 6587,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 25700,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3579,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3364,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4014,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3581,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3562,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3786,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3385,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7625,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4323,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3582,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3887,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4041,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3565,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7726,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3558,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3637,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3965,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 4637,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3567,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 5342,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Momotaro Densetsu",
+      "id": 11533,
+      "malId": 11533,
+      "slug": "momotaro-densetsu-xzjmi",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 6588,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 13119,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4555,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 27680,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4176,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3627,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3609,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3589,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3600,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3619,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7590,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6442,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3609,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 13951,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 5313,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8258,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7387,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3627,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3587,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3608,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 3771,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4652,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 5029,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Pink Lady Monogatari: Eikou no Tenshi-tachi",
+      "id": 17423,
+      "malId": 17423,
+      "slug": "pink-lady-monogatari-eikou-no-tenshi-tachi-q7w6o",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 6706,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 10997,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6340,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 26579,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3881,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3597,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3606,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3400,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3548,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3639,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7521,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 5498,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3682,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3669,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3595,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4325,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 6915,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3598,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3605,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3591,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 4794,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3711,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 5927,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Shen Lan Qi Yu Wushuang Zhu 2",
+      "id": 155839,
+      "malId": 53367,
+      "slug": "shen-lan-qi-yu-wushuang-zhu-2-6rkla",
+      "listedDub": 0,
+      "listedSub": 2,
+      "rosterOnly": false,
+      "chipsTried": 1,
+      "played": true,
+      "servedBy": "anidap-yuki (sub)",
+      "why": null,
+      "tried": [
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": true,
+          "ms": 2531,
+          "why": "HTTP 200"
+        }
+      ]
+    },
+    {
+      "title": "Edokko Boy: Gatten Tasuke",
+      "id": 9028,
+      "malId": 9028,
+      "slug": "edokko-boy-gatten-tasuke-jndes",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7357,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 10713,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 6451,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3507,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3508,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3514,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3791,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3499,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3523,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3488,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7702,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4469,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3506,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3485,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4013,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3494,
+          "why": "Anidap is temporarily rate-limited. Retry in ~29s."
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4101,
+          "why": "Anidap is temporarily rate-limited. Retry in ~29s."
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4164,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3494,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3497,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 3873,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 5222,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 4463,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Adventure on the Gaboten Island",
+      "id": 8184,
+      "malId": 8184,
+      "slug": "adventure-on-the-gaboten-island-yjji3",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 19289,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7339,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 28445,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7299,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 8675,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7092,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7321,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 7127,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7358,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7297,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9268,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7756,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7324,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7345,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7249,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8108,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7888,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 7893,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7341,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7767,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 8500,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7488,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 8396,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Beyond Time's Gaze 2",
+      "id": 213356,
+      "malId": 64398,
+      "slug": "213356",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 21498,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 31972,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 14280,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 11818,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 14162,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 13985,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9570,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 9768,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 10775,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 11811,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 16709,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 13304,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9672,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 9801,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 13057,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 12921,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 13602,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 12849,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 8476,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 13728,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 21860,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 11847,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 12487,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Big Brother 3",
+      "id": 182556,
+      "malId": 61730,
+      "slug": "big-brother-3-3vc3r",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 18000,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9263,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 27669,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7162,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 8747,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7592,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7241,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 7433,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7156,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7434,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 10614,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 9713,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7282,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7959,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7618,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7857,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7337,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 7382,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7749,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7759,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 7726,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7216,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 7981,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Seton Animal Chronicles",
+      "id": 7845,
+      "malId": 7845,
+      "slug": "seton-animal-chronicles-05wha",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 20472,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8244,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 27174,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7181,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 8080,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7206,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7193,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 7189,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7200,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7209,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8477,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 10678,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7826,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7312,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 9239,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7973,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 8194,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 8125,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7532,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 8786,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 8894,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 8067,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 7973,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Gozonji! Gekkou Kamen-kun",
+      "id": 5477,
+      "malId": 5477,
+      "slug": "gozonji-gekkou-kamen-kun-0a5eo",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 12615,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7569,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 28144,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3472,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3702,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3887,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3704,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3691,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 4029,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3688,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8311,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4763,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3676,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3606,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3776,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4189,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 6880,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3746,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3447,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3476,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 4942,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3736,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 5922,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Bug tte Honey",
+      "id": 10210,
+      "malId": 10210,
+      "slug": "bug-tte-honey-b7b6x",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 17071,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 5470,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 26884,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3456,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4148,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3700,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3712,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3719,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3775,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3841,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7406,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 5455,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3467,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3696,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 4142,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4121,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7584,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4659,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3696,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3700,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 4650,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 5364,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 3696,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Shounen Tokugawa Ieyasu",
+      "id": 20223,
+      "malId": 20223,
+      "slug": "shounen-tokugawa-ieyasu-4uktr",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 6222,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 9981,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7360,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 25056,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3082,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 1066,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 1107,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 1119,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 4047,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 2318,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9004,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 2914,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 1049,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3967,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3099,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7251,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4672,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4706,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3822,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3782,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 14041,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 9823,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 10042,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Tomatoman",
+      "id": 5201,
+      "malId": 5201,
+      "slug": "tomatoman-ecomg",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 20995,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 32285,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7585,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7582,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 9743,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8224,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7936,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 7602,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7529,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7089,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 10140,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7341,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 7084,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 8351,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 8676,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 9295,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7730,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 8240,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7488,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 8046,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 7680,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7759,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 7922,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Chou Supercar Gattiger",
+      "id": 9881,
+      "malId": 9881,
+      "slug": "chou-supercar-gattiger-b61um",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 14214,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 26090,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 7606,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3712,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3907,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3722,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3722,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3720,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3700,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3701,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7603,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 5351,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3707,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3714,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3707,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4057,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7258,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3701,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3695,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3709,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 4361,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 6118,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 3736,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Dou Po Cangqiong: San Nian Zhi Yue",
+      "id": 137729,
+      "malId": 49701,
+      "slug": "dou-po-cangqiong-san-nian-zhi-yue-ukfcv",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 16213,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8023,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 26211,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3401,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4707,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 5021,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3732,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3813,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3707,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 6133,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 6674,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 9907,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 4238,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4103,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3698,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4030,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7080,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3381,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3619,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3388,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 5615,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3414,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 6790,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Fei Ren Zai: Lichun Pian",
+      "id": 120055,
+      "malId": 42455,
+      "slug": "fei-ren-zai-lichun-pian-x1tbb",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7969,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8018,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3963,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3485,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3375,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4618,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 5279,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4314,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3739,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3745,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9888,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4275,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3715,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3587,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3702,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4388,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 4779,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3773,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 4211,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 4262,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 4095,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3507,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 5615,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Dr. Fabre is a Detective",
+      "id": 5088,
+      "malId": 5088,
+      "slug": "dr-fabre-is-a-detective-euq5m",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 19361,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8283,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 28018,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 7364,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 7804,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 7429,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 7307,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 8298,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 7669,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 7546,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 9642,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 8004,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 8968,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 8138,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 8741,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 8626,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 9773,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 8536,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 8858,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 8059,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 18063,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 12132,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 8289,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "OKAWARI-BOY Starzan S",
+      "id": 8799,
+      "malId": 8799,
+      "slug": "okawari-boy-starzan-s-sr070",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8312,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 12591,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 5127,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 26003,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 5160,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3748,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3754,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3760,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3761,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3511,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 7528,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 4843,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3739,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 4007,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3736,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3745,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7538,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 4407,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3822,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 4735,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 3781,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3740,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 6088,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    },
+    {
+      "title": "Manga Mitokoumon",
+      "id": 11829,
+      "malId": 11829,
+      "slug": "manga-mitokoumon-br8h0",
+      "listedDub": 10,
+      "listedSub": 13,
+      "rosterOnly": true,
+      "chipsTried": 23,
+      "played": false,
+      "servedBy": null,
+      "why": "No stream available for anidap-shiro/sub",
+      "tried": [
+        {
+          "type": "dub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 6793,
+          "why": "No stream available for anidap-loli/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 13145,
+          "why": "No stream available for anidap-yuki/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 3982,
+          "why": "No stream available for anidap-neko/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 27699,
+          "why": "No stream available for anidap-sora/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 3898,
+          "why": "No stream available for anidap-miku/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 4812,
+          "why": "No stream available for anidap-kiwi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 3757,
+          "why": "No stream available for anidap-mimi/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3756,
+          "why": "No stream available for anidap-nuri/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3594,
+          "why": "No stream available for anidap-kami/dub"
+        },
+        {
+          "type": "dub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3744,
+          "why": "No stream available for anidap-koto/dub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-loli",
+          "ok": false,
+          "ms": 8468,
+          "why": "No stream available for anidap-loli/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-neko",
+          "ok": false,
+          "ms": 5300,
+          "why": "No stream available for anidap-neko/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-yuki",
+          "ok": false,
+          "ms": 3887,
+          "why": "No stream available for anidap-yuki/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-sora",
+          "ok": false,
+          "ms": 3859,
+          "why": "No stream available for anidap-sora/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mimi",
+          "ok": false,
+          "ms": 23315,
+          "why": "No stream available for anidap-mimi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kiwi",
+          "ok": false,
+          "ms": 3970,
+          "why": "No stream available for anidap-kiwi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-beep",
+          "ok": false,
+          "ms": 7783,
+          "why": "No stream available for anidap-beep/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-nuri",
+          "ok": false,
+          "ms": 3664,
+          "why": "No stream available for anidap-nuri/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-kami",
+          "ok": false,
+          "ms": 3526,
+          "why": "No stream available for anidap-kami/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-koto",
+          "ok": false,
+          "ms": 3677,
+          "why": "No stream available for anidap-koto/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-mochi",
+          "ok": false,
+          "ms": 3751,
+          "why": "No stream available for anidap-mochi/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-miku",
+          "ok": false,
+          "ms": 4558,
+          "why": "No stream available for anidap-miku/sub"
+        },
+        {
+          "type": "sub",
+          "name": "anidap-shiro",
+          "ok": false,
+          "ms": 5112,
+          "why": "No stream available for anidap-shiro/sub"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "reProbed": 22,
+    "revived": 2,
+    "dead": 20,
+    "rosterOnlyGuess": 20
+  }
+}

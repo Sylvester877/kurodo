@@ -41,3 +41,4 @@ server/data/*.db-wal
 /tmp/
 *.tmp
 .tmp-*
+vite.config.ts

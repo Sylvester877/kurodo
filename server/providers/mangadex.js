@@ -83,21 +83,46 @@ function normalizeManga(md) {
 }
 
 // ── Normalize chapter ──
+//
+// MangaDex cannot host chapters that belong to a publisher's own platform
+// (Manga UP!, MANGA Plus, Webnovel, …). For those it stores a LINK OUT plus, in
+// place of pages, a single notice image — so a reader that treats them as
+// content shows users a "this chapter requires a paid subscription" card
+// instead of the chapter. That is what licensed titles look like now: every
+// English chapter of My Dress-Up Darling is a Manga UP! notice (220/220), and
+// One Piece / Dandadan / Jujutsu Kaisen are almost entirely MANGA Plus.
+//
+// We expose enough metadata for the UI to tell the two apart and route the
+// user somewhere they can actually read.
 function normalizeChapter(ch) {
   const attrs = ch.attributes || {}
   const scanGroup = (ch.relationships || []).find((r) => r.type === 'scanlation_group')
+  const official = !!scanGroup?.attributes?.official
+  const pages = attrs.pages || 0
+  const externalUrl = attrs.externalUrl || null
+  // A link-out plus (at most) one placeholder page = the notice-image case.
+  const noticeOnly = !!externalUrl && pages <= 1
   return {
     id: ch.id,
     chapter: attrs.chapter || '0',
     title: attrs.title || null,
     volume: attrs.volume || null,
-    pages: attrs.pages || 0,
+    pages,
     translatedLanguage: attrs.translatedLanguage || 'en',
     publishedAt: attrs.publishAt || null,
     hash: attrs.hash || null,
     data: attrs.data || [],
     dataSaver: attrs.dataSaver || [],
     scanGroup: scanGroup?.attributes?.name || null,
+    /** Publisher's own platform (null for fan scanlations). */
+    publisher: official ? (scanGroup?.attributes?.name || null) : null,
+    /** MangaDex account is a publisher/licensor account. */
+    official,
+    /** Where the publisher hosts it — the only place this chapter can be read. */
+    externalUrl,
+    isUnavailable: !!attrs.isUnavailable,
+    /** False when there is nothing readable here (notice image / delisted). */
+    readable: pages > 0 && !noticeOnly && !attrs.isUnavailable,
   }
 }
 

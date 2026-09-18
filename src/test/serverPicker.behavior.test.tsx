@@ -1,11 +1,14 @@
 /**
  * ServerPicker behavior tests.
  *
- * Pins down the "silent missing-tab → always-render-with-disabled"
- * fix: the picker must ALWAYS render all 3 type tabs (sub, hsub, dub),
- * regardless of how many providers the upstream returned. Empty tabs
- * are disabled with an explanatory tooltip; clicking an empty tab
- * must be a no-op (no streamType swap, no activeProvider swap).
+ * Pins down two rules:
+ *   1. ALL 3 type tabs (sub, hsub, dub) ALWAYS render, regardless of how
+ *      many providers the upstream returned — the prior bug silently hid
+ *      the Dub tab when chad returned no dub entries.
+ *   2. NOTHING in the picker is ever disabled. Tabs are always selectable
+ *      (an empty one shows a "nothing listed" panel), and every server tile
+ *      is always clickable — verified-dead servers included. Health is a
+ *      badge, not a gate.
  *
  * Background: prior bug — when chad.anidap.se returned no dub entries
  * for a title, the picker silently hid the Dub tab. Users thought the
@@ -80,13 +83,13 @@ describe('ServerPicker — always-render type tabs (dub/missing-tab fix)', () =>
       />,
     )
     // The prior bug hid the Dub tab when no dub providers existed.
-    // The fix: ALL three tabs render, with empty ones disabled.
+    // The fix: ALL three tabs render, and none of them is disabled.
     expect(tabButton('Sub')).toBeInTheDocument()
     expect(tabButton('H-Subs')).toBeInTheDocument()
     expect(tabButton('Dub')).toBeInTheDocument()
   })
 
-  it('empty tabs are rendered as disabled with the explanatory tooltip', () => {
+  it('empty tabs are NEVER disabled — they stay selectable and explain themselves', () => {
     renderWithProviders(
       <ServerPicker
         providers={providers}
@@ -97,15 +100,15 @@ describe('ServerPicker — always-render type tabs (dub/missing-tab fix)', () =>
       />,
     )
     const dubBtn = tabButton('Dub')
-    expect(dubBtn).toBeDisabled()
-    // Tooltip mentions the most likely cause (anidap upstream blocked)
-    // and the alternative explanation (no dub exists for the title).
-    expect(dubBtn.title).toMatch(/Dub servers aren't available/i)
-    expect(dubBtn.title).toMatch(/chad\.anidap\.se/i)
+    expect(dubBtn).not.toBeDisabled()
+    // Tooltip mentions the most likely cause (upstream blocked) and the
+    // alternative explanation (no dub exists for the title).
+    expect(dubBtn.title).toMatch(/Dub: nothing listed right now/i)
+    expect(dubBtn.title).toMatch(/dub stream for this title/i)
 
     const hsubBtn = tabButton('H-Subs')
-    expect(hsubBtn).toBeDisabled()
-    expect(hsubBtn.title).toMatch(/H-Subs servers aren't available/i)
+    expect(hsubBtn).not.toBeDisabled()
+    expect(hsubBtn.title).toMatch(/H-Subs: nothing listed right now/i)
   })
 
   it('non-empty tab (Sub) is NOT disabled and has no warning tooltip', () => {
@@ -124,7 +127,7 @@ describe('ServerPicker — always-render type tabs (dub/missing-tab fix)', () =>
     expect(subBtn.title).toBe('Sub (2 servers)')
   })
 
-  it('clicking an empty tab is a NO-OP — no streamType/provider change', async () => {
+  it('clicking an empty tab switches to it and shows the "nothing listed" panel', async () => {
     const onChangeType     = vi.fn()
     const onChangeProvider = vi.fn()
     const user = userEvent.setup()
@@ -138,11 +141,47 @@ describe('ServerPicker — always-render type tabs (dub/missing-tab fix)', () =>
       />,
     )
     const dubBtn = tabButton('Dub')
-    // userEvent respects the `disabled` HTML attr and will not dispatch
-    // click on a disabled button — so even attempting to click is a no-op.
     await user.click(dubBtn)
-    expect(onChangeType).not.toHaveBeenCalled()
+    // The tab is selectable — the user is never blocked from looking.
+    expect(onChangeType).toHaveBeenCalledWith('dub')
+    // But with zero dub entries there is nothing to auto-select, so the
+    // provider stays put rather than swapping to an undefined server.
     expect(onChangeProvider).not.toHaveBeenCalled()
+  })
+
+  it('no server tile is EVER disabled — verified-dead included', async () => {
+    // One alive, one verified-dead, one unverified. All three must render as
+    // enabled, clickable buttons: a server the backend could not verify (or
+    // verified dead for this episode) is still the user's to try.
+    const mixed: AnidapProvider[] = [
+      mkProvider({ name: 'anidap-yuki', type: 'sub', _provider: 'anidap', _healthy: true }),
+      mkProvider({ name: 'anidap-kiwi', type: 'sub', _provider: 'anidap', _healthy: false, _healthError: 'No stream for this title' }),
+      mkProvider({ name: 'anidap-neko', type: 'sub', _provider: 'anidap', _healthy: null }),
+    ]
+    const onChangeProvider = vi.fn()
+    const user = userEvent.setup()
+    renderWithProviders(
+      <ServerPicker
+        providers={mixed}
+        streamType="sub"
+        activeProvider="anidap-yuki"
+        onChangeProvider={onChangeProvider}
+        onChangeType={() => {}}
+      />,
+    )
+
+    for (const label of ['Yuki', 'Kiwi', 'Neko']) {
+      const tile = screen.getByText(label, { selector: 'span' }).closest('button') as HTMLButtonElement
+      expect(tile).toBeInTheDocument()
+      expect(tile).not.toBeDisabled()
+    }
+    // The dead one says so, without being taken away.
+    expect(screen.getByText('NO STREAM')).toBeInTheDocument()
+    expect(screen.getByText('UNVERIFIED')).toBeInTheDocument()
+
+    // And clicking the verified-dead tile really does select it.
+    await user.click(screen.getByText('Kiwi', { selector: 'span' }).closest('button') as HTMLButtonElement)
+    expect(onChangeProvider).toHaveBeenCalledWith('anidap-kiwi')
   })
 
   it('clicking a NON-empty tab DOES swap type + provider', async () => {

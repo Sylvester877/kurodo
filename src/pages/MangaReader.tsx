@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/shallow'
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, ChevronDown, Loader2, AlertTriangle, Settings2, Play, Pause, SkipForward, Maximize, Minimize, Sun, Columns, AlignJustify, Bookmark } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronRight, Loader2, AlertTriangle, SkipForward, Sun, Columns, AlignJustify } from 'lucide-react'
 import { cn } from '../lib/utils'
 import MangaPill from '../components/manga/MangaPill'
 import LeftProgressSpine from '../components/manga/LeftProgressSpine'
@@ -12,7 +12,8 @@ import MobileMangaToolbar from '../components/manga/MobileMangaToolbar'
 import MangaDrawer from '../components/manga/MangaDrawer'
 import DrawerSettingsCompact from '../components/manga/DrawerSettingsCompact'
 import { getChapterPages, getChapterFeed, getMangaInfo, getChapterMangaId, type MangaDexPage } from '../api/mangadex'
-import { getChapterPages as getChapterPagesAtsu, getChapterFeed as getChapterFeedAtsu, getMangaInfo as getMangaInfoAtsu } from '../api/atsu'
+import { getChapterPages as getChapterPagesAtsu, getChapterFeed as getChapterFeedAtsu, getMangaInfo as getMangaInfoAtsu, searchManga as searchMangaAtsu } from '../api/atsu'
+import { isPublisherNotice } from '../lib/mangaChapter'
 import { useTitle } from '../hooks/useTitle'
 import { useMangaListStore } from '../store/useMangaListStore'
 import { syncMangaProgress } from '../lib/mangaSync'
@@ -257,13 +258,12 @@ export default function MangaReader() {
    *  creating a new array reference on every render, which would
    *  poison every useEffect dependency array that includes `pages` or
    *  `chapters` and cause infinite re-render cascades (#185). */
-  const pages: MangaDexPage[] = pagesQuery.data?.pages ?? EMPTY_PAGES
+  const mdPages: MangaDexPage[] = pagesQuery.data?.pages ?? EMPTY_PAGES
   /** Atsu.moe / MangaDex API response shapes are not fully typed — these
    *  casts extract known fields from the loosely-typed query results. */
   const chapters: Array<{ id: string; chapter: string; title: string | null; pages: number; scanGroup: string | null }> = (chaptersQuery.data as any)?.chapters ?? EMPTY_CHAPTERS
   const mangaTitle = (mangaQuery.data as any)?.title || 'Manga'
   const mangaCover = (mangaQuery.data as any)?.coverUrl || ''
-  const hasPages = pages.length > 0
 
   // ── Colored-only chapter filter helper ──
   const isColoredChapter = (ch: { title?: string | null; scanGroup?: string | null }) => {
@@ -302,6 +302,48 @@ export default function MangaReader() {
     if (currentChIndex < 0 || currentChIndex >= displayChapters.length - 1) return null
     return displayChapters[currentChIndex + 1]
   }, [displayChapters, currentChIndex])
+
+  // ══════ Publisher-notice rescue (root fix for the white "EXTERNAL CHAPTER" card) ══════
+  // MangaDex serves licensed titles as a single publisher link-out image —
+  // rendering it shows a white notice card for EVERY chapter. Instead of
+  // dead-ending, pull the SAME chapter number from atsu.moe.
+  const noticeChapter = useMemo(() => {
+    if (isAtsu || mdPages.length === 0 || mdPages.length > 1) return false
+    if (currentChapter && !isPublisherNotice(currentChapter as any)) return false
+    return true
+  }, [isAtsu, mdPages.length, currentChapter])
+
+  const atsuRescueQuery = useQuery({
+    queryKey: ['atsu-rescue', mangaTitle, currentChapter?.chapter ?? null],
+    queryFn: async (): Promise<{ pages: MangaDexPage[] } | null> => {
+      const res = await searchMangaAtsu(mangaTitle, 5)
+      const entries = res.results || []
+      if (entries.length === 0) return null
+      const lower = mangaTitle.toLowerCase()
+      const best =
+        entries.find((e) => e.title.toLowerCase() === lower || e.englishTitle?.toLowerCase() === lower) ||
+        entries[0]
+      const feed = await getChapterFeedAtsu(best.id)
+      const num = currentChapter?.chapter
+      if (!num) return null
+      const match =
+        feed.chapters.find((c) => c.chapter === num) ||
+        feed.chapters.find((c) => parseFloat(c.chapter) === parseFloat(num))
+      if (!match) return null
+      const pagesRes = await getChapterPagesAtsu(best.id, match.id)
+      return { pages: pagesRes.pages.map((p) => ({ url: p.url, fileName: '' })) }
+    },
+    enabled: noticeChapter && !!chapterId && mangaTitle !== 'Manga',
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  })
+
+  const rescuePages = (atsuRescueQuery.data?.pages ?? []) as MangaDexPage[]
+  /** Final page set: the atsu rescue when it found the chapter, else MangaDex. */
+  const pages: MangaDexPage[] = rescuePages.length > 0 ? rescuePages : mdPages
+  /** True when this chapter is being read via the atsu.moe rescue. */
+  const rescuedFromNotice = rescuePages.length > 0
+  const hasPages = pages.length > 0
 
   // ── URL hash position persistence (atsu.moe-style `#rs=p:N`) ──
   const hashReadOnMount = useRef(false)
@@ -1018,6 +1060,36 @@ export default function MangaReader() {
   }
 
   if (!loading && !hasPages && chapters.length === 0) {
+    // fixes: white "EXTERNAL CHAPTER" notice PNG rendered as a fake page — publisher
+    // chapters with no atsu equivalent now get a themed dead-end instead.
+    const notice = currentChapter && isPublisherNotice(currentChapter as any)
+    if (notice) {
+      const ext = (currentChapter as any).externalUrl as string | undefined | null
+      return (
+        <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: getBgColor(bgTheme) }}>
+          <div className="w-full max-w-md rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-400/10">
+              <BookOpen className="h-6 w-6 text-amber-400" />
+            </div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400/90">Official chapter</p>
+            <h2 className="mt-2 text-lg font-bold text-white">Chapter {currentChapter?.chapter} is publisher-only</h2>
+            <p className="mt-2 text-sm leading-relaxed text-white/50">
+              MangaDex lists this chapter as a link to the official publisher — there are no reader pages for it here.
+            </p>
+            <div className="mt-6 flex flex-col gap-2">
+              {ext && (
+                <a href={ext} target="_blank" rel="noreferrer" className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90">
+                  Read on the publisher's site
+                </a>
+              )}
+              <Link to={mangaId ? `/manga/${mangaId}` : '/manga'} className="rounded-lg border border-white/10 px-4 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/[0.05]">
+                Back to chapter list
+              </Link>
+            </div>
+          </div>
+        </div>
+      )
+    }
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: getBgColor(bgTheme) }}><div className="text-center"><BookOpen className="h-12 w-12 text-white/10 mx-auto mb-3" /><p className="text-sm text-white/50">No pages found for this chapter.</p><Link to={mangaId ? `/manga/${mangaId}` : '/manga'} className="text-primary hover:underline text-sm mt-2 inline-block">Back to manga</Link></div></div>
   }
 
@@ -1160,6 +1232,12 @@ export default function MangaReader() {
 
       {/* ══════ Reader content ══════ — when drawer is pinned, strip pages avoid sitting under 343px drawer */}
       <div ref={readerRef} className={cn(isStrip ? '' : 'min-h-screen', drawerPinned && showDrawer && 'lg:pr-[343px]')}>
+        {rescuedFromNotice && (
+          <div className="mx-auto mt-4 mb-2 flex max-w-[900px] items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-xs text-emerald-200/90">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+            Official chapter unavailable on MangaDex — reading via atsu.moe
+          </div>
+        )}
         {isStrip ? (
           /* ── Strip mode ── */
           <div className="flex flex-col items-center">

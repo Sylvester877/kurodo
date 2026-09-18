@@ -106,20 +106,48 @@ function isNullArtKey(key: readonly unknown[], data: unknown): boolean {
 export function startPersistence(): void {
   if (typeof window === 'undefined') return
 
+  // fixes: a single huge payload used to disable persistence for EVERYTHING.
+  // The snapshot was written only when the whole thing fit under 1.5MB, so one
+  // 1000+ episode anime (One Piece's episode list alone is ~0.8MB) pushed the
+  // total over the cap and the entire write was skipped — every feed row,
+  // schedule and watchlist entry then lost its warm start, which looks like
+  // the app "forgetting" data after browsing a long show.
+  // Now: a per-entry cap plus a budget that keeps as many entries as fit,
+  // dropping the largest first. Long episode lists are excluded (they are one
+  // cheap server round trip away — the server caches them) instead of taking
+  // the whole snapshot down with them.
+  const MAX_ENTRY_CHARS = 300_000
+  const MAX_SNAPSHOT_CHARS = 1_500_000
+
   const save = () => {
     try {
-      const entries: Array<[unknown[], unknown]> = []
+      const candidates: Array<{ key: unknown[]; data: unknown; size: number }> = []
       for (const q of queryClient.getQueryCache().getAll()) {
         // Only persist queries flagged with persist:true in their meta
-        if (q.meta?.persist && q.state.data !== undefined &&
-            !isNullArtKey(q.queryKey, q.state.data)) {
-          entries.push([q.queryKey as unknown[], q.state.data])
+        if (!q.meta?.persist || q.state.data === undefined ||
+            isNullArtKey(q.queryKey, q.state.data)) continue
+        let size = 0
+        try {
+          size = JSON.stringify(q.state.data)?.length ?? 0
+        } catch {
+          continue // circular / unserialisable — skip this entry only
         }
+        if (size === 0 || size > MAX_ENTRY_CHARS) continue
+        candidates.push({ key: q.queryKey as unknown[], data: q.state.data, size })
       }
+
+      // Smallest first so the budget buys the most warm starts.
+      candidates.sort((a, b) => a.size - b.size)
+      const entries: Array<[unknown[], unknown]> = []
+      let used = 0
+      for (const c of candidates) {
+        if (used + c.size > MAX_SNAPSHOT_CHARS) continue
+        entries.push([c.key, c.data])
+        used += c.size
+      }
+
       const snap: Snapshot = { at: Date.now(), entries }
-      const json = JSON.stringify(snap)
-      // Soft cap at 1.5 MB to avoid breaking localStorage on huge feeds
-      if (json.length < 1_500_000) localStorage.setItem(STORAGE_KEY, json)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snap))
     } catch {
       /* quota — silently skip */
     }
