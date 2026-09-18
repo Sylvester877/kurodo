@@ -5,13 +5,14 @@ import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
 import { Play, Clock, Star, ChevronLeft, ChevronRight, Calendar, Film, Tv } from 'lucide-react'
 import { getTrending, getAiringSchedule } from '../api/anilist'
 import { getTmdbBackdrop, getAnimeLogo } from '../api/tmdb'
+import AnimeLogo from './AnimeLogo'
 import { feedMediaToAnime } from '../lib/adapters'
 import { preloadHandlers } from '../lib/routePreloaders'
 import { useSettings } from '../store/useSettings'
 import { useShallow } from 'zustand/react/shallow'
 import { cn, proxifyImgUrl } from '../lib/utils'
 
-const CROSSFADE_MS = 12000 // 12s between auto-advance
+const CROSSFADE_MS = 8000 // 8s between auto-advance (anikage carousel)
 
 // ── Mini countdown ticker for the schedule strip ──────────────────
 function MiniTicker({ targetAt }: { targetAt: number }) {
@@ -67,7 +68,6 @@ export default function Hero() {
   const upcomingEpisodes = (scheduleData?.items ?? []).filter((e) => e.media.idMal).slice(0, 5)
 
   const [bgIndex, setBgIndex] = useState(0)
-  const [logoFailed, setLogoFailed] = useState(false)
 
   // ── Parallax scroll: backdrop drifts slower than foreground ──
   const heroRef = useRef<HTMLElement>(null)
@@ -134,42 +134,27 @@ export default function Hero() {
     })
   }, [backdrops, queryClient])
 
-  // ── Auto crossfade ─────────────────────────────────────────────
-  useEffect(() => {
-    if (backdrops.length <= 1) return
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const t = window.setInterval(() => setBgIndex((i) => (i + 1) % backdrops.length), CROSSFADE_MS)
-    return () => window.clearInterval(t)
-  }, [backdrops.length])
-
-  const title = current?.title.english || current?.title.romaji || ''
-  const year = current?.seasonYear ?? null
-  const score = current?.averageScore != null ? Math.round(current.averageScore) : null
-
-  // Reset logo error state when title changes (new carousel item)
-  useEffect(() => { setLogoFailed(false) }, [title])
-
   const { reduceMotion, reduceQuality } = useSettings(
     useShallow((s) => ({ reduceMotion: s.reduceMotion, reduceQuality: s.reduceQuality })),
   )
   const skipHeroStagger = reduceMotion || reduceQuality
 
-  // Word-stagger variants for the hero title fallback (when no TMDB logo)
-  const titleContainerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.04, delayChildren: 0.1 },
-    },
-  }
-  const titleWordVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { type: 'spring', damping: 20, stiffness: 120 },
-    },
-  }
+  // ── Parallax off on low-power settings — iGPU machines pay real frame
+  // cost for scroll-linked motion values (spec §0 gate). ──
+  const parallaxOn = !skipHeroStagger
+
+  // ── Auto crossfade ─────────────────────────────────────────────
+  useEffect(() => {
+    if (backdrops.length <= 1) return
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (skipHeroStagger) return
+    const t = window.setInterval(() => setBgIndex((i) => (i + 1) % backdrops.length), CROSSFADE_MS)
+    return () => window.clearInterval(t)
+  }, [backdrops.length, skipHeroStagger])
+
+  const title = current?.title.english || current?.title.romaji || ''
+  const year = current?.seasonYear ?? null
+  const score = current?.averageScore != null ? Math.round(current.averageScore) : null
 
   // ── TMDB high-quality backdrop (v2 key — w1280 tier replaces the old
   // multi-MB /original; the key bump evicts persisted stale URLs) ─────
@@ -182,8 +167,9 @@ export default function Hero() {
     meta: { persist: true },
   })
 
-  // ── TMDB title logo (transparent PNG) ───────────────────────────
-  const { data: tmdbLogoUrl } = useQuery({
+  // ── TMDB title logo (transparent PNG) — kept WARM here so AnimeLogo's
+  // fallback tier is instant. Rendering lives inside AnimeLogo. ──
+  useQuery({
     queryKey: ['tmdbLogo', title],
     queryFn: () => getAnimeLogo({ english: current?.title.english ?? null, romaji: current?.title.romaji ?? '' }),
     enabled: !!title,
@@ -201,7 +187,7 @@ export default function Hero() {
   return (
     <section ref={heroRef} className="relative w-full h-[82vh] min-h-[640px] max-h-[900px] overflow-hidden bg-black">
       {/* ── Backdrop layer ─────────────────────────────────────── */}
-      <motion.div className="absolute inset-0 z-0" style={{ y: backdropY, scale: backdropScale }}>
+      <motion.div className="absolute inset-0 z-0" style={parallaxOn ? { y: backdropY, scale: backdropScale } : undefined}>
         <AnimatePresence mode="sync">
           {current && (() => {
             const staticSrc = proxifyImgUrl(
@@ -271,72 +257,62 @@ export default function Hero() {
                 }}
                 className="max-w-3xl flex flex-col items-start"
               >
-                {/* ── TMDB logo or wordmark title ───────────── */}
-                {!logoFailed && tmdbLogoUrl ? (
-                  <img
-                    src={tmdbLogoUrl}
-                    alt={title}
-                    className="hero-logo mb-3"
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                    onError={() => setLogoFailed(true)}
-                  />
-                ) : skipHeroStagger ? (
-                  <h1 className="hero-wordmark text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}>
-                    {title}
-                  </h1>
-                ) : (
-                  <motion.h1
-                    className="hero-wordmark flex flex-wrap text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight"
-                    style={{ textShadow: '0 2px 8px rgba(0,0,0,0.7)' }}
-                    initial="hidden"
-                    animate="visible"
-                    variants={titleContainerVariants}
-                  >
-                    {title.split(/\s+/).filter(Boolean).map((word, i) => (
-                      <motion.span
-                        key={`${title}-${i}`}
-                        className="mr-[0.25em] inline-block"
-                        variants={titleWordVariants}
-                      >
-                        {word}
-                      </motion.span>
-                    ))}
-                  </motion.h1>
-                )}
+                {/* ── Eyebrow label — otakutsu "Featured this week" ── */}
+                <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
+                  <span className="inline-block h-px w-6 bg-white/30" />
+                  Featured this week
+                </p>
+                {/* ── Logo: wordmark underlay + TVDB→TMDB pop-in (AnimeLogo) ── */}
+                <AnimeLogo
+                  titleEn={current.title.english ?? null}
+                  romaji={current.title.romaji || title}
+                  malId={current.idMal ?? null}
+                  anilistId={current.id ?? null}
+                  variant="hero"
+                  className="mb-3"
+                />
                 {current.title.native && (
                   <p className="mt-2 text-sm sm:text-base text-white/45 font-medium">
                     {current.title.native}
                   </p>
                 )}
 
-                {/* ── Meta pills — score · year · episodes · format ── */}
+                {/* ── Meta pills — score · year · episodes · format (stagger 40ms) ── */}
                 <div className="flex flex-wrap items-center gap-2 mt-4 mb-4">
-                  {score != null && (
-                    <span className={cn(metaPill, 'text-amber-300')}>
-                      <Star className={cn(metaIcon, 'fill-amber-300 text-amber-300')} />
-                      {score}%
+                  {[
+                    score != null ? (
+                      <span key="score" className={cn(metaPill, 'text-amber-300')}>
+                        <Star className={cn(metaIcon, 'fill-amber-300 text-amber-300')} />
+                        {score}%
+                      </span>
+                    ) : null,
+                    year ? (
+                      <span key="year" className={metaPill}>
+                        <Calendar className={metaIcon} />
+                        {year}
+                      </span>
+                    ) : null,
+                    current.episodes != null ? (
+                      <span key="eps" className={metaPill}>
+                        <Film className={metaIcon} />
+                        {current.episodes} Episodes
+                      </span>
+                    ) : null,
+                    current.format ? (
+                      <span key="fmt" className={metaPill}>
+                        <Tv className={metaIcon} />
+                        {current.format.replace('_', ' ')}
+                      </span>
+                    ) : null,
+                  ].filter(Boolean).map((pill, i) => (
+                    <span
+                      key={(pill as React.ReactElement).key}
+                      className="anim-fade-up"
+                      style={{ animationDelay: `${i * 40}ms` }}
+                    >
+                      {pill}
                     </span>
-                  )}
-                  {year && (
-                    <span className={metaPill}>
-                      <Calendar className={metaIcon} />
-                      {year}
-                    </span>
-                  )}
-                  {current.episodes != null && (
-                    <span className={metaPill}>
-                      <Film className={metaIcon} />
-                      {current.episodes} Episodes
-                    </span>
-                  )}
-                  {current.format && (
-                    <span className={metaPill}>
-                      <Tv className={metaIcon} />
-                      {current.format.replace('_', ' ')}
-                    </span>
-                  )}
+                  ))}
                 </div>
 
                 {/* ── Genre chips ─────────────────────────────── */}
@@ -408,7 +384,7 @@ export default function Hero() {
       {/* ── Slide controls — anikage style ───────────────────────── */}
       {backdrops.length > 1 && (
         <>
-          {/* Bottom-left: progress dashes */}
+          {/* Bottom-left: progress dashes — active dash runs the 8s slide timer */}
           <div
             className={cn(
               'absolute left-4 sm:left-8 lg:left-14 z-20 flex items-center gap-1.5',
@@ -422,10 +398,17 @@ export default function Hero() {
                 onClick={() => setBgIndex(i)}
                 aria-label={`Show ${m.title.english || m.title.romaji}`}
                 className={cn(
-                  'h-1 rounded-full transition-all duration-300',
-                  i === bgIndex ? 'w-8 bg-white' : 'w-4 bg-white/30 hover:bg-white/55',
+                  'h-1 rounded-full transition-all duration-300 overflow-hidden',
+                  i === bgIndex ? 'w-8 bg-white/25' : 'w-4 bg-white/30 hover:bg-white/55',
                 )}
-              />
+              >
+                {i === bgIndex && !skipHeroStagger && (
+                  <span
+                    key={`p-${bgIndex}`}
+                    className="slide-progress block h-full w-full rounded-full bg-white"
+                  />
+                )}
+              </button>
             ))}
           </div>
 

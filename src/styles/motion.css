@@ -1,0 +1,136 @@
+/* ══════════════════════════════════════════════════════════════════
+   Kurodo motion system — the anikuro.to split (spec §1C, §3.1).
+   Imported ONCE from index.css. transform+opacity only.
+
+   Easings:
+     --ease-spring   cubic-bezier(0.34,1.56,0.64,1)  pops (logo, quick-actions)
+     --ease-out-expo cubic-bezier(0.23,1,0.32,1)     enters (cards, pages)
+     --ease-hover    cubic-bezier(0.2,0.8,0.2,1)     hovers
+   Durations: fast 120-180ms · mid 250-350ms · slow 500-700ms
+   will-change only mid-animation (the anim-* classes set + clear it).
+   Every animation here is gated by the global reduced-motion block below
+   AND the app's reduceMotion/reduceQuality settings at the call site.
+   ══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-hover: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur-mid: 300ms;
+  --dur-slow: 550ms;
+}
+
+.ease-spring { transition-timing-function: var(--ease-spring); }
+
+/* ── Enters ──────────────────────────────────────────────────────── */
+@keyframes animFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-fade-up {
+  animation: animFadeUp var(--dur-mid) var(--ease-out-expo) both;
+  will-change: transform, opacity;
+}
+.anim-fade-up { animation-fill-mode: both; }
+
+@keyframes animPop {
+  0%   { opacity: 0; transform: scale(0.96); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+.anim-pop {
+  animation: animPop var(--dur-fast) var(--ease-spring) both;
+}
+
+@keyframes animScaleIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); filter: blur(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+.anim-scale-in {
+  animation: animScaleIn 250ms var(--ease-out-expo) both;
+}
+
+/* ── Logo pop (anikage: scale .96→1, y 8→0, blur 6→0, 250-450ms) ── */
+@keyframes logoPop {
+  0%   { opacity: 0; transform: scale(0.96) translateY(8px); filter: blur(6px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+.logo-pop {
+  animation: logoPop 380ms var(--ease-spring) both;
+  will-change: transform, opacity, filter;
+}
+
+/* ── Qtip fade (aniclover: 0.12s opacity only, NO scale wobble) ─── */
+@keyframes qtipFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.qtip-fade {
+  animation: qtipFade 120ms ease-out both;
+}
+
+/* ── anikage glass utilities ─────────────────────────────────────── */
+.meta-pill-blur {
+  border-radius: 9999px;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  background: rgb(0 0 0 / 0.4);
+  backdrop-filter: blur(8px);
+}
+.cta-secondary-blur {
+  border: 1px solid rgb(255 255 255 / 0.15);
+  background: rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(8px);
+  transition: transform var(--dur-fast) var(--ease-hover);
+}
+.cta-secondary-blur:hover { transform: scale(1.02); }
+.cta-secondary-blur:active { transform: scale(0.97); }
+.nav-arrow-blur {
+  border: 1px solid rgb(255 255 255 / 0.15);
+  background: rgb(0 0 0 / 0.4);
+  backdrop-filter: blur(8px);
+  transition: transform var(--dur-fast) var(--ease-hover);
+}
+.nav-arrow-blur:hover { transform: scale(1.1); }
+
+/* ── Slide progress dot (anikage .slide-progress, 8s linear) ─────── */
+@keyframes slideProgress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.slide-progress {
+  transform-origin: left;
+  animation: slideProgress 8000ms linear forwards;
+}
+
+/* ── Poster hover (expo, translateY+scale+glow — no layout props) ── */
+.poster-frame {
+  transition: transform var(--dur-mid) var(--ease-out-expo),
+              box-shadow var(--dur-mid) var(--ease-out-expo);
+  will-change: transform;
+}
+.poster-frame:hover {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: 0 20px 50px -12px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* ── Page enter (entrance-only; never animates on exit) ──────────── */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageEnter 350ms var(--ease-out-expo) both;
+}
+
+/* ── Reduced motion: kill everything above ───────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-pop, .anim-scale-in, .logo-pop, .qtip-fade,
+  .slide-progress, .page-enter {
+    animation: none !important;
+  }
+  .poster-frame, .cta-secondary-blur, .nav-arrow-blur {
+    transition: none !important;
+  }
+  .poster-frame:hover { transform: none; }
+}

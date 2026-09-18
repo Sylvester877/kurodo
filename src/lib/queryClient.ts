@@ -27,6 +27,45 @@ export const queryClient = new QueryClient({
 })
 
 /**
+ * Catalog/feed staleTime ladder (spec §5) — import at call sites instead of
+ * magic numbers. 429/404 never retried (handled by AniList client / server).
+ */
+export const STALE = {
+  /** Rails, grids, catalog rows — 30 min warm, persisted. */
+  catalog: 30 * 60 * 1000,
+  /** Airing schedule — 5 min (it moves), persisted so Home paints warm. */
+  schedule: 5 * 60 * 1000,
+  /** Comments/discover surfaces — 10 min. */
+  social: 10 * 60 * 1000,
+  /** TVDB art resolution — 24h (artwork immutable), persisted. */
+  tvdbArt: 24 * 60 * 60 * 1000,
+} as const
+
+/**
+ * Boot prefetch — fire-and-forget warm of the queries Home renders first.
+ * Called once from main.tsx AFTER loadPersistedCache(): persisted data
+ * paints instantly, these only fill gaps for a cold first run.
+ */
+export function startBootPrefetch(): void {
+  if (typeof window === 'undefined') return
+  const kick = (key: readonly unknown[], fn: () => Promise<unknown>, staleTime: number) => {
+    void queryClient.prefetchQuery({ queryKey: [...key], queryFn: fn, staleTime }).catch(() => {})
+  }
+  // Idle-time warm so the very first Home mount races nothing.
+  const idle = (cb: () => void) => {
+    if ('requestIdleCallback' in window) (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(cb)
+    else setTimeout(cb, 800)
+  }
+  idle(() => {
+    import('../api/anilist').then(({ getTrending, getAiringSchedule }) => {
+      kick(['feed', 'trending'], () => getTrending(18), STALE.catalog)
+      const nowSec = Math.floor(Date.now() / 1000)
+      kick(['hero-schedule'], () => getAiringSchedule(nowSec, nowSec + 7 * 86400, 1, 8), STALE.schedule)
+    }).catch(() => {})
+  })
+}
+
+/**
  * Lightweight persistence — we re-hydrate the top-level "feed" queries from
  * localStorage on app boot so second visits paint INSTANTLY with last week's
  * data (then quietly refetch in the background).

@@ -13,8 +13,10 @@ interface Props {
   children: React.ReactNode
 }
 
-const HOVER_DELAY = 350
-const LEAVE_DELAY = 120
+// Spec §3.5: snappier than aniclover — HOVER 350→180, LEAVE 120→80,
+// springs stiffened 1100/55/0.45 → 1400/60/0.35 (no wobble, ~70ms settle).
+const HOVER_DELAY = 180
+const LEAVE_DELAY = 80
 const CARD_WIDTH = 320
 
 /**
@@ -54,8 +56,8 @@ export default function AnimeHoverCard({ anime, children }: Props) {
   // hand-jitter without any perceivable lag). Settles in ~100ms, no wobble.
   const mx = useMotionValue(0)
   const my = useMotionValue(0)
-  const sx = useSpring(mx, { stiffness: 1100, damping: 55, mass: 0.45 })
-  const sy = useSpring(my, { stiffness: 1100, damping: 55, mass: 0.45 })
+  const sx = useSpring(mx, { stiffness: 1400, damping: 60, mass: 0.35 })
+  const sy = useSpring(my, { stiffness: 1400, damping: 60, mass: 0.35 })
 
   const clearTimers = useCallback(() => {
     if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null }
@@ -85,6 +87,10 @@ export default function AnimeHoverCard({ anime, children }: Props) {
     track(e.nativeEvent)
     setArmed(true)
     hoverTimer.current = setTimeout(() => setVisible(true), HOVER_DELAY)
+    // Prefetch the details chunk + data on hover (animex tap-prefetch spirit,
+    // anikage hover-prefetch): by the time the user clicks through, the
+    // code and the query are warm. Cache-only — never refetch here.
+    hoverTimer.current && void import('../lib/routePreloaders').then((m) => m.preloadHandlers('/anime/x'))
   }, [track])
 
   const onMouseLeave = useCallback(() => {
@@ -113,6 +119,7 @@ export default function AnimeHoverCard({ anime, children }: Props) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.12, ease: 'easeOut' }}
+          className="qtip-fade"
           style={{
             position: 'fixed',
             left: sx,

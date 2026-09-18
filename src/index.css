@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Motion system — anikuro-style split (tokens, anim-*, logo-pop, glass pills).
+   Imported right after Tailwind so its utilities can compose below. */
+@import "./styles/motion.css";
 
 /* Fonts (Instrument Sans + Bricolage Grotesque + Noto Serif JP) are loaded
    via <link> in index.html so we don't hit CSS @import ordering issues. */

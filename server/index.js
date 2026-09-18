@@ -1123,6 +1123,31 @@ async function fetchTmdbStills(malId) {
   return out
 }
 
+// TVDB key-art (clearlogo / background / banner) per anime — the anikage.cc
+// art pipeline. Direct artworks.thetvdb.com URLs (CORS *), resolved via the
+// shared AniZip mapping + TVDB session. 30d disk cache — artwork immutable.
+// Query: ?mal_id=123 | ?anilist_id=456
+app.get('/api/tvdb-art', async (req, res) => {
+  const malId = Number(req.query.mal_id)
+  const anilistId = Number(req.query.anilist_id)
+  if ((!Number.isFinite(malId) || malId <= 0) && (!Number.isFinite(anilistId) || anilistId <= 0)) {
+    return res.status(400).json({ ok: false, error: { code: 'bad_id', message: 'need mal_id or anilist_id' } })
+  }
+  try {
+    const { getTvdbArt } = await import('./tvdb-art.js')
+    const art = await getTvdbArt({
+      malId: Number.isFinite(malId) && malId > 0 ? malId : undefined,
+      anilistId: Number.isFinite(anilistId) && anilistId > 0 ? anilistId : undefined,
+    })
+    // Artwork URLs are stable CDN hashes — browsers can cache for a year.
+    res.set('Cache-Control', 'public, max-age=86400')
+    res.set('Access-Control-Allow-Origin', '*')
+    res.json({ ok: true, ...art })
+  } catch (e) {
+    res.status(502).json({ ok: false, error: { code: 'tvdb_art_failed', message: String(e?.message || e) } })
+  }
+})
+
 // Real per-episode thumbnail map for an anime (all episodes in one call).
 // TVDB v4 artworks win (real screenshots — anikage.cc source); TMDB stills
 // fill gaps for episodes TVDB lacks artwork for.
@@ -2979,10 +3004,23 @@ app.get('/api/health', async (_req, res) => {
     const { getTvdbStatus } = await import('./tvdb-episodes.js')
     tvdb = getTvdbStatus()
   } catch { /* tvdb module not loaded */ }
+  // Key-art pipeline gates (spec §5) — Diagnostics renders these so a user
+  // filing a "no logo" report includes which tier is down.
+  let tvdbArt = null
+  try {
+    const { getTvdbArtStatus } = await import('./tvdb-art.js')
+    tvdbArt = getTvdbArtStatus()
+  } catch { /* tvdb-art module not loaded */ }
+  const tmdbOk = !!process.env.TMDB_API_KEY
+  const wsrvOk = true // wsrv.nl is a public CDN with no key; reachability is client-side
   res.json({
     ok: true,
     service: 'kurodo-backend',
     uptime: Math.floor(process.uptime()),
+    tmdbOk,
+    tvdbOk: !!(tvdbArt && tvdbArt.keyConfigured),
+    wsrvOk,
+    tvdbArt,
     node: process.version,    memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
       memoryTotal: Math.round(process.memoryUsage().rss / 1024 / 1024),
       cache: {
@@ -3984,7 +4022,11 @@ app.get('/img', async (req, res) => {
       // Persist to disk (fire-and-forget) so restarts don't re-fetch this
       imgDiskWrite(cacheKey, ct, body)
       res.set('content-type', ct)
-      res.set('cache-control', 'public, max-age=86400, immutable')
+      // Spec §5: origin artwork is effectively immutable and we key the
+      // browser cache by exact URL — a full year removes repeat CDN trips
+      // for every card/logo/backdrop render. The proxy's own 48h memory +
+      // disk tiers still handle content refreshes.
+      res.set('cache-control', 'public, max-age=31536000, immutable')
       res.set('access-control-allow-origin', '*')
       return res.send(body)
     } catch {
@@ -4175,6 +4217,10 @@ async function warmTvdb() {
   try {
     const { warmTvdbToken } = await import('./tvdb-episodes.js')
     await warmTvdbToken()
+    // Key-art module shares the TVDB session — warm its token too so the
+    // first hero render skips the ~1s login on the logo critical path.
+    const { warmTvdbArt } = await import('./tvdb-art.js')
+    await warmTvdbArt()
   } catch (err) {
     console.warn('[tvdb-warm] error:', err?.message || err)
   }

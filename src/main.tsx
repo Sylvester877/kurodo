@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import 'lenis/dist/lenis.css'
 import './index.css'
-import { queryClient, loadPersistedCache, startPersistence } from './lib/queryClient'
+import { queryClient, loadPersistedCache, startPersistence, startBootPrefetch } from './lib/queryClient'
 import { initSyncBridge } from './lib/sync'
 import { initMangaSyncBridge } from './lib/mangaSync'
 
@@ -12,6 +12,8 @@ import { initMangaSyncBridge } from './lib/mangaSync'
 // can use it without flashing skeletons.
 loadPersistedCache()
 startPersistence()
+// Fire-and-forget warm of Home's first queries (idle-time, after hydrate).
+startBootPrefetch()
 
 // Wire the watchlist store ↔ AniList sync bridge (avoids circular imports).
 initSyncBridge()
