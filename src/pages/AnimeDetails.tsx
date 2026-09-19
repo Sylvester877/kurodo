@@ -29,7 +29,8 @@ import CharactersRow from '../components/CharactersRow'
 import ScrollReveal from '../components/ScrollReveal'
 import Relations from '../components/Relations'
 import WatchOrder from '../components/WatchOrder'
-import { fetchAnimeLogo, getTmdbLogoUrl, fetchTmdbArt, type TmdbLogo } from '../api/tmdb'
+import { fetchTmdbArt } from '../api/tmdb'
+import AnimeLogo from '../components/AnimeLogo'
 
 export default function AnimeDetails() {
   const { id } = useParams<{ id: string }>()
@@ -50,8 +51,6 @@ export default function AnimeDetails() {
   }, [location.state?.anime])
 
   const [expanded, setExpanded] = useState(false)
-  /** TMDB title logo — official PNG/SVG for the current anime */
-  const [tmdbLogo, setTmdbLogo] = useState<TmdbLogo | null>(null)
 
   const isInWatchlist = useWatchListStore((s) => s.isInWatchlist)
   const addToWatchlist = useWatchListStore((s) => s.addToWatchlist)
@@ -224,26 +223,9 @@ export default function AnimeDetails() {
     if (anime) window.scrollTo(0, 0)
   }, [anime?.mal_id])
 
-  // ─── Fetch TMDB title logo ───────────────────────────────────────
-  useEffect(() => {
-    if (!anime) return
-    let cancelled = false
-    // Defer the logo fetch so critical text/hero assets paint first.
-    const t = window.setTimeout(() => {
-      const titleEn = anime.title_english
-      const titleRom = anime.title
-      fetchAnimeLogo(titleEn, titleRom).then((result) => {
-        if (cancelled) return
-        setTmdbLogo(result?.logo ?? null)
-      }).catch(() => {
-        if (!cancelled) setTmdbLogo(null)
-      })
-    }, 200)
-    return () => {
-      cancelled = true
-      window.clearTimeout(t)
-    }
-  }, [anime?.mal_id])
+  // (Logo resolution moved into <AnimeLogo> — TVDB-first with the TMDB
+  //  fallback living inside the component, so every surface shares one
+  //  persisted cache chain.)
 
   // ───── Predictive pre-loading (must stay BEFORE early returns — hook order) ──
   // Pre-resolve the anidap slug + server list so the Watch page loads near-
@@ -482,44 +464,17 @@ export default function AnimeDetails() {
               />
             </motion.div>
             <div className="space-y-3 max-w-2xl min-h-[80px] md:min-h-[120px]">
-              {/* Logo-first: TMDB PNG logo or typographic fallback.
-                  The min-h on the parent prevents CLS while the logo PNG streams
-                  in (or while it never loads and we fall through to the h1).
-                  AnimatePresence mode="wait" makes the h1↔logo swap crossfade
-                  instead of the h1 unmounting instantly. */}
-              <AnimatePresence mode="wait" initial={false}>
-                {tmdbLogo ? (
-                  <motion.img
-                    key="logo"
-                    src={getTmdbLogoUrl(tmdbLogo)}
-                    srcSet={`${getTmdbLogoUrl(tmdbLogo, 'w300')} 300w, ${getTmdbLogoUrl(tmdbLogo, 'w500')} 500w`}
-                    sizes="(max-width: 768px) 80vw, 420px"
-                    alt={anime.title_english || anime.title}
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                    className="details-logo"
-                    style={{
-                      aspectRatio: `${tmdbLogo.width || 3} / ${tmdbLogo.height || 1}`,
-                    }}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.1, ease: [0.23, 1, 0.32, 1] }}
-                  />
-                ) : (
-                  <motion.h1
-                    key="h1"
-                    className="font-display text-3xl md:text-5xl font-bold text-gradient leading-[1.05] tracking-tight"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.1 }}
-                  >
-                    {anime.title_english || anime.title}
-                  </motion.h1>
-                )}
-              </AnimatePresence>
+              {/* Logo-first: TVDB clearlogo → TMDB → typographic wordmark.
+                  AnimeLogo reserves a fixed box (no CLS), paints the wordmark
+                  instantly, and pops the transparent PNG in over it once
+                  decoded. */}
+              <AnimeLogo
+                titleEn={anime.title_english || null}
+                romaji={anime.title}
+                malId={malId ?? null}
+                variant="hero"
+                wordmarkClassName="text-gradient font-display"
+              />
               {/* Japanese title always shown underneath as a smaller subline —
                   useful both for original-language context and as a caption
                   underneath the branded logo image. */}

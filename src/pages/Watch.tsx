@@ -40,7 +40,8 @@ import {
 } from '../lib/prefetch'
 import { useSettings } from '../store/useSettings'
 import { getFillerInfo, isFiller, type FillerInfo } from '../api/filler'
-import { fetchAnimeLogo, getTmdbLogoUrl, fetchTmdbArt, type TmdbLogo } from '../api/tmdb'
+import { fetchTmdbArt } from '../api/tmdb'
+import AnimeLogo from '../components/AnimeLogo'
 import type { Anime } from '../types'
 import SyncConfirmDialog, { useSyncConfirm } from '../components/SyncConfirmDialog'
 import StarRating from '../components/StarRating'
@@ -1089,21 +1090,8 @@ export default function Watch() {
     return () => { cancelled = true }
   }, [anidapSlug, currentEp, activeProvider, streamType, malId, anilistId, streamRetryKey])
 
-  // TMDB title logo — branded PNG for the current anime. Fetched once per
-  // anime (cached in tmdb.ts for 24h). Null while loading or if no logo
-  // exists for this title on TMDB.
-  const [tmdbLogo, setTmdbLogo] = useState<TmdbLogo | null>(null)
-  useEffect(() => {
-    if (!anime) return
-    let cancelled = false
-    setTmdbLogo(null) // clear stale logo while we fetch the new one
-    fetchAnimeLogo(anime.title_english, anime.title).then((result) => {
-      if (!cancelled) setTmdbLogo(result?.logo ?? null)
-    })
-    return () => { cancelled = true }
-    // Re-run when the English title arrives late — Jikan often returns
-    // the basic title first and the English title in a follow-up response.
-  }, [anime?.mal_id, anime?.title_english])
+  // (Logo resolution moved into <AnimeLogo> — TVDB-first chain, shared
+  //  persisted cache. Nothing to fetch at page level anymore.)
 
   // Group providers by type for the selector chips AND the auto-fallback
   // chain.
@@ -1853,29 +1841,15 @@ export default function Watch() {
                   to={`/anime/${anime.mal_id}`}
                   className="group block min-h-[32px] sm:min-h-[40px] leading-tight"
                 >
-                  {/* TMDB logo first, typographic h1 as fallback. AnimatePresence
-                      wraps the swap so the crossfade is smooth on logo load. */}
-                  {tmdbLogo ? (
-                    <img
-                      src={getTmdbLogoUrl(tmdbLogo)}
-                      srcSet={`${getTmdbLogoUrl(tmdbLogo, 'w300')} 300w, ${getTmdbLogoUrl(tmdbLogo, 'w500')} 500w`}
-                      sizes="(max-width: 640px) 220px, 280px"
-                      alt={anime.title_english || anime.title}
-                      loading="eager"
-                      fetchPriority="high"
-                      decoding="async"
-                      className="watch-logo"
-                      /* Reserve space using the logo's native aspect ratio so
-                         the layout doesn't jump while the PNG streams in. */
-                      style={{
-                        aspectRatio: `${tmdbLogo.width || 3} / ${tmdbLogo.height || 1}`,
-                      }}
-                    />
-                  ) : (
-                    <h1 className="text-base sm:text-lg font-bold text-white group-hover:text-primary transition-colors line-clamp-1 leading-tight">
-                      {anime.title_english || anime.title}
-                    </h1>
-                  )}
+                  {/* TVDB clearlogo → TMDB → typographic fallback, fixed
+                      box (no CLS), wordmark underlay with logo pop-in. */}
+                  <AnimeLogo
+                    titleEn={anime.title_english || null}
+                    romaji={anime.title}
+                    malId={malId ?? null}
+                    anilistId={anilistId ?? null}
+                    variant="watch"
+                  />
                 </Link>
                 {anidapSlug && anidapSlug !== 'unavailable' && (
                   <p className="text-sm text-white/70 mt-1 line-clamp-1">

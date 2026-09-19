@@ -43,6 +43,13 @@ const MAXW: Record<Variant, string> = {
 
 const RETRY_MS = 10 * 60 * 1000
 
+/** Wordmark size scales with the box — text-4xl would overflow the 32px watch box. */
+const WORDMARK: Record<Variant, string> = {
+  hero: 'text-4xl sm:text-5xl lg:text-6xl',
+  watch: 'text-base sm:text-lg',
+  qtip: 'text-2xl',
+}
+
 export default function AnimeLogo({
   titleEn,
   romaji,
@@ -88,7 +95,8 @@ export default function AnimeLogo({
       {/* Wordmark — instant paint, always mounted as the underlay */}
       <h1
         className={cn(
-          'hero-wordmark absolute inset-0 flex items-center text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight transition-opacity duration-200',
+          'hero-wordmark absolute inset-0 flex items-center font-bold text-white leading-tight transition-opacity duration-200',
+          WORDMARK[variant],
           showImg && imgOk ? 'opacity-0' : 'opacity-100',
           wordmarkClassName,
         )}
