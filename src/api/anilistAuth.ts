@@ -29,7 +29,12 @@ const CLIENT_ID_KEY = 'kurodo-anilist-client-id'
 const CLIENT_SECRET_KEY = 'kurodo-anilist-client-secret'
 
 const ENV_CLIENT_ID = import.meta.env.VITE_ANILIST_CLIENT_ID as string | undefined
-const ENV_CLIENT_SECRET = import.meta.env.VITE_ANILIST_CLIENT_SECRET as string | undefined
+// SECURITY: the Client Secret is NEVER read from import.meta.env — Vite
+// inlines VITE_* vars into the shipped bundle, which leaked the secret in
+// every release binary. The backend exchange route (/api/anilist/exchange)
+// keeps the server-side secret in .env.local only; browser-side exchange
+// uses only a secret the user pasted into THIS machine's setup screen.
+const ENV_CLIENT_SECRET = undefined as string | undefined
 
 /** Read the current Client ID, preferring user-pasted localStorage value. */
 export function getClientId(): string | undefined {
@@ -50,6 +55,25 @@ export function setClientId(id: string | null): void {
   saveCredsToDisk()
 }
 
+// fixes: "invalid_client — Client authentication failed" loop. When AniList
+//        rejects the stored ID+secret pair (public client with a bogus
+//        secret, or a stale/rotated secret), the code-flow authorize keeps
+//        failing on EVERY sign-in attempt. Remembering the rejection lets
+//        getLoginUrl skip the code flow from then on — the user signs in
+//        via the implicit flow instead of hitting the same wall forever.
+const PAIR_REJECTED_KEY = 'kurodo-anilist-pair-rejected'
+
+/** Mark the currently-stored ID+secret pair as rejected by AniList. */
+export function markClientPairRejected(): void {
+  try { localStorage.setItem(PAIR_REJECTED_KEY, String(Date.now())) } catch {}
+}
+
+/** True if AniList rejected the stored pair before (until the user sets a
+ *  new secret, which clears the flag via setClientSecret). */
+export function isClientPairRejected(): boolean {
+  try { return localStorage.getItem(PAIR_REJECTED_KEY) != null } catch { return false }
+}
+
 /** Read the stored Client Secret (localStorage or env var). */
 export function getClientSecret(): string | undefined {
   try {
@@ -65,6 +89,10 @@ export function setClientSecret(secret: string | null): void {
     if (!secret) localStorage.removeItem(CLIENT_SECRET_KEY)
     else localStorage.setItem(CLIENT_SECRET_KEY, secret.trim())
   } catch {}
+  // A (new) secret means a (possibly fixed) pair — clear the rejection flag.
+  if (secret) {
+    try { localStorage.removeItem(PAIR_REJECTED_KEY) } catch {}
+  }
   // Also save to disk via Electron IPC so it survives reinstalls
   saveCredsToDisk()
 }
@@ -192,7 +220,10 @@ export function getLoginUrl(opts: { flow?: 'token' | 'code' | 'auto'; state?: st
     //     clients with "unsupported_grant_type", so we must use code here.
     //   • No secret       → PUBLIC client → implicit flow (response_type=token),
     //     the zero-backend path.
-    effectiveFlow = hasClientSecret() ? 'code' : 'token'
+    //   • Secret present but AniList previously rejected the pair → treat as
+    //     public (implicit). Keeps sign-in working instead of retrying a
+    //     pair the server already refused.
+    effectiveFlow = hasClientSecret() && !isClientPairRejected() ? 'code' : 'token'
   } else {
     effectiveFlow = flow
   }

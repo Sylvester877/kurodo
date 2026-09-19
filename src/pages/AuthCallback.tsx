@@ -8,11 +8,14 @@ import {
   AniListExchangeError,
   getLoginUrl,
   setClientSecret,
+  markClientPairRejected,
 } from '../api/anilistAuth'
 import { useAuthStore } from '../store/useAuthStore'
 import { toast } from '../components/Toaster'
 import { useTitle } from '../hooks/useTitle'
 import { getBackendOrigin } from '../lib/utils'
+
+const STORAGE_IMPLICIT_RETRY = 'kurodo-anilist-implicit-retry'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
@@ -73,6 +76,7 @@ export default function AuthCallback() {
       setAuthFromToken(fromHash.token, fromHash.expiresIn)
         .then(() => {
           setState('ok')
+          sessionStorage.removeItem(STORAGE_IMPLICIT_RETRY)
           toast.success('Signed in with AniList')
           setTimeout(() => navigate('/', { replace: true }), 600)
         })
@@ -136,6 +140,7 @@ export default function AuthCallback() {
       .then(() => {
         if (!(window as any).electronAPI?.isElectron) return // already handled above
         setState('ok')
+        sessionStorage.removeItem(STORAGE_IMPLICIT_RETRY)
         toast.success('Signed in with AniList')
         setTimeout(() => navigate('/', { replace: true }), 600)
       })
@@ -145,6 +150,28 @@ export default function AuthCallback() {
           setMsg(e.message)
           setUpstream(e.upstream)
           setDebug(e.debug)
+          // fixes: "invalid_client — Client authentication failed" dead-end
+          //        (AniList rejects the stored ID+secret pair — usually because
+        //        the client is PUBLIC, i.e. it has no secret at all, or the
+        //        stored secret is stale). Self-heal: drop the stored secret
+        //        and silently retry sign-in via the IMPLICIT flow, which
+        //        works for public clients with zero configuration.
+          if (
+            /invalid_client/i.test(e.message) &&
+            !sessionStorage.getItem(STORAGE_IMPLICIT_RETRY)
+          ) {
+            sessionStorage.setItem(STORAGE_IMPLICIT_RETRY, String(Date.now()))
+            markClientPairRejected() // sticky: prefer implicit from now on
+            setClientSecret(null) // let the no-secret implicit path take over
+            const retryUrl = getLoginUrl({ flow: 'token' })
+            if (retryUrl) {
+              setState('pending')
+              setMsg('Credentials rejected — retrying with the no-setup sign-in flow…')
+              toast.info('Retrying AniList sign-in (implicit flow)')
+              setTimeout(() => { window.location.href = retryUrl }, 900)
+              return
+            }
+          }
         } else if (e instanceof Error) {
           setMsg(e.message)
         } else {
