@@ -220,10 +220,11 @@ export function getLoginUrl(opts: { flow?: 'token' | 'code' | 'auto'; state?: st
     //     clients with "unsupported_grant_type", so we must use code here.
     //   • No secret       → PUBLIC client → implicit flow (response_type=token),
     //     the zero-backend path.
-    //   • Secret present but AniList previously rejected the pair → treat as
-    //     public (implicit). Keeps sign-in working instead of retrying a
-    //     pair the server already refused.
-    effectiveFlow = hasClientSecret() && !isClientPairRejected() ? 'code' : 'token'
+    // NOTE: a previously-rejected pair does NOT switch the flow — for a
+    // confidential client the implicit flow only earns a second error
+    // (unsupported_grant_type). The heal path re-runs the CODE flow via the
+    // backend instead (see AuthCallback).
+    effectiveFlow = hasClientSecret() ? 'code' : 'token'
   } else {
     effectiveFlow = flow
   }

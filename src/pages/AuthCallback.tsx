@@ -8,7 +8,6 @@ import {
   AniListExchangeError,
   getLoginUrl,
   setClientSecret,
-  markClientPairRejected,
 } from '../api/anilistAuth'
 import { useAuthStore } from '../store/useAuthStore'
 import { toast } from '../components/Toaster'
@@ -151,23 +150,29 @@ export default function AuthCallback() {
           setUpstream(e.upstream)
           setDebug(e.debug)
           // fixes: "invalid_client — Client authentication failed" dead-end
-          //        (AniList rejects the stored ID+secret pair — usually because
-        //        the client is PUBLIC, i.e. it has no secret at all, or the
-        //        stored secret is stale). Self-heal: drop the stored secret
-        //        and silently retry sign-in via the IMPLICIT flow, which
-        //        works for public clients with zero configuration.
+          //        (AniList rejected the ID+secret pair used for the code
+        //        exchange). Two known sources: (a) a stale LOCAL secret in
+        //        localStorage overriding the backend's valid env secret,
+        //        (b) a genuinely rotated/wrong backend secret. Self-heal:
+        //        re-run the authorize→exchange round-trip once, letting the
+        //        normal priority chain pick the backend pair. We do NOT
+        //        switch to the implicit flow here — for confidential clients
+        //        AniList answers that with unsupported_grant_type, which is
+        //        strictly worse. A fresh authorize also mints a fresh code,
+        //        so a same-session code reuse can't bite.
           if (
             /invalid_client/i.test(e.message) &&
             !sessionStorage.getItem(STORAGE_IMPLICIT_RETRY)
           ) {
             sessionStorage.setItem(STORAGE_IMPLICIT_RETRY, String(Date.now()))
-            markClientPairRejected() // sticky: prefer implicit from now on
-            setClientSecret(null) // let the no-secret implicit path take over
-            const retryUrl = getLoginUrl({ flow: 'token' })
+            // Drop any locally-pasted secret so the retry exchanges through
+            // the backend (whose env pair is the one the server validates).
+            setClientSecret(null)
+            const retryUrl = getLoginUrl({ flow: 'code' })
             if (retryUrl) {
               setState('pending')
-              setMsg('Credentials rejected — retrying with the no-setup sign-in flow…')
-              toast.info('Retrying AniList sign-in (implicit flow)')
+              setMsg('Credentials hiccup — retrying sign-in with the server-side credentials…')
+              toast.info('Retrying AniList sign-in (backend exchange)')
               setTimeout(() => { window.location.href = retryUrl }, 900)
               return
             }

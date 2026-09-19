@@ -3013,6 +3013,16 @@ app.get('/api/health', async (_req, res) => {
   } catch { /* tvdb-art module not loaded */ }
   const tmdbOk = !!process.env.TMDB_API_KEY
   const wsrvOk = true // wsrv.nl is a public CDN with no key; reachability is client-side
+  // AniList OAuth gate — additive diagnostics so "invalid_client" reports
+  // say WHICH side is misconfigured. Ternary probe with a well-formed fake
+  // code: 401 invalid_client = bad pair; 400 invalid_request "Cannot
+  // decrypt" = pair VALID (fails later at the fake code, as expected).
+  // Result cached for 10 min so health polling doesn't hammer AniList.
+  let anilistAuth = null
+  try {
+    const { getAnilistAuthStatus } = await import('./anilist-auth-status.js')
+    anilistAuth = await getAnilistAuthStatus()
+  } catch { /* module not loaded — omit field */ }
   res.json({
     ok: true,
     service: 'kurodo-backend',
@@ -3020,6 +3030,7 @@ app.get('/api/health', async (_req, res) => {
     tmdbOk,
     tvdbOk: !!(tvdbArt && tvdbArt.keyConfigured),
     wsrvOk,
+    anilistAuth,
     tvdbArt,
     node: process.version,    memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
       memoryTotal: Math.round(process.memoryUsage().rss / 1024 / 1024),
