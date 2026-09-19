@@ -2,6 +2,32 @@
 
 All notable Kurōdo releases are tracked here.
 
+## [0.3.40] - 2026-09-19
+
+### Official title logos everywhere
+- **TVDB clearlogos** now resolve for the hero, details page, and watch page via the new `/api/tvdb-art` pipeline (AniList/MAL → TVDB mapping, 24h memory + 30d disk cache, served through the 1-year-immutable `/img` proxy).
+- New **AnimeLogo** component: instant text wordmark underlay, transparent logo pops in over it (spring, blur-to-sharp), fixed boxes = zero layout shift, silent 10-min retry when art appears later.
+- Wired into **Home hero**, **Anime details**, and the **Watch title bar** — one shared persisted cache chain across all three.
+
+### Fullscreen right-edge gap — fixed for real
+- Root cause 1: the Electron window never actually went OS-fullscreen; it now does (and restores perfectly).
+- Root cause 2: the app's themed scrollbar + reserved gutter stayed painted above the fullscreen element — an 8px (10 physical px) reddish-brown strip on the right. The root scrollbar is now suppressed while any fullscreen is active.
+- Player internals rebuilt for fullscreen: no more double-zoom (oversize% + scale + offsets), crop-zoom only for genuinely symmetric baked bars, webkit fullscreen events handled, rapid F toggling self-heals.
+
+### New "Original" video fit
+- Fourth fit mode alongside Contain / Cover / Fill: plays the stream at its **native pixel size** (1:1), never upscales, no auto-crop — selectable in the player gear menu and Settings.
+
+### Motion + speed (reference-site parity pass)
+- Hero crossfade tightened to 8s with an animated progress dot, "Featured this week" eyebrow, staggered meta pills, Ken Burns backdrop, magnetic CTAs.
+- Hover card (qtip) reacts 2x faster (180ms in / 80ms out, stiffer springs) and prefetches details on hover.
+- New motion-token stylesheet (`styles/motion.css`) — spring/out-expo/hover easings, transform+opacity only, fully disabled under reduced-motion / reduce-quality.
+- `/img` responses are now `max-age=31536000, immutable`; catalog/art queries keep longer stale windows; trending + schedule prefetched at idle boot.
+- Health endpoint now reports `tmdbOk` / `tvdbOk` / `wsrvOk` gates (visible in Settings → Diagnostics).
+
+**Install:** download `Kurodo-Setup-0.3.40.exe` and run it. Existing installs auto-update.
+
+---
+
 ## [0.3.38] - 2026-09-07
 
 ### Outage-proof catalog — the app no longer dies when the big APIs do
