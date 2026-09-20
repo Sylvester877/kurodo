@@ -102,6 +102,21 @@ export default function AuthCallback() {
     if ('error' in parsed) {
       setState('error')
       if (/unsupported_grant_type/i.test(parsed.error)) {
+        // fixes: confidential client sent down the implicit flow (AniList
+        //        rejects response_type=token for it). Self-heal ONCE:
+        //        restart sign-in explicitly on the CODE flow — the backend
+        //        exchange then supplies the secret server-side.
+        if (!sessionStorage.getItem(STORAGE_IMPLICIT_RETRY)) {
+          sessionStorage.setItem(STORAGE_IMPLICIT_RETRY, String(Date.now()))
+          const retryUrl = getLoginUrl({ flow: 'code' })
+          if (retryUrl) {
+            setState('pending')
+            setMsg('This AniList client requires the secure flow — restarting sign-in…')
+            toast.info('Retrying AniList sign-in (authorization-code flow)')
+            setTimeout(() => { window.location.href = retryUrl }, 900)
+            return
+          }
+        }
         setMsg(parsed.error)
         setUpstream(400)
       } else {

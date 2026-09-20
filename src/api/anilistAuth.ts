@@ -207,6 +207,42 @@ export function clearAuth() {
  * Pass `{flow: 'code'}` to use the auth-code grant (only works when the
  * backend has ANILIST_CLIENT_SECRET configured).
  */
+// fixes: "unsupported_grant_type" on confidential clients. With the env
+//        secret removed from the renderer (security fix), a machine with no
+//        locally-pasted secret looks "public" even when the BACKEND holds a
+//        valid secret — the implicit flow then fails at AniList. The
+//        backend is the source of truth, so we cache its answer from
+//        /api/health and refresh it in the background.
+let _backendHasSecret: boolean | null = null
+
+/** Best-known answer to "does the backend hold an AniList client secret?".
+ *  Null = never polled. Kept in a module global so getLoginUrl (sync) can
+ *  use the last known value. */
+export function backendHasSecret(): boolean {
+  if (_backendHasSecret != null) return _backendHasSecret
+  // Fall back to the local secret presence — pre-first-poll approximation
+  // of the old behavior (local secret ⇒ code flow worked before).
+  return hasClientSecret()
+}
+
+/** Kick off a background refresh of the backend-secret flag. Fire-and-
+ *  forget by default; pass `awaitResult=true` to get a promise that
+ *  resolves once the flag is current (used by the /login auto-start so the
+ *  flow decision never races the probe). */
+export function refreshBackendSecretFlag(awaitResult = false): Promise<void> | void {
+  const p = (async () => {
+    try {
+      const { data } = await axios.get(`${getBackendOrigin()}/api/health`, { timeout: 4000 })
+      const auth = data?.anilistAuth
+      if (auth && typeof auth.configured === 'boolean') {
+        _backendHasSecret = auth.configured
+      }
+    } catch { /* backend down — keep last known value */ }
+  })()
+  if (awaitResult) return p
+  return undefined
+}
+
 export function getLoginUrl(opts: { flow?: 'token' | 'code' | 'auto'; state?: string } = {}): string | null {
   const id = getClientId()
   if (!id) return null
@@ -214,17 +250,15 @@ export function getLoginUrl(opts: { flow?: 'token' | 'code' | 'auto'; state?: st
   let effectiveFlow: 'token' | 'code' = 'token'
 
   if (flow === 'auto') {
-    // Pick the flow that matches the client TYPE:
-    //   • Secret present  → CONFIDENTIAL client → authorization-code flow
-    //     (response_type=code). AniList REJECTS implicit for confidential
-    //     clients with "unsupported_grant_type", so we must use code here.
-    //   • No secret       → PUBLIC client → implicit flow (response_type=token),
-    //     the zero-backend path.
+    // Priority: a LOCAL secret means the user opted into browser-side
+    // exchange; otherwise the BACKEND's secret decides (configured ⇒
+    // confidential client ⇒ code flow). Only genuinely secret-less setups
+    // use the implicit flow.
     // NOTE: a previously-rejected pair does NOT switch the flow — for a
     // confidential client the implicit flow only earns a second error
     // (unsupported_grant_type). The heal path re-runs the CODE flow via the
     // backend instead (see AuthCallback).
-    effectiveFlow = hasClientSecret() ? 'code' : 'token'
+    effectiveFlow = hasClientSecret() || backendHasSecret() ? 'code' : 'token'
   } else {
     effectiveFlow = flow
   }

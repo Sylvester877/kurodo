@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import {
   Lock,
   ShieldCheck,
@@ -14,6 +14,7 @@ import {
   setClientId,
   getClientSecret,
   setClientSecret,
+  refreshBackendSecretFlag,
 } from '../api/anilistAuth'
 import { useTitle } from '../hooks/useTitle'
 
@@ -129,6 +130,7 @@ export default function Login() {
   // types anything. A short delay + visible cancel link keeps it escapable
   // (no redirect loops for users who want a different account).
   const [autoCancelled, setAutoCancelled] = useState(false)
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // The card should animate in once on mount.
   const [entered, setEntered] = useState(false)
@@ -159,11 +161,25 @@ export default function Login() {
   }
 
   // Auto-start when an id is known and the user hasn't cancelled.
+  // fixes: confidential clients got "unsupported_grant_type" from this
+  //        gate — the 1.4s auto-start could fire BEFORE the backend-secret
+  //        probe answered, so a browser tab with no local secret picked the
+  //        implicit flow. The external-browser tab has NO Electron storage:
+  //        the backend's answer is the only reliable signal. We wait for
+  //        refreshBackendSecretFlag() before building the URL.
   const autoId = passedCid || getClientId() || ''
   useEffect(() => {
     if (autoCancelled || !autoId) return
-    const t = setTimeout(() => beginLogin(autoId), 1400)
-    return () => clearTimeout(t)
+    let cancelled = false
+    Promise.resolve(refreshBackendSecretFlag(true)).finally(() => {
+      if (cancelled) return
+      const t = setTimeout(() => beginLogin(autoId), 1400)
+      autoTimerRef.current = t
+    })
+    return () => {
+      cancelled = true
+      if (autoTimerRef.current) clearTimeout(autoTimerRef.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCancelled, autoId])
 
