@@ -1,3 +1,5 @@
+import { isRememberedGood, serverMemoryScore } from './serverMemory'
+
 export interface ProviderMeta {
   name: string; label: string; hint?: string; priority: number; recommended?: boolean
 }
@@ -65,19 +67,18 @@ function tipQualityRank(tip?: string | null): number {
 }
 
 /** Server-health rank: verified-OK servers before unverified, dead last.
- *  The backend (server-verify.js) marks _healthy:false for servers that
- *  FAILED a live probe against THIS title (kiwi 404s, yuki/dub dead links) —
- *  they must sort to the very bottom and never win the default pick, even
- *  if their tip says "High quality". Unverified (undefined) stays neutral. */
-function healthRank(p: { _healthy?: boolean | null }): number {
-  if (p._healthy === false) return 2
-  if (p._healthy === true) return 0
-  return 1
-}
+ *  RETIRED from the visible sort (Sep 2026): fixes "every time I close the
+ *  app and open it again different servers appear" — the per-fetch probe
+ *  verdicts raced and reshuffled the picker between sessions. Health is now
+ *  used ONLY inside pickPreferredProvider's alive-pool (invisible speed
+ *  guard) and never reorders what the user sees. */
 
 export function sortProviders<T extends { name: string; default?: boolean; tip?: string | null; _healthy?: boolean | null }>(list: T[]): T[] {
   // Sort keys, in order:
-  //   0. verified health (working servers first, verified-dead last)
+  //   0. SERVER MEMORY — servers the user actually played successfully sort
+  //      first, persistently across app restarts (lib/serverMemory.ts). This
+  //      is what makes the picker show the SAME fast working servers in the
+  //      SAME order every session instead of reshuffling per fetch.
   //   1. static PROVIDER_META priority — measured per-chip capability
   //   2. tip quality ("High quality" first) — tie-breaker for UNKNOWN
   //      servers only, since every known server has a distinct priority
@@ -86,15 +87,18 @@ export function sortProviders<T extends { name: string; default?: boolean; tip?:
   //      (V8's sort is not guaranteed stable; without the tie-breaker two
   //      servers sharing all keys would "shuffle" on every page load).
   //
-  // fixes: "success 100%, fail 0%" default selection. Quality used to lead
-  // capability, so the DEFAULT pick (and therefore the first thing the
-  // auto-failover chain tried) was the best-LOOKING chip rather than the most
-  // likely to actually have the episode. Verified health still outranks both,
-  // so a live probe always wins the pick.
+  // fixes: "success 100%, fail 0%" default selection AND the per-session
+  // reshuffle. The live-probe health verdicts used to be sort key 0, which
+  // made the order change between runs; memory + capability are stable.
   return [...list].sort((a, b) => {
-    const ha = healthRank(a as T & { _healthy?: boolean | null })
-    const hb = healthRank(b as T & { _healthy?: boolean | null })
-    if (ha !== hb) return ha - hb
+    const ma = isRememberedGood(a.name)
+    const mb = isRememberedGood(b.name)
+    if (ma !== mb) return ma ? -1 : 1
+    if (ma && mb) {
+      const sa = serverMemoryScore(a.name)
+      const sb = serverMemoryScore(b.name)
+      if (sa !== sb) return sb - sa
+    }
     const pa = getProviderMeta(a.name).priority
     const pb = getProviderMeta(b.name).priority
     if (pa !== pb) return pa - pb

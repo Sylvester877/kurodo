@@ -10,16 +10,22 @@
 //        quality. `mimi` was ranked 2 while scoring **8%** on dub, and
 //        `loli` — 92% on dub, the best server measured — had no entry at
 //        all, so it fell to the unknown default (8) and was tried LAST.
-//     2. Verified health must still outrank both (a live probe beats a
-//        static table), and the upstream `tip` quality must survive only as
-//        a tie-breaker for UNKNOWN servers.
+//     2. The order must be STABLE across sessions (Sep 2026): per-fetch
+//        health probes used to be sort key 0 and reshuffled the picker on
+//        every app restart. The visible order is now: persistent user
+//        memory (played-here-first servers) → measured capability →
+//        deterministic tie-breakers. Health only steers the invisible
+//        auto-pick's alive-pool.
 //
 // The failover bench (scripts-perf/failover_bench.mjs, 100 titles) confirmed
 // the effect: of the titles that played, 100% were served by chain position
 // #1, i.e. the default pick hit a working server every time.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { PROVIDER_META, getProviderMeta, sortProviders } from '../lib/providers'
+import { rememberServerGood, rememberServerBad, clearServerMemory } from '../lib/serverMemory'
+
+beforeEach(() => { clearServerMemory() })
 
 const names = (list: { name: string }[]) => list.map((p) => p.name)
 
@@ -60,15 +66,44 @@ describe('sortProviders ordering', () => {
     expect(names(sortProviders(input))).toEqual(['anidap-loli', 'anidap-yuki', 'anidap-sora'])
   })
 
-  it('still lets a live verdict outrank the static table', () => {
-    // This is the ONE thing that must beat capability: server-verify.js
-    // marked loli dead for this episode, so sora is the correct pick.
+  it('NO LONGER lets a live verdict reorder the list (stable order across sessions)', () => {
+    // fixes: "every time I close the app and open it again different servers
+    // appear" — the per-fetch probe verdicts (`_healthy`) used to be sort key
+    // 0, reshuffling the picker between sessions. Health is now invisible:
+    // it only feeds pickPreferredProvider's alive-pool, never the order.
     const input = [
       { name: 'anidap-loli', tip: null, _healthy: false },
       { name: 'anidap-sora', tip: 'Soft sub, Fast, High quality', _healthy: true },
       { name: 'anidap-yuki', tip: 'Soft sub, Good, Multi quality' },
     ]
-    expect(names(sortProviders(input))).toEqual(['anidap-sora', 'anidap-yuki', 'anidap-loli'])
+    // Pure capability order, identical whether or not the probe ran.
+    expect(names(sortProviders(input))).toEqual(['anidap-loli', 'anidap-yuki', 'anidap-sora'])
+  })
+
+  it('ranks the user\'s REMEMBERED fast servers first, persistently', () => {
+    // The heart of "keep the same servers every session": a server that
+    // actually played for the user stays pinned at the top across app
+    // restarts (localStorage-backed serverMemory), even one with a weaker
+    // static priority.
+    rememberServerGood('anidap-beep') // priority 7 — would sort last
+    const input = [
+      { name: 'anidap-loli', tip: null },
+      { name: 'anidap-beep', tip: 'Soft sub, Fast' },
+      { name: 'anidap-yuki', tip: 'Soft sub, Good, Multi quality' },
+    ]
+    expect(names(sortProviders(input))).toEqual(['anidap-beep', 'anidap-loli', 'anidap-yuki'])
+  })
+
+  it('demotes a remembered server whose failures catch up with it', () => {
+    // Good-but-now-broken: bad ≥ good drops it out of the pinned tier.
+    rememberServerGood('anidap-beep')
+    rememberServerBad('anidap-beep')
+    rememberServerBad('anidap-beep')
+    const input = [
+      { name: 'anidap-beep', tip: 'Soft sub, Fast' },
+      { name: 'anidap-loli', tip: null },
+    ]
+    expect(names(sortProviders(input))).toEqual(['anidap-loli', 'anidap-beep'])
   })
 
   it('treats unverified as neutral, never as dead', () => {
@@ -76,7 +111,7 @@ describe('sortProviders ordering', () => {
       { name: 'anidap-mimi', tip: 'Soft sub, Fastest', _healthy: null },
       { name: 'anidap-neko', tip: 'Hard sub, Fast, High quality', _healthy: false },
     ]
-    expect(names(sortProviders(input))).toEqual(['anidap-mimi', 'anidap-neko'])
+    expect(names(sortProviders(input))).toEqual(['anidap-neko', 'anidap-mimi'])
   })
 
   it('uses tip quality as the tie-breaker for UNKNOWN servers only', () => {

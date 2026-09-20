@@ -7,8 +7,8 @@
  *      the Dub tab when chad returned no dub entries.
  *   2. NOTHING in the picker is ever disabled. Tabs are always selectable
  *      (an empty one shows a "nothing listed" panel), and every server tile
- *      is always clickable — verified-dead servers included. Health is a
- *      badge, not a gate.
+ *      is always clickable — verified-dead servers included. Health badges
+ *      were removed entirely (Sep 2026): nothing is flagged or hidden.
  *
  * Background: prior bug — when chad.anidap.se returned no dub entries
  * for a title, the picker silently hid the Dub tab. Users thought the
@@ -149,10 +149,14 @@ describe('ServerPicker — always-render type tabs (dub/missing-tab fix)', () =>
     expect(onChangeProvider).not.toHaveBeenCalled()
   })
 
-  it('no server tile is EVER disabled — verified-dead included', async () => {
+  it('no server tile is EVER disabled — all servers always shown, no health badges', async () => {
     // One alive, one verified-dead, one unverified. All three must render as
     // enabled, clickable buttons: a server the backend could not verify (or
     // verified dead for this episode) is still the user's to try.
+    // Sep 2026: the health ICONS and NO STREAM / UNVERIFIED badges were
+    // removed entirely (user request — they flickered per fetch and made the
+    // picker look like the servers changed between sessions). The tiles are
+    // now uniform; nothing is hidden or flagged.
     const mixed: AnidapProvider[] = [
       mkProvider({ name: 'anidap-yuki', type: 'sub', _provider: 'anidap', _healthy: true }),
       mkProvider({ name: 'anidap-kiwi', type: 'sub', _provider: 'anidap', _healthy: false, _healthError: 'No stream for this title' }),
@@ -175,9 +179,9 @@ describe('ServerPicker — always-render type tabs (dub/missing-tab fix)', () =>
       expect(tile).toBeInTheDocument()
       expect(tile).not.toBeDisabled()
     }
-    // The dead one says so, without being taken away.
-    expect(screen.getByText('NO STREAM')).toBeInTheDocument()
-    expect(screen.getByText('UNVERIFIED')).toBeInTheDocument()
+    // Health UI is GONE — no badges, no activity icons, no dead-flag chips.
+    expect(screen.queryByText('NO STREAM')).not.toBeInTheDocument()
+    expect(screen.queryByText('UNVERIFIED')).not.toBeInTheDocument()
 
     // And clicking the verified-dead tile really does select it.
     await user.click(screen.getByText('Kiwi', { selector: 'span' }).closest('button') as HTMLButtonElement)

@@ -34,6 +34,7 @@ import EpisodeRow from '../components/EpisodeRow'
 import RelatedAnime from '../components/RelatedAnime'
 import { toast } from '../components/Toaster'
 import { pickPreferredProvider } from '../lib/providers'
+import { rememberServerGood, rememberServerBad } from '../lib/serverMemory'
 import {
   prefetchSkipTimes, prefetchStream, prefetchAnidapServers,
   takePrefetchedStream, clearPrefetchedStream, cancelPrefetch,
@@ -962,6 +963,10 @@ export default function Watch() {
         setStreamLoading(false)
         setFailedProviders(new Set())  // reset on success
         fallbackCount.current = 0
+        // fixes: "different servers appear every session" — every successful
+        // resolve teaches the persistent server memory, so this server keeps
+        // its pinned top slot in the picker across app restarts.
+        rememberServerGood(providerName)
       } catch (e) {
         if (cancelled) return
 
@@ -988,6 +993,9 @@ export default function Watch() {
         const newFailed = new Set(failedProviders)
         newFailed.add(providerName)
         setFailedProviders(newFailed)
+        // Mirror the failure into the persistent memory: a server that keeps
+        // losing its successes-vs-failures race loses its pinned top slot.
+        rememberServerBad(providerName)
 
         // ── An EXPLICIT pick is honoured FIRST, then fails forward ──
         // The click is real: `explicitPick` above makes the server actually try

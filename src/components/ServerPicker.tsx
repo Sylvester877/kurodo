@@ -1,4 +1,4 @@
-import { Subtitles, Mic, Server, Activity } from 'lucide-react'
+import { Subtitles, Mic, Server } from 'lucide-react'
 import { useMemo } from 'react'
 import { cn } from '../lib/utils'
 import { sortProviders } from '../lib/providers'
@@ -47,15 +47,16 @@ function cleanServerName(name: string): string {
  *
  * - Segmented type tabs (Sub / Dub / H-Subs) with per-type counts.
  * - Servers grouped by provider family and laid out as clickable tiles.
- * - Active tile gets a glowing border + soft radial highlight.
- * - Quality badge parsed from provider tip.
+ * - Active tile gets a glowing border + soft radial highlight. * - Quality badge parsed from provider tip.
  * - Empty/unavailable states stay friendly and centered.
  *
  * HARD RULE: every server the backend returns is rendered, and every tile is
- * clickable. Health is shown as information only — emerald "verified", amber
- * "UNVERIFIED", red "NO STREAM" — never as a disabled state and never as a
- * reason to drop a row. Clicking a red tile really does try that server.
- */
+ * clickable. NO health badges or dots are shown (removed Sep 2026 — fixes
+ * "different servers appear every session": the per-fetch probe verdicts
+ * flickered and reshuffled the list; they now only guide the invisible
+ * auto-pick). The order the user sees is stable: remembered-fast servers
+ * first (serverMemory), then measured capability, then deterministic
+ * tie-breakers. */
 export default function ServerPicker({
   providers, streamType, activeProvider,
   onChangeProvider, onChangeType, unavailable, loading,
@@ -231,13 +232,7 @@ export default function ServerPicker({
                     <button
                       key={p.name}
                       onClick={() => onChangeProvider(p.name)}
-                      title={
-                        p._healthy === false
-                          ? 'No stream was found for this title on this server last time it was checked — click to try it anyway.'
-                          : p._healthy === true
-                            ? 'Verified working for this episode.'
-                            : 'Not checked yet for this episode — click to try it.'
-                      }
+                      title={`Play on ${cleanServerName(p.name)}`}
                       className={cn(
                         'relative flex flex-col p-3 rounded-xl border text-left transition-all overflow-hidden group cursor-pointer',
                         isActive
@@ -257,22 +252,6 @@ export default function ServerPicker({
                         <span className={cn('text-xs font-semibold truncate pr-2', isActive ? 'text-white' : 'text-white/70')}>
                           {cleanServerName(p.name)}
                         </span>
-                        {/* Three honest states: verified working (emerald),
-                            NOT verified yet (amber), verified dead for this
-                            title (red). The amber state exists because the
-                            backend can only probe a few servers per request —
-                            showing those as "working" was a promise we could
-                            not keep on the long tail. */}
-                        <Activity
-                          className={cn(
-                            'h-3.5 w-3.5 shrink-0',
-                            p._healthy === false
-                              ? 'text-red-500'
-                              : p._healthy === true
-                                ? 'text-emerald-500'
-                                : 'text-amber-400',
-                          )}
-                        />
                       </div>
 
                       <div className="flex items-center gap-1.5 mt-auto relative z-10">
@@ -285,15 +264,6 @@ export default function ServerPicker({
                           </span>
                         )}
                         <span className="text-[10px] text-white/40">{p.type.toUpperCase()}</span>
-                        {p._healthy === false ? (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-500/10 text-red-300/80">
-                            NO STREAM
-                          </span>
-                        ) : p._healthy !== true ? (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300/80">
-                            UNVERIFIED
-                          </span>
-                        ) : null}
                       </div>
                     </button>
                   )
