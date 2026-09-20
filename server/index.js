@@ -487,6 +487,44 @@ app.get('/api/anidap/servers/:slug/:ep', async (req, res) => {
       const { getRosterProviders } = await import('./anidap.js')
       data = { providers: getRosterProviders(), _rosterFast: true }
     }
+    // ── STABLE ROSTER GUARANTEE (Sep 2026) ─────────────────────────────
+    // fixes: "every time I close the app and open it again different servers
+    // appear". routedGetProviders races source families; whichever wins
+    // returns ITS OWN roster, so the tile set changed between fetches (chad:
+    // loli/yuki/neko/beep/… one run, a 6-name other-family roster the next).
+    // The chad family is what the whole priority/verification stack is tuned
+    // around, so its canonical roster is now ALWAYS merged in — ADDITIVE
+    // ONLY: nothing the winning family returned is ever removed, and the
+    // per-title verification below annotates the merged list exactly like
+    // any other.
+    try {
+      const { getRosterProviders } = await import('./anidap.js')
+      // Dedupe by family+type+cleaned name (case-insensitive) so the other
+      // families' "Yuki" collapses into chad's "anidap-yuki" — one tile per
+      // server, identical set on every app open. Chad's canonical entry wins
+      // collisions; other families' UNIQUE servers are still kept (additive).
+      const clean = (n) => String(n || '').toLowerCase().replace(/^anidap-/, '')
+      const have = new Map()
+      for (const p of data.providers) {
+        const key = `${p.type}:${clean(p.name)}`
+        have.set(key, p)
+      }
+      for (const rp of getRosterProviders()) {
+        const key = `${rp.type}:${clean(rp.name)}`
+        const existing = have.get(key)
+        if (!existing) {
+          data.providers.push(rp)
+          have.set(key, rp)
+        } else if (!/^anidap-/i.test(existing.name)) {
+          // Replace the other family's duplicate with chad's canonical entry,
+          // keeping the existing array position (client re-sorts anyway).
+          Object.assign(existing, rp)
+        }
+      }
+    } catch (e) {
+      // A roster import failure must never break the list.
+      console.warn('[servers] roster merge skipped:', e?.message || e)
+    }
     // ── Empty-list protection ──
     // When anidap is briefly rate-limited / bot-blocked, the provider list
     // comes back EMPTY and the generic cache would lock that in for the

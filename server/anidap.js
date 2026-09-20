@@ -960,10 +960,12 @@ function pruneProviderListCache() {
 // hit its 12s cap on the long tail — all of it BEFORE the client could even
 // begin resolving a stream, so it was pure added latency.
 export function getRosterProviders() {
+  // Prefix + _provider match real chad providers (getStream strips the
+  // prefix) so merged roster tiles group and dedupe identically to live ones.
   return [
-    ...ALL_SUB_SERVERS.map(name => ({ name, type: 'sub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
-    ...ALL_DUB_SERVERS.map(name => ({ name, type: 'dub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
-    ...ALL_HSUB_SERVERS.map(name => ({ name, type: 'hsub', tip: PROVIDER_TIPS[name] || null, _roster: true })),
+    ...ALL_SUB_SERVERS.map(name => ({ name: `anidap-${name}`, type: 'sub', tip: PROVIDER_TIPS[name] || null, _provider: 'anidap', _roster: true })),
+    ...ALL_DUB_SERVERS.map(name => ({ name: `anidap-${name}`, type: 'dub', tip: PROVIDER_TIPS[name] || null, _provider: 'anidap', _roster: true })),
+    ...ALL_HSUB_SERVERS.map(name => ({ name: `anidap-${name}`, type: 'hsub', tip: PROVIDER_TIPS[name] || null, _provider: 'anidap', _roster: true })),
   ]
 }
 
