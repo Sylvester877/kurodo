@@ -24,6 +24,7 @@ import ScrollReveal from '../components/ScrollReveal'
 import LazyMount from '../components/LazyMount'
 import GenreTiles from '../components/GenreTiles'
 import SeasonalCountdown from '../components/SeasonalCountdown'
+import ReleaseStatusTabs from '../components/ReleaseStatusTabs'
 import { SkeletonRow } from '../components/Skeleton'
 import StaggerCard from '../components/StaggerCard'
 import { useSettings } from '../store/useSettings'
@@ -197,6 +198,14 @@ export default function Home() {
       <LazyMount minHeight={220}>
         <ScrollReveal delay={0.1}>
           <GenreTiles />
+        </ScrollReveal>
+      </LazyMount>
+
+      {/* Fresh off the press — anikototv-style New Release / Newly Added /
+          Just Completed tabs (researched Sep 2026) */}
+      <LazyMount minHeight={520}>
+        <ScrollReveal delay={0.11}>
+          <ReleaseStatusTabs />
         </ScrollReveal>
       </LazyMount>
 

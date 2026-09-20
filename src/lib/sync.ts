@@ -203,7 +203,14 @@ export async function syncProgress(malId: number, episode: number) {
   }
   try {
     const aniId = await getAniIdCached(malId)
-    if (!aniId) return
+    // fixes: progress silently lost when the MAL→AniList id lookup fails
+    //        (transient network/API error). Queue for retry like the
+    //        signed-out path so the watch is never dropped.
+    if (!aniId) {
+      console.warn('[sync] no AniList id for MAL', malId, '— queued for retry')
+      queuePendingProgress(malId, episode)
+      return
+    }
 
     // ── Pick the right status ────────────────────────────────────
     // • Existing entry is COMPLETED / REPEATING / DROPPED / PAUSED?

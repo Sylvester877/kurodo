@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   Star, Calendar, Heart, Film, Globe, Hash, ArrowLeft,
-  AlertCircle, Search, Keyboard, X, CheckCircle2, Eye, EyeOff, Mic, RefreshCw,
+  AlertCircle, Search, Keyboard, X, Eye, EyeOff, Mic, RefreshCw,
   ChevronLeft, ChevronRight, Play, PlayCircle,
 } from 'lucide-react'
 import { useTitle } from '../hooks/useTitle'
@@ -169,7 +169,7 @@ export default function Watch() {
   const clearEpisodeProgress = useWatchListStore((s) => s.clearEpisodeProgress)
 
   // ── Sync confirmation ──
-  const { show: syncDialogOpen, checkAndPrompt, handleConfirm, handleDecline: _handleDecline } = useSyncConfirm(malId, 'anime')
+  const { show: syncDialogOpen, handleConfirm, handleDecline: _handleDecline } = useSyncConfirm(malId, 'anime')
   const onSyncDecline = useCallback(() => {
     _handleDecline()
     if (malId) markEpisodeWatched(malId, currentEp, { skipSync: true })
@@ -1920,39 +1920,8 @@ export default function Watch() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06]">
-                {/* Mark current episode as watched / unwatched. */}
-                {(() => {
-                  const watched = isEpisodeWatched(anime.mal_id, currentEp)
-                  return (
-                    <button
-                      onClick={() => {
-                        // markEpisodeWatched is a toggle — clicking when already
-                        // marked clears it (see useWatchListStore.ts).
-                        // If the anime isn't in the watchlist yet, add it first
-                        // so the user gets the full AniList sync experience.
-                        checkAndPrompt(() => {
-                          if (!inList) addToWatchlist(anime)
-                          markEpisodeWatched(anime.mal_id, currentEp)
-                        })
-                      }}
-                      aria-label={watched ? 'Mark as unwatched' : 'Mark as watched'}
-                      title={watched ? 'Click to mark as unwatched' : 'Mark as watched'}
-                      className={cn(
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border',
-                        watched
-                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
-                          : 'bg-white/[0.04] border-white/10 text-white/80 hover:bg-white/10 hover:text-white',
-                      )}
-                    >
-                      {watched
-                        ? <CheckCircle2 className="h-3.5 w-3.5" />
-                        : <Eye className="h-3.5 w-3.5" />}
-                      <span className="hidden md:inline">
-                        {watched ? 'Watched' : 'Mark watched'}
-                      </span>
-                    </button>
-                  )
-                })()}
+                {/* Manual "Mark watched" removed — episodes auto-mark at 90% /
+                    on end; a manual toggle only invited accidental un-watching. */}
 
                 {/* Download — only useful when we have a known slug + active provider */}
                 {anidapSlug && anidapSlug !== 'unavailable' && activeProvider && (

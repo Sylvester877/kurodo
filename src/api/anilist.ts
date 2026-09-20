@@ -393,6 +393,20 @@ export const getAllTimeTop = (perPage = 24) =>
   feedWithKitsuFallback('top', perPage, () =>
     pageQuery('sort: SCORE_DESC, status_in: [FINISHED, RELEASING]', perPage))
 
+// ── anikototv.tv-style discovery tabs (researched Sep 2026) ─────────
+// "New Release" = shows that just started airing (newest start dates).
+export const getNewReleases = (perPage = 24) =>
+  pageQuery('status: RELEASING, sort: START_DATE_DESC', perPage)
+
+// "Newly Added" = most recently registered on AniList (fresh announcements
+// and new catalog entries) — AniList ids are chronological.
+export const getNewlyAdded = (perPage = 24) =>
+  pageQuery('sort: ID_DESC', perPage)
+
+// "Just Completed" = shows that aired their final episode most recently.
+export const getJustCompleted = (perPage = 24) =>
+  pageQuery('status: FINISHED, sort: END_DATE_DESC', perPage)
+
 /**
  * Latest episodes that aired recently — the anidap-style "Recent Episodes" row.
  * Returns 1 entry per show with the episode number that just dropped.
