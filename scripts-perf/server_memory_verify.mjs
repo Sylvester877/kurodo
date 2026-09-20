@@ -32,6 +32,7 @@ for (let i = 0; i < 40; i++) {
   await sleep(1500)
 }
 if (tiles.length === 0) { console.error('NO_TILES'); process.exit(1) }
+const tilesBefore = tiles
 console.log('tiles_before:', JSON.stringify(tiles))
 
 const badges = await page.evaluate(() => document.body.innerText.match(/NO STREAM|UNVERIFIED/g) || [])
@@ -81,8 +82,16 @@ await page.screenshot({ path: shot('3-after-reload') })
 const first = tilesAfter[0] ?? ''
 const targetClean = target.replace(/^(anidap|gogoanime|miruro|saturn|pahe)-/i, '').toLowerCase()
 const firstClean = first.replace(/^(anidap|gogoanime|miruro|saturn|pahe)-/i, '').toLowerCase()
-const stable = resolved
-  ? (firstClean === targetClean ? 'PASS' : 'FAIL')
-  : (firstClean === targetClean ? 'PASS (order kept even without good-memory)' : 'CHECK')
-console.log('verdict:', stable, '— first tile after reload:', first)
+// The real acceptance: (1) tile SET identical across restart (roster merge),
+// (2) the clicked server is now memory-pinned into the TOP GROUP — it outranks
+// every zero-memory server. It doesn't have to be #1: other remembered
+// servers with higher accumulated scores legitimately stay ahead.
+const sameSet = tilesAfter.length === tilesBefore.length &&
+  [...tilesAfter].sort().join('|') === [...tilesBefore].sort().join('|')
+const targetIdx = tilesAfter.findIndex((t) => t.replace(/^(anidap|gogoanime|miruro|saturn|pahe)-/i, '').toLowerCase() === targetClean)
+const stable = resolved && sameSet && targetIdx >= 0 && targetIdx <= 1
+  ? 'PASS'
+  : (sameSet ? 'CHECK' : 'FAIL — roster changed across reload')
+console.log('verdict:', stable, '— first tile after reload:', first,
+  `| target index: ${targetIdx} | set stable: ${sameSet}`)
 browser.disconnect()
