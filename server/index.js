@@ -2540,10 +2540,19 @@ app.post('/api/anilist-gql', async (req, res) => {
       console.log('[anilist-gql] serving stale cache while refreshing')
       // Trigger background refresh without awaiting, but only if there isn't
       // already a refresh in flight for this key.
+      // fixes: "Cannot access 'reqHeaders' before initialization" — this
+      //        closure ran before the `const reqHeaders` below was declared
+      //        (TDZ), 502-ing every stale-while-revalidate refresh. Headers
+      //        are now built from the request up front.
       if (!anilistInFlight.has(cacheKey)) {
+        const reqHeadersEarly = {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(token ? { Authorization: token } : {}),
+        }
         const refresh = (async () => {
           try {
-            const { data, status } = await aniListUpstreamPost(query, variables, reqHeaders)
+            const { data, status } = await aniListUpstreamPost(query, variables, reqHeadersEarly)
             if (status >= 200 && status < 300) {
               anilistCache.set(cacheKey, { at: Date.now(), data })
               console.log('[anilist-gql] refreshed stale cache')

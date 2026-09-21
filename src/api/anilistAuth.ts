@@ -576,14 +576,24 @@ export async function saveListEntry(
     score?: number
   },
 ): Promise<number> {
+  // fixes: scores written ×10 off for users with a POINT_10/POINT_5 account
+  //        format. The `score` field is interpreted in the USER's scoring
+  //        method (docs: "in the user's chosen scoring method"), not the
+  //        0-100 wire scale — 8/10 stars sent as 80 landed as 10/10 after
+  //        AniList clamped it. Callers now pass the 0-10 rating and we write
+  //        `scoreRaw` (fixed 0-100, input-only) — unambiguous for every
+  //        account format. Verified live: scoreRaw 80 → displays 8/10.
+  const { score, ...rest } = args
+  const variables: Record<string, unknown> = { ...rest }
+  if (score != null) variables.scoreRaw = Math.round(Math.min(100, Math.max(0, score)))
   const data = await authQuery<{ SaveMediaListEntry: { id: number } }>(
     token,
-    `mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
-      SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
+    `mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $scoreRaw: Int) {
+      SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, scoreRaw: $scoreRaw) {
         id status progress
       }
     }`,
-    args,
+    variables,
   )
   return data.SaveMediaListEntry.id
 }
