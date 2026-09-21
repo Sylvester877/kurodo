@@ -1,0 +1,25 @@
+# Kurōdo v0.3.41
+
+## AniList sync — proven at scale, self-healing
+- Full OAuth chain rebuilt: stale-secret heal (retries through the backend's valid pair), confidential-client-safe flow choice, one-retry guard so it can never loop.
+- The client secret is no longer bundled into the app — previous installers embedded it in the renderer; v0.3.41+ is clean.
+- Finish an episode → auto-mark at 90%/end → progress lands on AniList, auto-COMPLETED at the final episode. Verified end-to-end: 174/174 successful writes on a test account.
+- Failed syncs queue offline and flush on sign-in/reconnect instead of being dropped.
+- Settings → Diagnostics now shows which account is signed in — no more wrong-account surprises.
+
+## Server picker — stable and honest
+- Same server roster every launch (canonical chad roster always merged; duplicates like Yuki / anidap-yuki collapse into one tile).
+- Servers you've successfully played are remembered and pinned to the top, stably ordered.
+- Health badges removed — every server is always shown and clickable.
+
+## Home — reference-site parity
+- Top 10 with Day / Week / Month tabs (zero extra requests — reuses warmed queries).
+- New "Fresh off the press" strip: New Release / Newly Added / Just Completed tabs.
+- Manual mark-watched toggle removed (episodes mark themselves).
+
+## Fixes
+- AniList sign-in errors (invalid_client, unsupported_grant_type) now self-heal instead of dead-ending.
+- Auth diagnostics in /api/health: anilistAuth {configured, pairValid}.
+
+## Install
+Download Kurodo-Setup-0.3.41.exe and run it. Existing installs auto-update.
