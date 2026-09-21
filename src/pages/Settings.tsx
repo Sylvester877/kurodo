@@ -12,6 +12,7 @@ import Row from '../components/settings/Row'
 import Toggle from '../components/settings/Toggle'
 import Select from '../components/settings/Select'
 import { toast } from '../components/Toaster'
+import { useAuthStore } from '../store/useAuthStore'
 import {
   getPermission, requestPermission, sendTestNotification,
 } from '../lib/notifications'
@@ -720,6 +721,27 @@ export default function Settings() {
             title="Diagnostics"
             description="Build info & troubleshooting"
           >
+            {/* fixes: "you spammed my main account" — every sync-capable
+                surface must show WHICH account writes land on. Front and
+                center in Diagnostics, impossible to miss. */}
+            <Row
+              label="AniList account (sync target)"
+              description="Every episode-finish sync, watchlist change, and rating goes to THIS account"
+            >
+              {(() => {
+                const auth = useAuthStore((s) => s.auth)
+                return auth?.user?.name ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {auth.user.name}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] text-white/50 border border-white/8">
+                    Signed out — syncs queue locally
+                  </span>
+                )
+              })()}
+            </Row>
             <Row label="AniList sign-in diagnostic">
               <a
                 href="/admin"
