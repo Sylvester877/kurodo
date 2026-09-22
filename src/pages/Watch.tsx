@@ -528,10 +528,19 @@ export default function Watch() {
     if (!malId || !anime) return
     // Incognito: pause the watched mark + tracker sync.
     if (incognito) return
-    if (isEpisodeWatched(anime.mal_id, currentEp)) return
     if (!isInWatchlist(anime.mal_id)) addToWatchlist(anime)
+    // fixes: re-watching an already-marked episode never re-synced AniList.
+    //        The old `if (isEpisodeWatched(...)) return` skipped the whole
+    //        chain — so on a REPEAT watch (ep 6 of 26 already ticked), the
+    //        near-end signal fired but progress stayed at the old value.
+    //        markEpisodeWatched still toggles the LOCAL list correctly
+    //        (re-marking is a no-op there), and syncProgress is idempotent
+    //        (AniList just overwrites progress with the same number), so we
+    //        always mirror and let the sync layer dedupe.
     markEpisodeWatched(anime.mal_id, currentEp)
-    toast.success(`✓ EP ${currentEp} completed`, 2000)
+    if (!isEpisodeWatched(anime.mal_id, currentEp)) {
+      toast.success(`✓ EP ${currentEp} completed`, 2000)
+    }
   }, [malId, anime, currentEp, incognito, isEpisodeWatched, isInWatchlist, addToWatchlist, markEpisodeWatched])
 
   // ───── Autoplay next ─────

@@ -167,6 +167,12 @@ export async function anilistRequest<T>(
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`
 
   const cacheKey = getStaleCacheKey(query, variables)
+  // fixes: mutations were stored as — and later served — stale-cache
+  //        "successes". A cached mutation result proves nothing about whether
+  //        THIS write reached AniList: under a 429 the write was silently
+  //        dropped (watched episodes / ratings vanished) while the app
+  //        counted it synced. Mutations never read or write the stale cache.
+  const isMutation = /^\s*mutation\b/i.test(query.trim())
 
   // Pace (throws AniListRateLimitError immediately while the breaker is open).
   await paceRequest(opts.signal)
@@ -204,7 +210,8 @@ export async function anilistRequest<T>(
         throw new Error(data.errors[0]?.message || 'AniList error')
       }
       // Cache successful response for stale-while-revalidate fallback
-      if (typeof window !== 'undefined') {
+      // (queries only — never cache mutation results, see isMutation above).
+      if (!isMutation && typeof window !== 'undefined') {
         writeStaleCache(cacheKey, data?.data as T)
       }
       return data?.data as T
@@ -221,7 +228,7 @@ export async function anilistRequest<T>(
     // users keep their home feed during the outage instead of an error row.
     // (The Kitsu feed fallback covers cold-start users with no cache.)
     if (!isTransient) {
-      if (status === 403 && typeof window !== 'undefined') {
+      if (status === 403 && !isMutation && typeof window !== 'undefined') {
         const stale = readStaleCache<T>(cacheKey)
         if (stale != null) {
           console.warn('[anilistClient] 403 (site-wide outage?) — returning stale cache')
@@ -237,7 +244,7 @@ export async function anilistRequest<T>(
     // share the IP). Serve stale cache when available, else throw immediately.
     if (isRateLimited) {
       breakerUntil = Date.now() + BREAKER_MS
-      if (typeof window !== 'undefined') {
+      if (!isMutation && typeof window !== 'undefined') {
         const stale = readStaleCache<T>(cacheKey)
         if (stale != null) {
           console.warn('[anilistClient] 429 — returning stale cache, breaker open')
@@ -249,8 +256,9 @@ export async function anilistRequest<T>(
 
     if (attempt >= MAX_RETRIES) {
       // If we exhausted retries, try to return a stale cached response
-      // rather than breaking the UI entirely.
-      if (typeof window !== 'undefined') {
+      // rather than breaking the UI entirely (queries only — a mutation
+      // must throw so callers queue the write for retry).
+      if (!isMutation && typeof window !== 'undefined') {
         const stale = readStaleCache<T>(cacheKey)
         if (stale != null) {
           console.warn('[anilistClient] exhausted retries, returning stale cache')
