@@ -61,6 +61,10 @@ const malToAniId = new Map<number, number>()
 // Lets syncProgress avoid downgrading COMPLETED back to CURRENT when
 // the user re-watches an episode they've already finished.
 const malToStatus = new Map<number, ListStatus>()
+// When we last refreshed our status knowledge for a MAL id — lets the write
+// path distinguish "just written/read by us" (fresh, trust it) from
+// "boot-time snapshot" (possibly stale, re-confirm before overwriting).
+const malToStatusAt = new Map<number, number>()
 
 // ── Pending progress queue ───────────────────────────────────────
 // Episodes finished while signed OUT (or while the network/AniList was
@@ -221,12 +225,83 @@ export async function syncProgress(malId: number, episode: number) {
     // • Otherwise → CURRENT (actively watching)
     const total = await getTotalEpisodesCached(malId, aniId)
     const isFinished = total != null && episode >= total
-    const prev = malToStatus.get(malId)
-    const preserve =
+    let prev = malToStatus.get(malId)
+    let statusKnown = prev != null // true = from cache or a successful fresh read
+    let readFailed = false
+    const readFresh = async (): Promise<ListStatus | null | 'FAIL'> => {
+      // fixes: this read went through the server relay, which caches reads —
+      //        the "fresh" status read returned the boot-time cached status,
+      //        so REPEATING still got flipped to CURRENT. This one read must
+      //        bypass every cache (relay + renderer) or it isn't fresh.
+      try {
+        const r = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            query: `query ($id: Int) { Media(id: $id) { mediaListEntry { status } } }`,
+            variables: { id: aniId },
+          }),
+          cache: 'no-store',
+        })
+        if (!r.ok) return 'FAIL'
+        const j = await r.json().catch(() => null)
+        return j?.data?.Media?.mediaListEntry?.status ?? null
+      } catch {
+        return 'FAIL'
+      }
+    }
+    // fixes: the status cache is a boot-time snapshot (backfill). A status
+    //        changed AFTER boot (e.g. the user set REPEATING on anilist.co,
+    //        or our own write flip) wasn't seen, so a re-watch progress
+    //        write wrongly "preserved" a stale COMPLETED and — worse — a
+    //        REPEATING entry got flipped to CURRENT. Unknown or stale-cache
+    //        entries now get a fresh authoritative read before deciding.
+    if (!prev) {
+      const fresh = await readFresh()
+      if (fresh === 'FAIL') {
+        // fixes: when the fresh read FAILS (429 etc.) we don't know the
+        //        remote status. Forcing CURRENT here flips a hidden
+        //        REPEATING/COMPLETED entry. statusKnown stays false → the
+        //        write below omits the status field entirely (progress-only),
+        //        which AniList treats as "keep whatever status exists".
+        readFailed = true
+      } else {
+        statusKnown = true // the read itself succeeded — trust its answer
+        if (fresh) {
+          malToStatus.set(malId, fresh)
+          malToStatusAt.set(malId, Date.now())
+          prev = fresh
+        }
+      }
+    }
+    let preserve =
       prev === 'COMPLETED' || prev === 'REPEATING' ||
       prev === 'DROPPED'   || prev === 'PAUSED'
+    // fixes: a cache entry stamped CURRENT *before* the status changed
+    //        elsewhere (user edit on anilist.co, a second device) is
+    //        known-but-stale — the write below would still stamp CURRENT
+    //        over it. Whenever we're about to send an explicit status and
+    //        our knowledge is older than 60s, re-confirm with a fresh read.
+    if (!preserve && !readFailed && Date.now() - (malToStatusAt.get(malId) ?? 0) > 60_000) {
+      const fresh = await readFresh()
+      if (fresh === 'FAIL') {
+        readFailed = true
+      } else if (fresh) {
+        malToStatus.set(malId, fresh)
+        malToStatusAt.set(malId, Date.now())
+        prev = fresh
+        preserve =
+          fresh === 'COMPLETED' || fresh === 'REPEATING' ||
+          fresh === 'DROPPED'   || fresh === 'PAUSED'
+      }
+    }
     let status: ListStatus | undefined
-    if (preserve && !isFinished) {
+    if (!statusKnown && !isFinished) {
+      status = undefined // read failed — progress-only write, never guess
+    } else if (preserve && !isFinished) {
       status = undefined  // don't touch the status field
     } else {
       status = isFinished ? 'COMPLETED' : 'CURRENT'
@@ -238,7 +313,10 @@ export async function syncProgress(malId: number, episode: number) {
       progress: episode,
     })
     malToEntryId.set(malId, entryId)
-    if (status) malToStatus.set(malId, status)
+    if (status) {
+      malToStatus.set(malId, status)
+      malToStatusAt.set(malId, Date.now())
+    }
 
     // Surface auto-completion — dispatch an event for the completion dialog
     // instead of showing a toast. The dialog offers a star rating picker.
@@ -436,6 +514,6 @@ export async function backfillEntryIds() {
 }
 
 // Expose a no-op helper for store tests
-export function _resetSyncCache() { malToEntryId.clear(); malToTotalEpisodes.clear(); malToAniId.clear(); malToStatus.clear() }
+export function _resetSyncCache() { malToEntryId.clear(); malToTotalEpisodes.clear(); malToAniId.clear(); malToStatus.clear(); malToStatusAt.clear() }
 
 

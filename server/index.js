@@ -2527,10 +2527,17 @@ app.post('/api/anilist-gql', async (req, res) => {
 
     const token = req.headers.authorization || ''
     const cacheKey = getAnilistCacheKey(query, variables, token)
+    // fixes: mutations were served from (and written into) the response cache —
+    //        a repeated SaveMediaListEntry within the TTL returned the FIRST
+    //        write's cached 200 and never reached AniList ("phantom success":
+    //        the app believed it synced, the pending queue cleared, AniList
+    //        never saw the write). Mutations must ALWAYS hit upstream and
+    //        must never be cached — only reads get cache semantics.
+    const isMutation = /^\s*mutation\b/i.test(String(query || ''))
 
     // 1. Check in-memory cache — including stale entries.  If a stale
     // entry exists, serve it immediately and refresh in the background.
-    const cached = anilistCache.get(cacheKey)
+    const cached = isMutation ? undefined : anilistCache.get(cacheKey)
     const cacheAge = cached ? Date.now() - cached.at : Infinity
     if (cached && cacheAge < ANILIST_STALE_TTL) {
       if (cacheAge < ANILIST_CACHE_TTL) {
@@ -2574,7 +2581,9 @@ app.post('/api/anilist-gql', async (req, res) => {
     }
 
     // 2. Check negative cache — fail fast if this query recently failed
-    const failed = anilistFailCache.get(cacheKey)
+    // (reads only — a failed mutation must stay retryable, never pinned
+    // to 502 by an earlier transient failure)
+    const failed = isMutation ? undefined : anilistFailCache.get(cacheKey)
     if (failed && Date.now() - failed.at < ANILIST_FAIL_TTL) {
       console.warn('[anilist-gql] negative cache hit')
       return res.status(502).json({ data: null, errors: [{ message: failed.message }] })
@@ -2597,9 +2606,13 @@ app.post('/api/anilist-gql', async (req, res) => {
           try {
             const { data, status, headers: respHeaders } = await aniListUpstreamPost(query, variables, reqHeaders)
 
-            // Success — cache and return
-            if (status >= 200 && status < 300) {
+            // Success — cache and return (reads only; mutation responses
+            // must never be cached or a replay would fake-succeed)
+            if (!isMutation && status >= 200 && status < 300) {
               anilistCache.set(cacheKey, { at: Date.now(), data })
+              return { data, status }
+            }
+            if (isMutation && status >= 200 && status < 300) {
               return { data, status }
             }
 
