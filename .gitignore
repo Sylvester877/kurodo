@@ -21,6 +21,11 @@ Thumbs.db
 *.blockmap
 builder-debug.yml
 
+# whisper.cpp: binary (~62MB) is tracked, the 874MB model is NOT —
+# see tools/whisper/README.md for the download URL.
+tools/whisper/*.bin
+!tools/whisper/whisper-cli.exe
+
 # Electron
 out/
 

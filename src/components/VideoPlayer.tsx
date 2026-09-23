@@ -18,6 +18,14 @@ interface Props {
   /** Optional fallback URL — auto-switched-to if the primary fails. */
   fallbackSrc?: string | null
   subtitles?: Array<{ src: string; label: string; default?: boolean; lang?: string }>
+  /** AI caption generation (whisper.cpp) — forwarded to PlayerControls. */
+  aiSubs?: {
+    status: 'idle' | 'running' | 'done' | 'error'
+    phase?: string
+    pct?: number
+    error?: string | null
+    onRequest: () => void
+  }
   poster?: string
   /** Skip-time intervals (intro/outro) from AniSkip. */
   skipTimes?: SkipTimes
@@ -75,7 +83,7 @@ declare global {
 }
 
 export default React.memo(function VideoPlayer({
-  src, fallbackSrc, subtitles = [], poster, skipTimes,
+  src, fallbackSrc, subtitles = [], aiSubs, poster, skipTimes,
   onNearEnd, onProgress, theaterMode, onToggleTheaterMode,
   resumeAt, onProgressTick, onResumeDismiss,
   initialTime, autoPlay,
@@ -2093,6 +2101,7 @@ ${offset > 0 ? `
           subtitles={subtitles}
           activeSubIdx={activeSubIdx}
           onChangeSubIdx={setActiveSubIdx}
+          aiSubs={aiSubs}
           levels={levels}
           currentLevel={currentLevel}
           onChangeLevel={switchLevel}

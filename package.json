@@ -62,6 +62,10 @@
       {
         "from": ".env.local",
         "to": ".env.local"
+      },
+      {
+        "from": "tools/whisper",
+        "to": "tools/whisper"
       }
     ],
     "win": {
