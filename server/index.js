@@ -1589,34 +1589,11 @@ app.get('/subs', async (req, res) => {
       ep: req.query.ep ? Number(req.query.ep) : (kCtx[1] ? Number(kCtx[1]) || null : null),
       type: req.query.type ? String(req.query.type) : (kCtx[2] || 'sub'),
       deadUrl: parsed.toString(),
+      label: req.query.label ? decodeURIComponent(String(req.query.label)) : (kCtx[3] || ''),
       title: { english: req.query.title_english, romaji: req.query.title_romaji },
     })
     if (alt?.buf) {
       res.setHeader('Cache-Control', 'public, max-age=600') // short TTL — sourced from another provider
-      res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
-      return res.send(alt.buf)
-    }
-  } catch (e) {
-    console.warn('[subs] cross-provider fallback failed:', e.message)
-  }
-  // fixes: parked/dead subtitle mirror hosts — the SAME episode's dub-timed
-  //        embedded tracks live on other providers' mirrors. Cross-provider
-  //        fallback for the same route is identical timing by construction.
-  try {
-    const { subsCrossProviderFallback } = await import('./subs-fallback.js')
-    // Context comes from the renderer (Watch.tsx appends it to /subs URLs)
-    // or the srcdoc passthrough — without it cross-provider fan-out can't run.
-    const alt = await subsCrossProviderFallback({
-      anilistId: req.query.anilistId ? Number(req.query.anilistId) : null,
-      malId: req.query.malId ? Number(req.query.malId) : null,
-      slug: req.query.slug ? String(req.query.slug) : (req.query.k ? decodeURIComponent(String(req.query.k)).split('|')[0] : ''),
-      ep: req.query.ep ? Number(req.query.ep) : (req.query.k ? Number(decodeURIComponent(String(req.query.k)).split('|')[1]) || null : null),
-      type: req.query.type ? String(req.query.type) : (req.query.k ? decodeURIComponent(String(req.query.k)).split('|')[2] || 'sub' : 'sub'),
-      deadUrl: parsed.toString(),
-      title: { english: req.query.title_english, romaji: req.query.title_romaji },
-    })
-    if (alt?.buf) {
-      res.setHeader('Cache-Control', 'public, max-age=600') // short TTL — sourced from another provider, don't treat as immutable
       res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
       return res.send(alt.buf)
     }

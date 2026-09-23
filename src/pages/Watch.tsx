@@ -145,9 +145,14 @@ export default function Watch() {
         }
         // Cross-provider fallback context: lets /subs re-resolve the SAME
         // episode's tracks on other providers' mirrors when this one is dead.
-        // (No slug here — the server resolves it from the anilist/mal id.)
-        const kSuffix = `&k=${encodeURIComponent(`|${currentEp || ''}|${streamType || 'sub'}`)}`
-        const ctx = anilistId ? `&anilistId=${anilistId}` : malId ? `&malId=${malId}` : ''
+        // k = |ep|type|label (slug omitted — the server resolves it from the
+        // anilist/mal id). Label drives per-language mirror matching.
+        const kSuffix = `&k=${encodeURIComponent(`|${currentEp || ''}|${streamType || 'sub'}|${t.label || ''}`)}`
+        // fixes: TDZ crash ("Cannot access '$' before initialization") — this
+        //        memo runs before `anilistId` (line ~316) is declared. malId is
+        //        declared at the top of the component; the server's /subs
+        //        fallback resolves MAL→AniList itself, so malId-only is enough.
+        const ctx = malId ? `&malId=${malId}` : ''
         return {
           // fixes: embedded caption tracks rendered 0 cues — subtitle hosts
           //        403'd the generic /proxy header set and flaked with no
