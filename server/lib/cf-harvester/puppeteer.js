@@ -1115,6 +1115,33 @@ async function puppeteerInit() {
 
   function isReadyImpl() { return ready && page && !page.isClosed() }
 
+  // fixes: subtitle hosts serving anti-bot challenge pages with HTTP 200 —
+  //        plain fetches (any headers) get HTML instead of the VTT. A real
+  //        browser solves the challenge, then the same URL returns text.
+  async function fetchTextInBrowserImpl(url, timeoutMs = 25000) {
+    const sharedPage = await ensureBrowser()
+    const pg = await sharedPage.browser().newPage()
+    try {
+      console.log(`[cf-harvester] fetchTextInBrowser: ${url.slice(0, 80)}...`)
+      await pg.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs, referer: 'https://megaplay.buzz/' })
+      // Challenges reload the page after solving — poll until the body looks like a subtitle file.
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 2000))
+        let text = ''
+        try { text = await pg.evaluate(() => document.documentElement?.innerText || '') } catch { /* mid-navigation */ }
+        if (text && (text.includes('-->') || /^WEBVTT/i.test(text))) {
+          console.log(`[cf-harvester] ✓ fetchTextInBrowser: got ${text.length} chars`)
+          return { text }
+        }
+      }
+      console.warn('[cf-harvester] fetchTextInBrowser: body never looked like a subtitle file')
+      return null
+    } catch (e) {
+      console.warn(`[cf-harvester] fetchTextInBrowser failed: ${e.message}`)
+      return null
+    } finally { try { await pg.close() } catch {} }
+  }
+
   async function warmUpImpl() {
     try { await ensureBrowser(); console.log('[cf-harvester] Pre-warmed browser') }
     catch (e) { console.warn('[cf-harvester] Pre-warm failed:', e.message) }
@@ -1168,6 +1195,7 @@ async function puppeteerInit() {
     extractStreamFromWatchPage: extractStreamImpl,
     extractSlugInBrowser: extractSlugInBrowserImpl,
     exportCookies: exportCookiesImpl,
+    fetchTextInBrowser: fetchTextInBrowserImpl,
     isReady: isReadyImpl,
     warmUp: warmUpImpl,
     shutdown: shutdownImpl,

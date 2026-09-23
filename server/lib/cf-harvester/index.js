@@ -53,6 +53,14 @@ export async function exportCookies(url, outPath) {
   return impl.exportCookies(url, outPath)
 }
 
+// Fetch a URL in the harvester's real browser (solves JS challenges) and
+// return its body text. Used by /subs as the fallback for anti-bot hosts.
+export async function fetchTextInBrowser(url, timeoutMs) {
+  const impl = await getImpl()
+  if (!impl.fetchTextInBrowser) return null
+  return impl.fetchTextInBrowser(url, timeoutMs)
+}
+
 export async function isReady() {
   try {
     const impl = await getImpl()

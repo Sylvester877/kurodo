@@ -143,8 +143,18 @@ export default function Watch() {
             // safeBase64 can throw on non-ASCII headers
           }
         }
+        // Cross-provider fallback context: lets /subs re-resolve the SAME
+        // episode's tracks on other providers' mirrors when this one is dead.
+        // (No slug here — the server resolves it from the anilist/mal id.)
+        const kSuffix = `&k=${encodeURIComponent(`|${currentEp || ''}|${streamType || 'sub'}`)}`
+        const ctx = anilistId ? `&anilistId=${anilistId}` : malId ? `&malId=${malId}` : ''
         return {
-          src: `${getBackendOrigin()}/proxy?url=${encodeURIComponent(t.file)}${hSuffix}`,
+          // fixes: embedded caption tracks rendered 0 cues — subtitle hosts
+          //        403'd the generic /proxy header set and flaked with no
+          //        retry. /subs is the dedicated fetcher: proper UA+Referer
+          //        candidates, 3 attempts, disk cache, browser fallback and
+          //        cross-provider mirror fallback when the host is dead.
+          src: `${getBackendOrigin()}/subs?url=${encodeURIComponent(t.file)}${hSuffix}${kSuffix}${ctx}`,
           label: t.label || 'Subtitles',
           default: t.default,
           lang: t.lang || undefined,
@@ -218,6 +228,43 @@ export default function Watch() {
   })
   const anime = animeQuery.data?.data ?? null
   const loading = animeQuery.isLoading
+
+  // fixes: embedded caption tracks died silently — subtitle mirror hosts
+  //        (e.g. cdn.watching.onl) can 403, time out, or become parked
+  //        domains, leaving 0 cues with no fallback. When the stream's
+  //        embedded tracks fail or are missing entirely, auto-fetch an
+  //        English Wyzie track (same subtitle aggregator the Downloads
+  //        manager uses) and append it to the caption menu.
+  const [wyzieFallbackSubs, setWyzieFallbackSubs] = useState<Array<{ src: string; label: string; default?: boolean; lang?: string }>>([])
+  useEffect(() => {
+    let cancelled = false
+    const api = (window as any).electronAPI
+    if (!api?.wyzieSearch || !api?.wyzieDownload) return
+    const t = setTimeout(async () => {
+      try {
+        if (!malId || !currentEp) return
+        const embedded = playerSubtitles
+        const hasEnglish = embedded.some((s) => /english|\ben\b/i.test(s.label))
+        if (hasEnglish && embedded.length > 0) return // embedded track exists — let /subs handle flakiness
+        const title = anime?.title_english || anime?.title || ''
+        if (!title) return
+        const res = await api.wyzieSearch(title, null, Number(currentEp), 'eng')
+        if (cancelled || !res?.results?.length) return
+        // Prefer VTT-format results, else first result
+        const pick = res.results.find((r: any) => r.format === 'vtt' && /eng/i.test(r.language || '')) || res.results[0]
+        if (!pick?.url) return
+        const dl = await api.wyzieDownload(pick.url, pick.format === 'ass' ? 'ass' : 'srt')
+        if (cancelled || !dl?.url || dl.error) return
+        setWyzieFallbackSubs([{ src: dl.url, label: 'English (auto)', default: embedded.length === 0, lang: 'en' }])
+      } catch { /* subtitle fallback is best-effort — never block playback */ }
+    }, 4000)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [malId, currentEp, (stream as any)?.url, anime?.title_english])
+  // fixes: append the Wyzie fallback tracks to the embedded ones
+  const allPlayerSubtitles = useMemo(
+    () => [...playerSubtitles, ...wyzieFallbackSubs],
+    [playerSubtitles, wyzieFallbackSubs],
+  )
 
   // Filler detection — deferred 2.5s to prioritize critical content (hero, episodes, stream)
   const [loadFiller, setLoadFiller] = useState(false)
@@ -1736,7 +1783,7 @@ export default function Watch() {
               }}
                 episodeNumber={currentEp}
                 episodeTitle={currentEpisodeMeta?.title?.en || currentEpisodeMeta?.title?.['x-jat'] || `Episode ${currentEp}`}
-                subtitles={playerSubtitles}
+                subtitles={allPlayerSubtitles}
                 streamType={streamType}
               />
               </Suspense>

@@ -1404,6 +1404,241 @@ function stripPngDisguise(buf) {
 // Dirty-dedupe subtitle 404s so we don't spam the console
 const subtitleLogOnce = new Set()
 
+// ════════════════════════════════════════════════════════════════════
+// GET /subs — dedicated subtitle-file fetcher.
+// fixes: embedded caption tracks rendered 0 cues — the generic /proxy
+//        (1) fell back to a bare/no-referer header set on hosts that 403
+//        non-browser requests, (2) had no retry while flaky subtitle hosts
+//        (nexabloom) intermittently resolve a dead IP, and (3) never cached,
+//        so every seek re-fetched from a dying host.
+// Behavior: multi-referer retry → header-candidates like /proxy but tuned
+//        for text files, disk cache (stale-serve on failure — a flaky host
+//        can never blank captions again), immutable browser caching.
+const SUBS_DISK_DIR = process.env.KURODO_SUBS_CACHE_DIR || path.join(os.tmpdir(), 'kurodo-subs')
+const SUBS_DISK_TTL = 30 * 24 * 60 * 60 * 1000 // 30d — episode subs are immutable
+const SUBS_DISK_MAX_BYTES = 50 * 1024 * 1024  // 50MB — plenty of VTT/SRT text
+const SUBS_FETCH_TIMEOUT = 12000
+
+function ensureSubsDiskDir() {
+  try { fs.mkdirSync(SUBS_DISK_DIR, { recursive: true }) } catch { /* memory-only env */ }
+}
+
+function subsDiskPaths(key) {
+  const h = crypto.createHash('sha1').update(key).digest('hex')
+  return { bin: path.join(SUBS_DISK_DIR, h + '.vtt'), meta: path.join(SUBS_DISK_DIR, h + '.json') }
+}
+
+function subsDiskRead(key) {
+  try {
+    const { bin, meta } = subsDiskPaths(key)
+    if (!fs.existsSync(bin)) return null
+    const m = JSON.parse(fs.readFileSync(meta, 'utf-8'))
+    if (Date.now() - m.at > SUBS_DISK_TTL) return null
+    const buf = fs.readFileSync(bin)
+    if (!buf.length) return null
+    // fixes: pre-validation runs cached a challenge page as a subtitle —
+    //        validate cached content too, never serve HTML as a track.
+    if (!looksLikeSubtitles(buf)) return null
+    return { buf, ct: m.ct || 'text/vtt; charset=utf-8' }
+  } catch { return null }
+}
+
+function subsDiskWrite(key, buf, ct) {
+  try {
+    ensureSubsDiskDir()
+    const { bin, meta } = subsDiskPaths(key)
+    fs.writeFileSync(bin, buf)
+    fs.writeFileSync(meta, JSON.stringify({ at: Date.now(), ct }))
+    const files = fs.readdirSync(SUBS_DISK_DIR).filter((f) => f.endsWith('.vtt'))
+    if (files.length > 4000) { // text is tiny — trim oldest files only past a sane count
+      for (const f of files.slice(0, 400)) {
+        try { fs.rmSync(path.join(SUBS_DISK_DIR, f), { force: true }) } catch { /* ignore */ }
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+// Header candidate sets, tried in order. The first that yields HTTP 200 wins.
+function subsHeaderCandidates(url, upstreamHeaders) {
+  const list = []
+  const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+  const refs = []
+  const upRef = upstreamHeaders?.Referer || upstreamHeaders?.referer
+  if (upRef) refs.push(upRef)
+  refs.push(...pickReferers(url))
+  for (const ref of refs) {
+    list.push({ 'user-agent': ua, referer: ref })
+  }
+  list.push({ 'user-agent': ua })
+  return list
+}
+
+async function subsFetchWithRetry(url, upstreamHeaders, signal) {
+  const candidates = subsHeaderCandidates(url, upstreamHeaders)
+  let lastStatus = 0
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const headers = candidates[Math.min(attempt, candidates.length - 1)]
+    const ac = new AbortController()
+    const onAbort = () => ac.abort()
+    if (signal) { if (signal.aborted) throw new Error('aborted'); signal.addEventListener('abort', onAbort, { once: true }) }
+    const timer = setTimeout(() => ac.abort(), SUBS_FETCH_TIMEOUT)
+    try {
+      const res = await fetch(url, { headers, redirect: 'follow', signal: ac.signal })
+      clearTimeout(timer)
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer())
+        // fixes: a challenge page can arrive with HTTP 200 — validate the
+        //        body actually looks like a subtitle file before accepting.
+        if (buf.length > 0 && looksLikeSubtitles(buf)) return { buf, ct: res.headers.get('content-type') || 'text/vtt; charset=utf-8' }
+        if (buf.length > 0) lastStatus = 415 // wrong content type — treat as retryable failure
+        else lastStatus = 204
+      } else {
+        lastStatus = res.status
+        try { await res.arrayBuffer() } catch { /* drain */ }
+      }
+    } catch (e) {
+      clearTimeout(timer)
+      lastStatus = 0
+      if (signal?.aborted) throw new Error('aborted')
+    } finally {
+      if (signal) signal.removeEventListener('abort', onAbort)
+    }
+    if (lastStatus === 404) break // definitive — retrying with different headers won't help
+    await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
+  }
+  return null
+}
+
+function looksLikeSubtitles(buf) {
+  // VTT starts with WEBVTT; SRT has "NNN -->" timing lines; both are plain text.
+  const head = buf.subarray(0, Math.min(buf.length, 4096)).toString('utf-8')
+  if (/^WEBVTT/i.test(head)) return true
+  if (/\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}\s+-->\s+\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}/.test(head)) return true
+  if (/\d{1,2}:\d{2}[,.]\d{1,3}\s+-->\s+\d{1,2}:\d{2}[,.]\d{1,3}/.test(head)) return true
+  if (/<html[\s>]/i.test(head)) return false // anti-bot challenge page — never a subtitle
+  return false
+}
+
+app.get('/subs', async (req, res) => {
+  const target = req.query.url
+  if (!target) return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'No URL provided', retryable: false } })
+  let parsed
+  try { parsed = new URL(String(target)) } catch {
+    return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'Invalid URL', retryable: false } })
+  }
+  if (!/^https?:$/.test(parsed.protocol)) {
+    return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'Only http(s) URLs are proxied', retryable: false } })
+  }
+  let upstreamHeaders = {}
+  if (req.query.h) {
+    try { upstreamHeaders = JSON.parse(Buffer.from(String(req.query.h), 'base64').toString('utf-8')) || {} } catch { /* ignore */ }
+  }
+
+  const cacheKey = String(target)
+  const hit = subsDiskRead(cacheKey)
+  if (hit) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    res.setHeader('Content-Type', hit.ct)
+    return res.send(hit.buf)
+  }
+
+  const fetched = await subsFetchWithRetry(parsed.toString(), upstreamHeaders, null)
+  if (fetched) {
+    subsDiskWrite(cacheKey, fetched.buf, fetched.ct)
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+    res.setHeader('Content-Type', fetched.ct)
+    return res.send(fetched.buf)
+  }
+
+  // fixes: challenge-page hosts (cdn.watching.onl) only yield real text to a
+  //        real browser — the harvester's browser solves the JS challenge.
+  try {
+    const { fetchTextInBrowser } = await import('./lib/cf-harvester/index.js')
+    const browsed = await fetchTextInBrowser(parsed.toString(), 25000)
+    if (browsed?.text) {
+      const buf = Buffer.from(browsed.text, 'utf-8')
+      subsDiskWrite(cacheKey, buf, 'text/vtt; charset=utf-8')
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+      res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
+      return res.send(buf)
+    }
+  } catch (e) {
+    console.warn('[subs] browser fallback failed:', e.message)
+  }
+  // fixes: parked/dead subtitle mirror hosts — the SAME episode's dub-timed
+  //        embedded tracks live on other providers' mirrors. Cross-provider
+  //        fallback for the same route is identical timing by construction.
+  try {
+    const { subsCrossProviderFallback } = await import('./subs-fallback.js')
+    // The renderer passes its anilistId (or malId) + ep + type; the slug is
+    // resolved server-side so the fallback works even on cold mappings.
+    let effAnilistId = req.query.anilistId ? Number(req.query.anilistId) : null
+    const malIdQ = req.query.malId ? Number(req.query.malId) : null
+    if (!effAnilistId && malIdQ) {
+      try {
+        const { getAnizipMapping } = await import('./anizip-cache.js')
+        const m = await getAnizipMapping({ malId: malIdQ })
+        effAnilistId = m?.mappings?.anilist_id ?? m?.anilistId ?? null
+      } catch { /* mapping miss — fan-out will run slugless */ }
+    }
+    const kCtx = req.query.k ? decodeURIComponent(String(req.query.k)).split('|') : []
+    const alt = await subsCrossProviderFallback({
+      anilistId: effAnilistId,
+      malId: malIdQ,
+      slug: req.query.slug ? String(req.query.slug) : '',
+      ep: req.query.ep ? Number(req.query.ep) : (kCtx[1] ? Number(kCtx[1]) || null : null),
+      type: req.query.type ? String(req.query.type) : (kCtx[2] || 'sub'),
+      deadUrl: parsed.toString(),
+      title: { english: req.query.title_english, romaji: req.query.title_romaji },
+    })
+    if (alt?.buf) {
+      res.setHeader('Cache-Control', 'public, max-age=600') // short TTL — sourced from another provider
+      res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
+      return res.send(alt.buf)
+    }
+  } catch (e) {
+    console.warn('[subs] cross-provider fallback failed:', e.message)
+  }
+  // fixes: parked/dead subtitle mirror hosts — the SAME episode's dub-timed
+  //        embedded tracks live on other providers' mirrors. Cross-provider
+  //        fallback for the same route is identical timing by construction.
+  try {
+    const { subsCrossProviderFallback } = await import('./subs-fallback.js')
+    // Context comes from the renderer (Watch.tsx appends it to /subs URLs)
+    // or the srcdoc passthrough — without it cross-provider fan-out can't run.
+    const alt = await subsCrossProviderFallback({
+      anilistId: req.query.anilistId ? Number(req.query.anilistId) : null,
+      malId: req.query.malId ? Number(req.query.malId) : null,
+      slug: req.query.slug ? String(req.query.slug) : (req.query.k ? decodeURIComponent(String(req.query.k)).split('|')[0] : ''),
+      ep: req.query.ep ? Number(req.query.ep) : (req.query.k ? Number(decodeURIComponent(String(req.query.k)).split('|')[1]) || null : null),
+      type: req.query.type ? String(req.query.type) : (req.query.k ? decodeURIComponent(String(req.query.k)).split('|')[2] || 'sub' : 'sub'),
+      deadUrl: parsed.toString(),
+      title: { english: req.query.title_english, romaji: req.query.title_romaji },
+    })
+    if (alt?.buf) {
+      res.setHeader('Cache-Control', 'public, max-age=600') // short TTL — sourced from another provider, don't treat as immutable
+      res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
+      return res.send(alt.buf)
+    }
+  } catch (e) {
+    console.warn('[subs] cross-provider fallback failed:', e.message)
+  }
+
+  // All attempts failed — serve stale cache if it exists beyond TTL, else 404
+  try {
+    const { bin } = subsDiskPaths(cacheKey)
+    if (fs.existsSync(bin)) {
+      const buf = fs.readFileSync(bin)
+      if (buf.length && looksLikeSubtitles(buf)) {
+        res.setHeader('Cache-Control', 'no-store')
+        res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
+        return res.send(buf)
+      }
+    }
+  } catch { /* ignore */ }
+  return res.status(404).json({ ok: false, error: { code: 'SUBS_UNREACHABLE', message: 'Subtitle upstream unreachable', retryable: true } })
+})
+
 app.get('/proxy', async (req, res) => {
   const targetUrl = req.query.url
   if (!targetUrl) return res.status(400).send('No URL provided')
