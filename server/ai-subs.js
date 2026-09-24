@@ -76,12 +76,31 @@ export function aiSubsStatus(key) {
   }
 }
 
-export function aiSubsCacheKey(streamUrl) {
-  return crypto.createHash('sha1').update(streamUrl).digest('hex').slice(0, 24)
+export function aiSubsCacheKey(streamUrl, { title, ep, type } = {}) {
+  // fixes: anidap stream URLs rotate EVERY fetch — ?token=…, the per-fetch
+  // path id AND the mirror host all change (verified across akirax/shiora/
+  // mikora), so hashing the URL made the cache never hit and mid-job
+  // reloads lose the re-attach. Key on the semantic identity instead:
+  //   title|ep|type   (passed by the renderer; stable across sessions)
+  // falling back to the URL's first two path segments (md5(ep)/file-id),
+  // then host+path, then the raw URL.
+  if (title && ep) {
+    return crypto.createHash('sha1').update(`${title}|${ep}|${type || ''}`).digest('hex').slice(0, 24)
+  }
+  try {
+    const u = new URL(streamUrl)
+    const seg = u.pathname.split('/').filter(Boolean)
+    if (seg.length >= 2 && /^[0-9a-f]{32}$/i.test(seg[0]) && /^[0-9a-f]{32}$/i.test(seg[1])) {
+      return crypto.createHash('sha1').update(`${seg[0]}/${seg[1]}`).digest('hex').slice(0, 24)
+    }
+    return crypto.createHash('sha1').update(`${u.host}${u.pathname}`).digest('hex').slice(0, 24)
+  } catch {
+    return crypto.createHash('sha1').update(streamUrl).digest('hex').slice(0, 24)
+  }
 }
 
-export function startAiSubsJob({ streamUrl, title, headers }) {
-  const key = aiSubsCacheKey(streamUrl)
+export function startAiSubsJob({ streamUrl, title, ep, type, headers }) {
+  const key = aiSubsCacheKey(streamUrl, { title, ep, type })
   const existing = jobs.get(key)
   if (existing && (existing.status === 'running')) return { key, ...aiSubsStatus(key) }
   if (existing && existing.status === 'done' && fs.existsSync(existing.vttPath)) {
