@@ -1346,11 +1346,13 @@ function pickReferers(targetUrl) {
     else if (host.includes('kryntal'))   { refs.push('https://megaplay.buzz/', cdnSelf) }
     else if (host.includes('akirax'))    { refs.push('https://megaplay.buzz/', cdnSelf) }
     else if (host.includes('megaplay'))  { refs.push('https://megaplay.buzz/', cdnSelf) }
-    // Bloom-family subtitle CDNs (nexabloom / watching.onl): verified live
-    // Sep 2026 — fetch.nexabloom.top track files 403 every referer EXCEPT
-    // https://megaplay.buzz/ (cdnSelf, www., anikoto all 403; megaplay
-    // returns the VTT). These hosts carry the muxed-from-master tracks.
-    else if (host.includes('nexabloom'))  { refs.push('https://megaplay.buzz/', cdnSelf) }
+    // Bloom-family subtitle CDNs (nexabloom / watching.onl / imgnex):
+    // verified live Sep 2026 — track files 403 every referer EXCEPT
+    // https://megaplay.buzz/ (cdnSelf, www., anikoto, anidap.lol all 403;
+    // megaplay returns the VTT). These hosts carry the muxed-from-master
+    // tracks. imgnex serves the same /anime/<ep>/<video>/subtitles/ paths
+    // with the SAME megaplay-only rule (284-cue eng-4 verified).
+    else if (host.includes('nexabloom') || host.endsWith('imgnex.top'))  { refs.push('https://megaplay.buzz/', cdnSelf) }
     else if (host.endsWith('watching.onl')) { refs.push('https://megaplay.buzz/', 'https://anidap.lol/', cdnSelf) }
     else if (host.includes('rapid-cloud')) { refs.push('https://rapid-cloud.co/', cdnSelf) }
     else if (host.includes('megacloud')) { refs.push('https://megacloud.blog/', cdnSelf) }
@@ -1479,12 +1481,14 @@ function subsDiskWrite(key, buf, ct) {
 function subsHeaderCandidates(url, upstreamHeaders) {
   const list = []
   const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
-  const refs = []
-  const upRef = upstreamHeaders?.Referer || upstreamHeaders?.referer
-  if (upRef) refs.push(upRef)
-  refs.push(...pickReferers(url))
+  // Referer priority: upstream-provided first (stream host knows its own
+  // CDN), then the bloom-family megaplay pin, then the host map.
+  const refs = subsRefererPriority(url, upstreamHeaders)
   for (const ref of refs) {
     list.push({ 'user-agent': ua, referer: ref })
+  }
+  for (const ref of pickReferers(url)) {
+    if (!refs.includes(ref)) list.push({ 'user-agent': ua, referer: ref })
   }
   list.push({ 'user-agent': ua })
   return list
@@ -1544,6 +1548,27 @@ function looksLikeSubtitles(buf) {
   return false
 }
 
+// ── Mislabel guard: some providers ship en.vtt whose CONTENT is Swedish
+//    or Norwegian/Danish (ingest mixup — verified live: the "English"
+//    track read "Alkemi är vetenskapen om att förstå…"). An English-labeled
+//    track full of å/ä/ö/æ/ø dialogue is worthless to an English viewer —
+//    treat it as a miss so the cross-provider fallback can surface the
+//    real English track from a sibling CDN.
+function isEnglishLabeled(label) {
+  return /\beng(lish)?\b/i.test(String(label || ''))
+}
+function subtitlesLookScandinavian(buf) {
+  try {
+    const head = buf.subarray(0, Math.min(buf.length, 8000)).toString('utf-8')
+    // sample dialogue lines only — skip timestamps, cue ids, WEBVTT boilerplate
+    const lines = head.split('\n').filter((l) => !/-->/.test(l.trim()) && !/^(WEBVTT|NOTE|STYLE|REGION|\d+)\s*$/.test(l.trim()))
+    const text = lines.join(' ')
+    if (text.length < 120) return false // not enough signal — don't judge
+    const hits = (text.match(/[åäöæøÅÄÖÆØ]/g) || []).length
+    return hits >= 4 // real Scandinavian dialogue has dozens; real English has 0
+  } catch { return false }
+}
+
 // ── Option B: canonical track URLs + dead-host rewrite ────────────────
 // fixes: (1) some providers emit "https:///host/..." (double slash) which
 //        URL-parse into garbage; (2) the cdn.watching.onl subtitle mirror
@@ -1562,6 +1587,17 @@ function subsCanonicalUrl(raw) {
     }
   } catch { /* keep cleaned string */ }
   return s
+}
+
+// Header candidates for a subs URL — bloom-family hosts (nexabloom, imgnex,
+// watching.onl) require the megaplay referer FIRST or they 403/challenge.
+// Upstream-provided headers still win when present.
+function subsRefererPriority(url, upstreamHeaders) {
+  const refs = []
+  const upRef = upstreamHeaders?.Referer || upstreamHeaders?.referer
+  if (upRef) refs.push(upRef)
+  if (/nexabloom|imgnex|watching\.onl/i.test(url)) refs.push('https://megaplay.buzz/')
+  return [...new Set(refs)]
 }
 
 function subsTargetCandidates(rawUrl) {
@@ -1589,15 +1625,21 @@ app.get('/subs', async (req, res) => {
   }
 
   const cacheKey = String(target)
+  // Mislabel guard scope: only reject fetched/cached files when the REQUEST
+  // asks for English and the bytes read as Scandinavian dialogue.
+  const labelQ = req.query.label
+    ? decodeURIComponent(String(req.query.label))
+    : (String(req.query.k || '').split('|')[3] || '')
+  const rejectScandi = isEnglishLabeled(labelQ)
   const hit = subsDiskRead(cacheKey)
-  if (hit) {
+  if (hit && !(rejectScandi && subtitlesLookScandinavian(hit.buf))) {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
     res.setHeader('Content-Type', hit.ct)
     return res.send(hit.buf)
   }
 
   const fetched = await subsFetchWithRetry(parsed.toString(), upstreamHeaders, null)
-  if (fetched) {
+  if (fetched && !(rejectScandi && subtitlesLookScandinavian(fetched.buf))) {
     subsDiskWrite(cacheKey, fetched.buf, fetched.ct)
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
     res.setHeader('Content-Type', fetched.ct)
@@ -1611,10 +1653,14 @@ app.get('/subs', async (req, res) => {
     const browsed = await fetchTextInBrowser(parsed.toString(), 25000)
     if (browsed?.text) {
       const buf = Buffer.from(browsed.text, 'utf-8')
-      subsDiskWrite(cacheKey, buf, 'text/vtt; charset=utf-8')
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
-      res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
-      return res.send(buf)
+      // mislabel guard applies here too — a browser-solved challenge for an
+      // English-labeled URL can still return Scandinavian content.
+      if (!(rejectScandi && subtitlesLookScandinavian(buf))) {
+        subsDiskWrite(cacheKey, buf, 'text/vtt; charset=utf-8')
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+        res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
+        return res.send(buf)
+      }
     }
   } catch (e) {
     console.warn('[subs] browser fallback failed:', e.message)
@@ -1646,7 +1692,7 @@ app.get('/subs', async (req, res) => {
       label: req.query.label ? decodeURIComponent(String(req.query.label)) : (kCtx[3] || ''),
       title: { english: req.query.title_english, romaji: req.query.title_romaji },
     })
-    if (alt?.buf) {
+    if (alt?.buf && !(rejectScandi && subtitlesLookScandinavian(alt.buf))) {
       res.setHeader('Cache-Control', 'public, max-age=600') // short TTL — sourced from another provider
       res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
       return res.send(alt.buf)
@@ -1656,11 +1702,12 @@ app.get('/subs', async (req, res) => {
   }
 
   // All attempts failed — serve stale cache if it exists beyond TTL, else 404
+  // (mislabel guard applies: never let the poisoned Swedish file leak out the bottom)
   try {
     const { bin } = subsDiskPaths(cacheKey)
     if (fs.existsSync(bin)) {
       const buf = fs.readFileSync(bin)
-      if (buf.length && looksLikeSubtitles(buf)) {
+      if (buf.length && looksLikeSubtitles(buf) && !(rejectScandi && subtitlesLookScandinavian(buf))) {
         res.setHeader('Cache-Control', 'no-store')
         res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
         return res.send(buf)

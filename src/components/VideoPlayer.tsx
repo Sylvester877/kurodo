@@ -1296,7 +1296,13 @@ export default React.memo(function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subtitlesKey, streamType])
 
+  // 0-cue watchdog remount counter — declared here because the mode-sync
+  // effect below re-applies caption modes after a remount.
+  const [trackNonce, setTrackNonce] = useState(0)
+
   // ---- Sync caption track visibility with the picker ----
+  // (also re-runs after a 0-cue watchdog remount: fresh elements default to
+  // 'disabled', so the active mode must be re-applied)
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
@@ -1304,7 +1310,37 @@ export default React.memo(function VideoPlayer({
     for (let i = 0; i < tracks.length; i++) {
       tracks[i].mode = i === activeSubIdx ? 'showing' : 'disabled'
     }
-  }, [activeSubIdx, subtitles])
+  }, [activeSubIdx, subtitles, trackNonce])
+
+  // ── 0-cue watchdog: rescue tracks whose load silently died ──────────
+  // Chromium NEVER retries a failed <track> load: if /subs hiccups during
+  // page load (upstream timeout storm), the element parses 0 cues and stays
+  // dead forever — mode 'showing', menu checkmark on, nothing renders.
+  // A fresh element with the SAME src parses fine (verified live), so the
+  // rescue is a remount: bump a nonce into the track keys → React swaps
+  // every element → Chromium re-fetches (from immutable browser cache on
+  // the healthy path — no extra network when the file is cached).
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v || activeSubIdx < 0 || activeSubIdx >= subtitles.length) return
+    let tries = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const check = () => {
+      const v2 = videoRef.current
+      const t = v2?.textTracks?.[activeSubIdx]
+      if (!v2 || !t) return
+      if ((t.cues?.length ?? 0) > 0) return // healthy — done
+      if (tries++ < 5) {
+        setTrackNonce((n) => n + 1)
+        timer = setTimeout(check, 5000)
+      }
+      // after 5 remounts, leave it — a genuinely empty file would loop here
+    }
+    timer = setTimeout(check, 6000) // grace: direct hits land in 1-2s; the
+    // cross-provider fallback path takes ~15-20s, so retries span ~30s
+    return () => { if (timer) clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSubIdx, subtitlesKey, trackNonce === 0])
 
   // ---- AirPlay availability (Safari/iOS only) ----
   useEffect(() => {
@@ -2072,9 +2108,9 @@ ${offset > 0 ? `
               }),
         }}
       >
-        {offsetSubtitles.map((s) => (
+        {offsetSubtitles.map((s, i) => (
           <track
-            key={s.src}
+            key={`${s.src}#${trackNonce}-${i}`}
             kind="subtitles"
             src={s.src}
             srcLang={s.lang || 'en'}
