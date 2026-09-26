@@ -707,6 +707,17 @@ app.get('/api/anidap/sources/:slug/:ep/:provider/:type', async (req, res) => {
     if (Array.isArray(data.tracks) && !Array.isArray(data.subtitles)) data.subtitles = data.tracks
     if (Array.isArray(data.subtitles) && !Array.isArray(data.tracks)) data.tracks = data.subtitles
 
+    // ── Option B: normalize track URLs at source time ──
+    // fixes: malformed "https:///host/..." entries parsed as garbage and
+    //        dead parked mirrors (cdn.watching.onl) handed to the player
+    //        as-is, producing 0-cue tracks. Canonicalize every track URL so
+    //        the player's /subs requests start from the live identity.
+    for (const key of ['tracks', 'subtitles']) {
+      if (Array.isArray(data[key])) {
+        data[key] = data[key].map((t) => t?.file ? { ...t, file: subsCanonicalUrl(t.file) } : t)
+      }
+    }
+
     const primarySrc = data.raw || data.url || ''
 
     // Guard: if we got no URL at all, fail gracefully
@@ -1335,6 +1346,12 @@ function pickReferers(targetUrl) {
     else if (host.includes('kryntal'))   { refs.push('https://megaplay.buzz/', cdnSelf) }
     else if (host.includes('akirax'))    { refs.push('https://megaplay.buzz/', cdnSelf) }
     else if (host.includes('megaplay'))  { refs.push('https://megaplay.buzz/', cdnSelf) }
+    // Bloom-family subtitle CDNs (nexabloom / watching.onl): verified live
+    // Sep 2026 — fetch.nexabloom.top track files 403 every referer EXCEPT
+    // https://megaplay.buzz/ (cdnSelf, www., anikoto all 403; megaplay
+    // returns the VTT). These hosts carry the muxed-from-master tracks.
+    else if (host.includes('nexabloom'))  { refs.push('https://megaplay.buzz/', cdnSelf) }
+    else if (host.endsWith('watching.onl')) { refs.push('https://megaplay.buzz/', 'https://anidap.lol/', cdnSelf) }
     else if (host.includes('rapid-cloud')) { refs.push('https://rapid-cloud.co/', cdnSelf) }
     else if (host.includes('megacloud')) { refs.push('https://megacloud.blog/', cdnSelf) }
     else if (host.includes('krussdomi')) { refs.push('https://krussdomi.com/', cdnSelf) }
@@ -1474,37 +1491,45 @@ function subsHeaderCandidates(url, upstreamHeaders) {
 }
 
 async function subsFetchWithRetry(url, upstreamHeaders, signal) {
-  const candidates = subsHeaderCandidates(url, upstreamHeaders)
+  // fixes: try BOTH the rewritten (canonical) URL and the original — a dead
+  //        mirror's sibling host often holds the identical file — and sweep
+  //        every header candidate across them (bounded to 9 fetches).
+  const targets = subsTargetCandidates(url)
   let lastStatus = 0
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const headers = candidates[Math.min(attempt, candidates.length - 1)]
-    const ac = new AbortController()
-    const onAbort = () => ac.abort()
-    if (signal) { if (signal.aborted) throw new Error('aborted'); signal.addEventListener('abort', onAbort, { once: true }) }
-    const timer = setTimeout(() => ac.abort(), SUBS_FETCH_TIMEOUT)
-    try {
-      const res = await fetch(url, { headers, redirect: 'follow', signal: ac.signal })
-      clearTimeout(timer)
-      if (res.ok) {
-        const buf = Buffer.from(await res.arrayBuffer())
-        // fixes: a challenge page can arrive with HTTP 200 — validate the
-        //        body actually looks like a subtitle file before accepting.
-        if (buf.length > 0 && looksLikeSubtitles(buf)) return { buf, ct: res.headers.get('content-type') || 'text/vtt; charset=utf-8' }
-        if (buf.length > 0) lastStatus = 415 // wrong content type — treat as retryable failure
-        else lastStatus = 204
-      } else {
-        lastStatus = res.status
-        try { await res.arrayBuffer() } catch { /* drain */ }
+  let attempts = 0
+  for (const target of targets) {
+    const candidates = subsHeaderCandidates(target, upstreamHeaders)
+    for (let hIdx = 0; hIdx < candidates.length; hIdx++) {
+      if (++attempts > 9) return null
+      const headers = candidates[hIdx]
+      const ac = new AbortController()
+      const onAbort = () => ac.abort()
+      if (signal) { if (signal.aborted) throw new Error('aborted'); signal.addEventListener('abort', onAbort, { once: true }) }
+      const timer = setTimeout(() => ac.abort(), SUBS_FETCH_TIMEOUT)
+      try {
+        const res = await fetch(target, { headers, redirect: 'follow', signal: ac.signal })
+        clearTimeout(timer)
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer())
+          // fixes: a challenge page can arrive with HTTP 200 — validate the
+          //        body actually looks like a subtitle file before accepting.
+          if (buf.length > 0 && looksLikeSubtitles(buf)) return { buf, ct: res.headers.get('content-type') || 'text/vtt; charset=utf-8' }
+          if (buf.length > 0) lastStatus = 415 // wrong content type — treat as retryable failure
+          else lastStatus = 204
+        } else {
+          lastStatus = res.status
+          try { await res.arrayBuffer() } catch { /* drain */ }
+        }
+      } catch (e) {
+        clearTimeout(timer)
+        lastStatus = 0
+        if (signal?.aborted) throw new Error('aborted')
+      } finally {
+        if (signal) signal.removeEventListener('abort', onAbort)
       }
-    } catch (e) {
-      clearTimeout(timer)
-      lastStatus = 0
-      if (signal?.aborted) throw new Error('aborted')
-    } finally {
-      if (signal) signal.removeEventListener('abort', onAbort)
+      if (lastStatus === 404) break // header-independent for THIS target — try the next target
+      await new Promise((r) => setTimeout(r, 250))
     }
-    if (lastStatus === 404) break // definitive — retrying with different headers won't help
-    await new Promise((r) => setTimeout(r, 300 * (attempt + 1)))
   }
   return null
 }
@@ -1519,11 +1544,40 @@ function looksLikeSubtitles(buf) {
   return false
 }
 
+// ── Option B: canonical track URLs + dead-host rewrite ────────────────
+// fixes: (1) some providers emit "https:///host/..." (double slash) which
+//        URL-parse into garbage; (2) the cdn.watching.onl subtitle mirror
+//        is a PARKED domain (HTML served with HTTP 200) while the SAME
+//        ingest's tracks live on fetch.nexabloom.top under an identical
+//        /anime/<ep>/<video>/subtitles/<lang>.vtt path — try the rewrite
+//        first, fall back to the original URL.
+function subsCanonicalUrl(raw) {
+  let s = String(raw || '')
+  s = s.replace(/^(https?:)\/\/+/, '$1//')
+  try {
+    const u = new URL(s)
+    if (/(^|\.)watching\.onl$/i.test(u.hostname) && u.pathname.startsWith('/anime/')) {
+      u.hostname = 'fetch.nexabloom.top'
+      return u.toString()
+    }
+  } catch { /* keep cleaned string */ }
+  return s
+}
+
+function subsTargetCandidates(rawUrl) {
+  const canon = subsCanonicalUrl(rawUrl)
+  const list = canon !== rawUrl ? [canon, rawUrl] : [rawUrl]
+  return list
+}
+
 app.get('/subs', async (req, res) => {
-  const target = req.query.url
-  if (!target) return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'No URL provided', retryable: false } })
+  if (!req.query.url) return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'No URL provided', retryable: false } })
+  // Canonicalize FIRST: fixes the "https:///host" malformed entries AND
+  // rewrites dead parked mirrors to their live sibling host — cache key,
+  // browser fallback and cross-provider fallback all share one identity.
+  const target = subsCanonicalUrl(String(req.query.url))
   let parsed
-  try { parsed = new URL(String(target)) } catch {
+  try { parsed = new URL(target) } catch {
     return res.status(400).json({ ok: false, error: { code: 'BAD_REQUEST', message: 'Invalid URL', retryable: false } })
   }
   if (!/^https?:$/.test(parsed.protocol)) {
