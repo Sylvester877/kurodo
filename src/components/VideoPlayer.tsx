@@ -25,16 +25,7 @@ interface Props {
     pct?: number
     error?: string | null
     onRequest: () => void
-    /** One-click 'AI (English)': select the track if it exists, else start generating. */
-    onSelect?: () => void
-    /** True when the AI track exists in the current subtitles list. */
-    hasTrack?: boolean
   }
-  /** Parent-commanded track selection ({ idx } into subtitles, null ignored).
-   *  Pass a NEW object per command ({ idx }) so repeat clicks re-fire — used
-   *  by the one-click 'AI (English)' row to select a track that lands after
-   *  generation. */
-  forcedSub?: { idx: number } | null
   poster?: string
   /** Skip-time intervals (intro/outro) from AniSkip. */
   skipTimes?: SkipTimes
@@ -92,7 +83,7 @@ declare global {
 }
 
 export default React.memo(function VideoPlayer({
-  src, fallbackSrc, subtitles = [], aiSubs, poster, skipTimes, forcedSub,
+  src, fallbackSrc, subtitles = [], aiSubs, poster, skipTimes,
   onNearEnd, onProgress, theaterMode, onToggleTheaterMode,
   resumeAt, onProgressTick, onResumeDismiss,
   initialTime, autoPlay,
@@ -397,12 +388,6 @@ export default React.memo(function VideoPlayer({
   })
   const activeSubIdxRef = useRef(activeSubIdx)
   activeSubIdxRef.current = activeSubIdx
-  // Parent-commanded selection: apply whenever a new { idx } command object
-  // arrives (Watch's one-click 'AI (English)' row).
-  useEffect(() => {
-    if (!forcedSub) return
-    if (forcedSub.idx >= 0 && forcedSub.idx < subtitles.length) setActiveSubIdx(forcedSub.idx)
-  }, [forcedSub]) // eslint-disable-line react-hooks/exhaustive-deps -- subtitles intentionally not a dep; command objects are fresh per click
   const [activeSkip, setActiveSkip] = useState<'op' | 'ed' | 'recap' | null>(null)
   const [skipCountdown, setSkipCountdown] = useState<number | null>(null)
   const skipCountdownRef = useRef<number | null>(null)
