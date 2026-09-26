@@ -1420,13 +1420,7 @@ app.get('/api/ai-subs/start', async (req, res) => {
     let headers = {}
     try { headers = req.query.h ? JSON.parse(Buffer.from(String(req.query.h), 'base64').toString('utf-8')) : {} } catch { headers = {} }
     const { startAiSubsJob } = await getAiSubsApi()
-    const r = startAiSubsJob({
-      streamUrl,
-      title: req.query.title ? String(req.query.title) : '',
-      ep: req.query.ep ? Number(req.query.ep) : null,
-      type: req.query.type ? String(req.query.type) : '',
-      headers,
-    })
+    const r = startAiSubsJob({ streamUrl, title: req.query.title ? String(req.query.title) : '', headers })
     return ok(res, r)
   } catch (e) {
     return fail(res, e)
@@ -1438,11 +1432,7 @@ app.get('/api/ai-subs/probe', async (req, res) => {
     const streamUrl = req.query.url ? String(req.query.url) : null
     if (!streamUrl) return badParam(res, 'Missing url')
     const { aiSubsCacheKey, aiSubsStatus, aiSubsVttPath } = await getAiSubsApi()
-    const key = aiSubsCacheKey(streamUrl, {
-      title: req.query.title ? String(req.query.title) : '',
-      ep: req.query.ep ? Number(req.query.ep) : null,
-      type: req.query.type ? String(req.query.type) : '',
-    })
+    const key = aiSubsCacheKey(streamUrl)
     let st = aiSubsStatus(key)
     if (st.status === 'unknown' && aiSubsVttPath(key)) {
       st = { status: 'done', pct: 100, url: `/ai-subs/${key}.vtt` }

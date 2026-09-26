@@ -289,37 +289,24 @@ export default function Watch() {
     let cancelled = false
     ;(async () => {
       try {
-        // fixes: call() already unwraps the {ok,data} envelope — reading
-        //        r.data here silently yielded undefined, so cached jobs
-        //        never re-attached and keys were never stored.
-        // Probe must send the SAME identity the start call does — anidap
-        // stream URLs rotate every fetch, so the server keys on title|ep|type.
-        const probeParams = new URLSearchParams({ url: rawStreamUrl })
-        if (anime?.title_english || anime?.title) probeParams.set('title', anime.title_english || anime.title || '')
-        if (currentEp) probeParams.set('ep', String(currentEp))
-        if (streamType) probeParams.set('type', streamType)
-        const r = await call<any>(`/api/ai-subs/probe?${probeParams}`)
-        if (!cancelled && r?.key) {
-          aiKeyRef.current = r.key
-          if (r.status === 'done') {
+        const r = await call<any>(`/api/ai-subs/probe?url=${encodeURIComponent(rawStreamUrl)}`)
+        if (!cancelled && r?.data?.key) {
+          aiKeyRef.current = r.data.key
+          if (r.data.status === 'done') {
             setAiSubsState({ status: 'done' })
             // fixes: a cached generation must append its track immediately —
             //        the polling effect only runs while status==='running'.
             setWyzieFallbackSubs((prev) => {
               if (prev.some((s) => s.label === 'AI (English)')) return prev
               const backend = getBackendOrigin()
-              return [...prev, { src: `${backend}${r.url}`, label: 'AI (English)', default: true, lang: 'en' }]
+              return [...prev, { src: `${backend}${r.data.url}`, label: 'AI (English)', default: true, lang: 'en' }]
             })
-          } else if (r.status === 'running') {
-            // Reload mid-job: resume the progress UI (polling effect keys off
-            // status==='running'; without this the job finishes unseen).
-            setAiSubsState({ status: 'running', phase: r.phase, pct: r.pct })
           }
         }
       } catch { /* probe is optional */ }
     })()
     return () => { cancelled = true }
-  }, [rawStreamUrl, currentEp, streamType, anime?.title_english, anime?.title])
+  }, [rawStreamUrl])
 
   // Poll while running; auto-select the track when done.
   useEffect(() => {
@@ -329,7 +316,7 @@ export default function Watch() {
         const key = aiKeyRef.current
         if (!key) return
         const r = await call<any>(`/api/ai-subs/status?key=${key}`)
-        const d = r || {}
+        const d = r?.data || {}
         if (d.status === 'done') {
           setAiSubsState({ status: 'done' })
           setWyzieFallbackSubs((prev) => {
@@ -354,20 +341,18 @@ export default function Watch() {
       try {
         const params = new URLSearchParams({ url: rawStreamUrl })
         if (anime?.title_english || anime?.title) params.set('title', anime.title_english || anime.title || '')
-        if (currentEp) params.set('ep', String(currentEp))
-        if (streamType) params.set('type', streamType)
         if (streamHeaders) params.set('h', safeBase64(JSON.stringify(streamHeaders)))
         const r = await call<any>(`/api/ai-subs/start?${params}`)
-        if (r?.key) {
-          aiKeyRef.current = r.key
-          setAiSubsState({ status: 'running', phase: r.phase || 'audio', pct: r.pct || 0 })
+        if (r?.data?.key) {
+          aiKeyRef.current = r.data.key
+          setAiSubsState({ status: 'running', phase: r.data.phase || 'audio', pct: r.data.pct || 0 })
           toast.info('Generating AI captions — watch progress in the caption menu')
         }
       } catch (e: any) {
         setAiSubsState({ status: 'error', error: e?.message || 'failed to start' })
       }
     })()
-  }, [rawStreamUrl, anime?.title_english, anime?.title, streamHeaders, currentEp, streamType])
+  }, [rawStreamUrl, anime?.title_english, anime?.title, streamHeaders])
 
   const aiSubsUi = useMemo(() => ({
     ...aiSubsState,
