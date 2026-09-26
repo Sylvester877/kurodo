@@ -1286,6 +1286,47 @@ function setCachedManifest(url, data) { manifestCache.set(url, { at: Date.now(),
 const manifestFailCache = new Map()
 const MANIFEST_FAIL_TTL = 20_000
 
+// ── Dead-host circuit breaker (app-wide latency fix) ───────────────────
+// When a CDN dies at the TCP level (the echovideo case: connect ETIMEDOUT),
+// hls.js still fires DOZENS of parallel segment/manifest requests at it —
+// each sat in axios' 20s timeout, so one dead host froze the whole proxy
+// pool for ~20s and every concurrent request queued behind it. The breaker
+// remembers hosts that hard-fail (connect-level errors, not 4xx/5xx) and
+// short-circuits further requests to them for 90s with an instant 503, so
+// hls.js fails over to a fresh provider immediately instead of hanging.
+const deadHostBreaker = new Map() // host → { until, strikes }
+const DEAD_HOST_TTL_MS = 90_000
+const DEAD_HOST_STRIKES = 2
+function hostOf(targetUrl) {
+  try { return new URL(String(targetUrl)).hostname.toLowerCase() } catch { return '' }
+}
+function isHostBroken(u) {
+  const h = hostOf(u)
+  if (!h) return false
+  const e = deadHostBreaker.get(h)
+  if (!e) return false
+  // until===0 means "still accumulating strikes, not yet open" — must NOT
+  // be treated as expired (wiping it here reset the counter every request
+  // and the breaker never opened).
+  if (e.until > 0 && Date.now() > e.until) { deadHostBreaker.delete(h); return false }
+  return e.until > 0
+}
+function markHostBroken(u, reason) {
+  const h = hostOf(u)
+  if (!h) return
+  const e = deadHostBreaker.get(h) || { until: 0, strikes: 0 }
+  e.strikes += 1
+  if (e.strikes >= DEAD_HOST_STRIKES) {
+    e.until = Date.now() + DEAD_HOST_TTL_MS
+    console.warn(`[proxy] circuit breaker OPEN for ${h} (${reason}) — failing fast ${DEAD_HOST_TTL_MS / 1000}s`)
+  }
+  deadHostBreaker.set(h, e)
+}
+function clearHostBroken(u) {
+  const h = hostOf(u)
+  if (h) deadHostBreaker.delete(h)
+}
+
 // ── CDN hosts known to send Access-Control-Allow-Origin: * on their
 // m3u8 manifests AND segment files. For these hosts we can bypass the
 // /proxy entirely — the browser loads streams directly, avoiding 403
@@ -1678,7 +1719,14 @@ app.get('/subs', async (req, res) => {
       try {
         const { getAnizipMapping } = await import('./anizip-cache.js')
         const m = await getAnizipMapping({ malId: malIdQ })
-        effAnilistId = m?.mappings?.anilist_id ?? m?.anilistId ?? null
+        const mapped = m?.mappings?.anilist_id ?? m?.anilistId ?? null
+        // AniZip data quirk: some entries carry an anilist_id that collides
+        // with the MAL id itself (FMA:B: mal 5114 → "anilist 5114" is a
+        // different show). A mirrored MAL id is never a valid AniList id —
+        // prefer the known-correct MAL→AniList pairs and otherwise run the
+        // fan-out slugless (it resolves the slug from malId directly).
+        const KNOWN_MAL_ANILIST = { 5114: 21 } // MAL → AniList
+        effAnilistId = (mapped && mapped !== malIdQ) ? mapped : (KNOWN_MAL_ANILIST[malIdQ] ?? null)
       } catch { /* mapping miss — fan-out will run slugless */ }
     }
     const kCtx = req.query.k ? decodeURIComponent(String(req.query.k)).split('|') : []
@@ -1693,6 +1741,11 @@ app.get('/subs', async (req, res) => {
       title: { english: req.query.title_english, romaji: req.query.title_romaji },
     })
     if (alt?.buf && !(rejectScandi && subtitlesLookScandinavian(alt.buf))) {
+      // Persist the fallback win under the ORIGINAL cache key too — this key
+      // is either dead upstream or mislabel-poisoned, so every future load
+      // would otherwise re-run the full 15-25s fan-out (or 404 when upstream
+      // is having a bad day). The sibling's track IS this track's answer.
+      subsDiskWrite(cacheKey, alt.buf, 'text/vtt; charset=utf-8')
       res.setHeader('Cache-Control', 'public, max-age=600') // short TTL — sourced from another provider
       res.setHeader('Content-Type', 'text/vtt; charset=utf-8')
       return res.send(alt.buf)
@@ -1800,6 +1853,11 @@ app.get('/proxy', async (req, res) => {
   // (403, 404, timeout, etc.) AND processing errors both result in a
   // clean HTTP error response to the client — never an unhandled
   // rejection that crashes the server.
+  // ── Circuit breaker: fail fast for hosts we already know are dead ──
+  if (isHostBroken(targetUrl)) {
+    return res.status(503).json({ ok: false, error: { code: 'UPSTREAM_DEAD', message: 'Upstream CDN is unreachable (circuit open) — pick another server', retryable: true } })
+  }
+
   try {
     let response
     let triedRefs = [primaryReferer]
@@ -1809,11 +1867,18 @@ app.get('/proxy', async (req, res) => {
         headers: reqHeaders,
         responseType: 'stream',
         maxRedirects: 5,
-        timeout: 20000,
+        // 12s to first byte (was 20s): hls.js fires dozens of parallel
+        // segment requests — a dead host must stop eating the pool fast.
+        timeout: 12000,
         validateStatus: (s) => s >= 200 && s < 400,
         proxy: shouldUseProxy(targetUrl) ? RESIDENTIAL_PROXY : undefined,
       })
+      clearHostBroken(targetUrl)
     } catch (firstErr) {
+      // Connect-level failures (ETIMEDOUT/ENOTFOUND/ECONNREFUSED) mean the
+      // HOST is dead — count a strike; 2 strikes open the breaker so the
+      // dozens of queued hls.js requests fail instantly instead of each
+      // burning 12-20s. HTTP-level 4xx/5xx do NOT count (host is alive).
       // ── Transient network errors: one quick retry ──
       // ENOTFOUND / ECONNRESET / socket hang-up are DNS or connection
       // blips — the same URL works a moment later (verified live: vibevibe
@@ -1827,6 +1892,12 @@ app.get('/proxy', async (req, res) => {
           firstErr?.code === 'EAI_AGAIN' ||
           firstErr?.code === 'ETIMEDOUT' ||
           /ECONNRESET|ENOTFOUND|socket hang up|EAI_AGAIN/i.test(netErrMsg))
+      // Strike-worthy: TCP connect failures (ETIMEDOUT/ENOTFOUND/ECONNREFUSED)
+      // AND axios header-timeout aborts (ECONNABORTED — the host never even
+      // sent response headers; a live CDN always does in <12s).
+      if (!firstErr?.response && (firstErr?.code === 'ETIMEDOUT' || firstErr?.code === 'ENOTFOUND' || firstErr?.code === 'ECONNREFUSED' || firstErr?.code === 'ECONNABORTED')) {
+        markHostBroken(targetUrl, firstErr.code || 'timeout')
+      }
       if (isTransientNetErr) {
         console.warn(`[proxy] ${netErrMsg.slice(0, 60)} — transient network error, retrying once: ${String(targetUrl).slice(0, 90)}`)
         await new Promise((r) => setTimeout(r, 700))
@@ -1834,7 +1905,7 @@ app.get('/proxy', async (req, res) => {
           headers: reqHeaders,
           responseType: 'stream',
           maxRedirects: 5,
-          timeout: 20000,
+          timeout: 12000,
           validateStatus: (s) => s >= 200 && s < 400,
           proxy: shouldUseProxy(targetUrl) ? RESIDENTIAL_PROXY : undefined,
         })
@@ -1851,7 +1922,7 @@ app.get('/proxy', async (req, res) => {
               headers: { ...reqHeaders, referer: altRef, origin: altOrigin },
               responseType: 'stream',
               maxRedirects: 5,
-              timeout: 20000,
+              timeout: 12000,
               validateStatus: (s) => s >= 200 && s < 400,
               proxy: shouldUseProxy(targetUrl) ? RESIDENTIAL_PROXY : undefined,
             })
@@ -1871,7 +1942,7 @@ app.get('/proxy', async (req, res) => {
               headers: headersNoRef,
               responseType: 'stream',
               maxRedirects: 5,
-              timeout: 20000,
+              timeout: 12000,
               validateStatus: (s) => s >= 200 && s < 400,
               proxy: shouldUseProxy(targetUrl) ? RESIDENTIAL_PROXY : undefined,
             })
@@ -1897,7 +1968,7 @@ app.get('/proxy', async (req, res) => {
               headers: minimalHeaders,
               responseType: 'stream',
               maxRedirects: 5,
-              timeout: 20000,
+              timeout: 12000,
               validateStatus: (s) => s >= 200 && s < 400,
               proxy: shouldUseProxy(targetUrl) ? RESIDENTIAL_PROXY : undefined,
             })

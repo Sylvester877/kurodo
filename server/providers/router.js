@@ -203,6 +203,12 @@ export async function routedGetProviders(anilistId, slug, ep, title) {
   // Always return all anidap servers — no rate-limit gate here.
   // Individual servers may be rate-limited, but the LIST should always
   // show so the user can see what's available and try different servers.
+  // ── Fetch both rosters IN PARALLEL — anidap + gogoanime were awaited
+  // serially, so the server-picker paid anidap's full latency PLUS
+  // gogoanime's before rendering chips.
+  const gogoRoster = IS_ELECTRON
+    ? gogoanimeProvider.getProviders(slug, ep, anilistId).catch(() => null)
+    : null
   try {
     const providers = await anidapProvider.getProviders(slug || String(anilistId), ep, anilistId, title)
     if (Array.isArray(providers)) {
@@ -210,10 +216,10 @@ export async function routedGetProviders(anilistId, slug, ep, title) {
     }
   } catch { /* continue */ }
 
-  // Then gogoanime as fallback (Electron mode only)
-  if (IS_ELECTRON) {
+  // Gogoanime roster (Electron mode only) — already resolved concurrently.
+  if (gogoRoster) {
     try {
-      const gogoProviders = await gogoanimeProvider.getProviders(slug, ep, anilistId)
+      const gogoProviders = await gogoRoster
       if (Array.isArray(gogoProviders)) {
         allProviders.push(...gogoProviders.map((s) => ({ ...s, _provider: 'gogoanime' })))
       }

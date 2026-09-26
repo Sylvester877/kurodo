@@ -228,7 +228,7 @@ async function checkAvailability(anilistId) {
   try {
     const res = await fetch(`${BASE}/watch?id=${anilistId}&ep=1`, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      signal: AbortSignal.timeout(4_000),
+      signal: AbortSignal.timeout(3_000),
     })
     const text = await res.text()
     // Existing pages return 200 with a title like "Watch <Title> Sub/Dub...".
@@ -274,7 +274,7 @@ async function searchAnilistIdByTitle(title) {
         query: `query($s: String){Page(perPage: 5){media(search:$s, type:ANIME){id title{romaji english}}}}`,
         variables: { s: title },
       }),
-      signal: AbortSignal.timeout(4_000),
+      signal: AbortSignal.timeout(3_000),
     })
     const json = await resp.json()
     const results = json?.data?.Page?.media || []
@@ -667,7 +667,7 @@ async function isRealVideoStream(streamUrl, headers = null) {
       Buffer.from(JSON.stringify({ Referer: referer })).toString('base64'),
     )
     const res = await fetch(`${origin}/proxy?url=${encodeURIComponent(streamUrl)}&h=${h}`, {
-      signal: AbortSignal.timeout(4_000),
+      signal: AbortSignal.timeout(3_000),
     })
     // Definitive 4xx through the proxy (404/410 gone, 403/401 blocked, 429
     // rate-limited) means the player — which loads via this SAME /proxy —
@@ -706,7 +706,7 @@ async function isRealVideoStream(streamUrl, headers = null) {
           const inner = decodeURIComponent(variantLine.split('url=')[1]?.split('&')[0] || '')
           if (/^https?:/i.test(inner)) {
             const vRes = await fetch(`${origin}/proxy?url=${encodeURIComponent(inner)}&h=${h}`, {
-              signal: AbortSignal.timeout(4_000),
+              signal: AbortSignal.timeout(3_000),
             })
             if (vRes.status >= 400 && vRes.status < 500) return false
             if (vRes.ok) {
@@ -721,7 +721,7 @@ async function isRealVideoStream(streamUrl, headers = null) {
             ? variantLine
             : new URL(variantLine, new URL(streamUrl)).href
           const vRes = await fetch(`${origin}/proxy?url=${encodeURIComponent(vAbs)}&h=${h}`, {
-            signal: AbortSignal.timeout(4_000),
+            signal: AbortSignal.timeout(3_000),
           })
           if (vRes.status >= 400 && vRes.status < 500) return false
           if (vRes.ok) {
@@ -752,7 +752,7 @@ async function isCachedStreamAlive(data) {
   )
   try {
     const res = await fetch(`${origin}/proxy?url=${encodeURIComponent(data.url)}&h=${h}`, {
-      signal: AbortSignal.timeout(4_000),
+      signal: AbortSignal.timeout(3_000),
     })
     // 429 = upstream rate window, not a dead link — keep serving the cache
     // (the player's own requests would hit the same window anyway).
@@ -1283,15 +1283,24 @@ async function getStreamOnce(slug, ep, provider, type, anilistId, opts = {}) {
   const normalizeStreamUrl = async (rawUrl, headers) => {
     if (!rawUrl || /\.m3u8(\?|$)/i.test(rawUrl)) return rawUrl
     if (urlNormalizeCache.has(rawUrl)) return urlNormalizeCache.get(rawUrl)
-    let resolved = rawUrl
-    for (const suffix of ['/master.m3u8', '/index.m3u8', '/playlist.m3u8']) {
-      try {
+    // Probe all candidate suffixes IN PARALLEL — sequential probing burned
+    // up to 3×6s on the critical path when the first two suffixes 404'd.
+    // First OK wins; a total miss resolves to the raw URL unchanged.
+    const suffixes = ['/master.m3u8', '/index.m3u8', '/playlist.m3u8']
+    const results = await Promise.allSettled(
+      suffixes.map(async (suffix) => {
         const res = await fetch(`${rawUrl}${suffix}`, {
           headers: headers && Object.keys(headers).length ? headers : undefined,
-          signal: AbortSignal.timeout(6_000),
+          signal: AbortSignal.timeout(5_000),
         })
-        if (res.ok) { resolved = `${rawUrl}${suffix}`; break }
-      } catch { /* try next */ }
+        if (!res.ok) throw new Error(`${suffix}: ${res.status}`)
+        try { await res.body?.cancel() } catch { /* drain-free */ }
+        return `${rawUrl}${suffix}`
+      }),
+    )
+    let resolved = rawUrl
+    for (const r of results) {
+      if (r.status === 'fulfilled') { resolved = r.value; break }
     }
     urlNormalizeCache.set(rawUrl, resolved)
     if (urlNormalizeCache.size > 500) urlNormalizeCache.clear()

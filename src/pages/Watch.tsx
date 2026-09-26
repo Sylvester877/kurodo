@@ -669,9 +669,11 @@ export default function Watch() {
     const nextEp = currentEp + 1
     if (!total || nextEp > total) return
 
-    if (pct === 0.5) {
-      // Warm skip-times + server list early so both are cached before
-      // the user clicks "next episode" or autoplay fires.
+    if (pct === 0.1) {
+      // EARLY WARM: skip-times + server list fire right after playback
+      // starts (was 50% — the old tier only warmed servers 6-7 minutes
+      // into a 24-min episode, so skipping episodes or autoplaying early
+      // still paid the full server-list latency).
       prefetchSkipTimes(malId, nextEp)
       if (anidapSlug && anidapSlug !== 'unavailable') {
         prefetchAnidapServers(anidapSlug, nextEp, anilistId, {
@@ -679,7 +681,7 @@ export default function Watch() {
           romaji: anime?.title,
         })
       }
-    } else if (pct === 0.7 &&
+    } else if (pct === 0.5 &&
                anidapSlug &&
                anidapSlug !== 'unavailable') {
       // Expensive: prefetch the actual decrypted stream URL.
@@ -695,7 +697,7 @@ export default function Watch() {
     } else if (pct === 0.75 &&
                anidapSlug &&
                anidapSlug !== 'unavailable') {
-      // Redundant safety net: re-trigger if 70% was missed or aborted
+      // Redundant safety net: re-trigger if 50% was missed or aborted
       void prefetchStream({
         malId,
         anilistId,
