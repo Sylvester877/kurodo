@@ -14,7 +14,7 @@ import { getEpisodeInfoFromMal } from '../api/anilist'
 import { getEpisodesByMalId, getAniListIdFromMal, type AniZipEpisode } from '../api/anizip'
 import { useAnikageEpisodes } from '../hooks/useAnikageEpisodes'
 import {
-  fetchAnidapServers, fetchAnidapStream, call,
+  fetchAnidapServers, fetchAnidapStream,
   type AnidapProvider, type AnidapStream,
 } from '../api/anidap'
 import { getSkipTimes, type SkipTimes } from '../api/aniskip'
@@ -270,94 +270,6 @@ export default function Watch() {
     () => [...playerSubtitles, ...wyzieFallbackSubs],
     [playerSubtitles, wyzieFallbackSubs],
   )
-
-  // ═══ AI captions (whisper.cpp) ═══
-  // Offer generation whenever the current stream has no embedded English
-  // track (dead mirrors already 0-cue via /subs — this is the last resort
-  // that always works: it listens to the actual audio). The generated VTT
-  // is cached per stream URL forever and auto-selected when it lands.
-  const [aiSubsState, setAiSubsState] = useState<{ status: 'idle' | 'running' | 'done' | 'error'; phase?: string; pct?: number; error?: string | null }>({ status: 'idle' })
-  const aiKeyRef = useRef<string | null>(null)
-  const rawStreamUrl = (stream as any)?.raw || (stream as any)?.url || null
-  const streamHeaders = (stream as any)?.headers || null
-
-  // Reset + probe the cache when the stream changes.
-  useEffect(() => {
-    setAiSubsState({ status: 'idle' })
-    aiKeyRef.current = null
-    if (!rawStreamUrl) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const r = await call<any>(`/api/ai-subs/probe?url=${encodeURIComponent(rawStreamUrl)}`)
-        if (!cancelled && r?.data?.key) {
-          aiKeyRef.current = r.data.key
-          if (r.data.status === 'done') {
-            setAiSubsState({ status: 'done' })
-            // fixes: a cached generation must append its track immediately —
-            //        the polling effect only runs while status==='running'.
-            setWyzieFallbackSubs((prev) => {
-              if (prev.some((s) => s.label === 'AI (English)')) return prev
-              const backend = getBackendOrigin()
-              return [...prev, { src: `${backend}${r.data.url}`, label: 'AI (English)', default: true, lang: 'en' }]
-            })
-          }
-        }
-      } catch { /* probe is optional */ }
-    })()
-    return () => { cancelled = true }
-  }, [rawStreamUrl])
-
-  // Poll while running; auto-select the track when done.
-  useEffect(() => {
-    if (aiSubsState.status !== 'running') return
-    const iv = setInterval(async () => {
-      try {
-        const key = aiKeyRef.current
-        if (!key) return
-        const r = await call<any>(`/api/ai-subs/status?key=${key}`)
-        const d = r?.data || {}
-        if (d.status === 'done') {
-          setAiSubsState({ status: 'done' })
-          setWyzieFallbackSubs((prev) => {
-            if (prev.some((s) => s.label === 'AI (English)')) return prev
-            const backend = getBackendOrigin()
-            return [...prev, { src: `${backend}${d.url}`, label: 'AI (English)', default: true, lang: 'en' }]
-          })
-          toast.success('AI captions ready')
-        } else if (d.status === 'error') {
-          setAiSubsState({ status: 'error', error: d.error })
-        } else if (d.status === 'running') {
-          setAiSubsState({ status: 'running', phase: d.phase, pct: d.pct })
-        }
-      } catch { /* keep polling */ }
-    }, 4000)
-    return () => clearInterval(iv)
-  }, [aiSubsState.status])
-
-  const requestAiSubs = useCallback(() => {
-    if (!rawStreamUrl) return
-    ;(async () => {
-      try {
-        const params = new URLSearchParams({ url: rawStreamUrl })
-        if (anime?.title_english || anime?.title) params.set('title', anime.title_english || anime.title || '')
-        if (streamHeaders) params.set('h', safeBase64(JSON.stringify(streamHeaders)))
-        const r = await call<any>(`/api/ai-subs/start?${params}`)
-        if (r?.data?.key) {
-          aiKeyRef.current = r.data.key
-          setAiSubsState({ status: 'running', phase: r.data.phase || 'audio', pct: r.data.pct || 0 })
-          toast.info('Generating AI captions — watch progress in the caption menu')
-        }
-      } catch (e: any) {
-        setAiSubsState({ status: 'error', error: e?.message || 'failed to start' })
-      }
-    })()
-  }, [rawStreamUrl, anime?.title_english, anime?.title, streamHeaders])
-
-  const aiSubsUi = useMemo(() => ({
-    ...aiSubsState,
-    onRequest: requestAiSubs,
-  }), [aiSubsState, requestAiSubs])
 
   // Filler detection — deferred 2.5s to prioritize critical content (hero, episodes, stream)
   const [loadFiller, setLoadFiller] = useState(false)
@@ -1877,7 +1789,6 @@ export default function Watch() {
                 episodeNumber={currentEp}
                 episodeTitle={currentEpisodeMeta?.title?.en || currentEpisodeMeta?.title?.['x-jat'] || `Episode ${currentEp}`}
                 subtitles={allPlayerSubtitles}
-                aiSubs={aiSubsUi}
                 streamType={streamType}
               />
               </Suspense>

@@ -25,7 +25,7 @@ type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; upstream?: number | null }
 
-export async function call<T>(url: string, signal?: AbortSignal): Promise<T> {
+async function call<T>(url: string, signal?: AbortSignal): Promise<T> {
   try {
     const { data } = await api.get<Envelope<T>>(url, { signal })
     if (!data.ok) throw new Error(data.error)

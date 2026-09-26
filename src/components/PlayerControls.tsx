@@ -32,14 +32,6 @@ interface Props {
   subtitles: Array<{ src: string; label: string; default?: boolean; lang?: string }>
   activeSubIdx: number
   onChangeSubIdx: (i: number) => void
-  /** AI caption generation (whisper.cpp) — present when generation is possible. */
-  aiSubs?: {
-    status: 'idle' | 'running' | 'done' | 'error'
-    phase?: string
-    pct?: number
-    error?: string | null
-    onRequest: () => void
-  }
 
   // Quality
   levels: Level[]
@@ -129,7 +121,6 @@ const SETTINGS_VIEW_LABEL: Record<'speed' | 'boost' | 'captions' | 'more', strin
 export default function PlayerControls({
   videoRef, loading,
   subtitles, activeSubIdx, onChangeSubIdx,
-  aiSubs,
   levels, currentLevel, onChangeLevel,
   pipActive, onTogglePiP, hasAirPlay, onTriggerAirPlay,
   chapters,
@@ -744,8 +735,8 @@ export default function PlayerControls({
             <RotateCw />
           </CtrlBtn>
 
-          {/* Captions — visible when tracks exist OR AI generation available */}
-          {(subtitles.length > 0 || aiSubs) && (
+          {/* Captions */}
+          {subtitles.length > 0 && (
             <Menu open={menu === 'captions'} setOpen={(o) => setMenu(o ? 'captions' : null)}>
               <CtrlBtn
                 label="Captions"
@@ -786,47 +777,6 @@ export default function PlayerControls({
                           {s.label}
                         </MenuItem>
                       ))}
-                      {/* AI caption generation — whisper.cpp, offline. */}
-                      {aiSubs && (
-                        <div className="border-t border-white/5">
-                          {aiSubs.status === 'running' ? (
-                            <div className="px-3 py-2 text-xs text-white/60">
-                              <div className="flex items-center justify-between">
-                                <span>Generating AI captions…</span>
-                                <span className="tabular-nums text-white/40">{aiSubs.pct ?? 0}%</span>
-                              </div>
-                              <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/10">
-                                <div
-                                  className="h-full rounded-full bg-[var(--accent,7c6cff)] transition-[width] duration-500"
-                                  style={{ width: `${aiSubs.pct ?? 0}%` }}
-                                />
-                              </div>
-                              <div className="mt-1 text-[10px] text-white/40">
-                                {aiSubs.phase === 'audio' ? 'Extracting audio…' : aiSubs.phase === 'whisper' ? 'Transcribing (one-time per episode)' : 'Converting…'}
-                              </div>
-                            </div>
-                          ) : aiSubs.status === 'error' ? (
-                            <button
-                              onClick={aiSubs.onRequest}
-                              className="w-full px-3 py-2 text-left text-xs text-red-300/90 hover:bg-white/5"
-                            >
-                              AI generation failed — retry
-                              <div className="text-[10px] text-white/40">{(aiSubs.error || '').slice(0, 60)}</div>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={aiSubs.onRequest}
-                              className="w-full px-3 py-2 text-left text-xs text-white/80 hover:bg-white/8"
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                <span aria-hidden>✦</span>
-                                Generate AI captions (EN)
-                              </span>
-                              <div className="pl-5 text-[10px] text-white/40">Offline · word-timed to this stream</div>
-                            </button>
-                          )}
-                        </div>
-                      )}
                       {/* Appearance entry */}
                       <button
                         onClick={() => setCaptionsTab('appearance')}
