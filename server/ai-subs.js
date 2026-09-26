@@ -100,6 +100,8 @@ export function aiSubsCacheKey(streamUrl, { title, ep, type } = {}) {
 }
 
 export function startAiSubsJob({ streamUrl, title, ep, type, headers }) {
+  // type: 'dub' | 'sub' | 'hsub' — sub/hsub audio is Japanese, so those jobs
+  // run whisper's translate task instead of forcing source language English.
   const key = aiSubsCacheKey(streamUrl, { title, ep, type })
   const existing = jobs.get(key)
   if (existing && (existing.status === 'running')) return { key, ...aiSubsStatus(key) }
@@ -118,7 +120,7 @@ export function startAiSubsJob({ streamUrl, title, ep, type, headers }) {
   jobs.set(key, job)
 
   // Run async — the HTTP handler returns immediately.
-  runJob({ key, job, streamUrl, title, headers }).catch((e) => {
+  runJob({ key, job, streamUrl, title, type, headers }).catch((e) => {
     job.status = 'error'
     job.error = e.message
     job.endedAt = Date.now()
@@ -160,7 +162,7 @@ function whisperProgressChunk(chunk) {
   return m ? Number(m[1]) : null
 }
 
-async function runJob({ key, job, streamUrl, title, headers }) {
+async function runJob({ key, job, streamUrl, title, type, headers }) {
   const ffmpeg = await getFfmpegPath()
   const whisperBin = findFirst(WHISPER_CANDIDATES)
   const modelPath = findFirst(MODEL_CANDIDATES)
@@ -191,20 +193,25 @@ async function runJob({ key, job, streamUrl, title, headers }) {
     '-y', wavPath,
   ], { timeoutMs: 10 * 60 * 1000 })
 
-  // 2. Transcribe + translate.
+  // 2. Transcribe (+ translate Japanese audio to English for sub/hsub —
+  //    the user wants EN captions everywhere; dub audio is already English
+  //    so it just transcribes with source forced to English).
   job.phase = 'whisper'
   job.pct = 8
   const srtPath = path.join(WORK_DIR, `${key}.srt`)
   const prompt = title ? `${title}. ` : ''
-  await runOnce(whisperBin, [
+  const whisperArgs = [
     '-m', modelPath,
     '-f', wavPath,
-    '-l', 'en',
+    ...(type === 'sub' || type === 'hsub'
+      ? ['--translate']                      // auto-detect source → English
+      : ['-l', 'en']),                        // dub: source IS English
     '--beam-size', '5',
     '--prompt', prompt,
     '-osrt', '-of', srtPath.replace(/\.srt$/, ''),
     '-pp',
-  ], {
+  ]
+  await runOnce(whisperBin, whisperArgs, {
     timeoutMs: 90 * 60 * 1000,
     onLine: (chunk) => {
       const p = whisperProgressChunk(chunk)

@@ -277,6 +277,11 @@ export default function Watch() {
   // that always works: it listens to the actual audio). The generated VTT
   // is cached per stream URL forever and auto-selected when it lands.
   const [aiSubsState, setAiSubsState] = useState<{ status: 'idle' | 'running' | 'done' | 'error'; phase?: string; pct?: number; error?: string | null }>({ status: 'idle' })
+  // Set when the user clicks the 'AI (English)' row before the track exists —
+  // the track auto-selects the moment generation completes (one-click UX).
+  const [aiPendingSelect, setAiPendingSelect] = useState(false)
+  // Fresh object per command so VideoPlayer's effect re-fires on every click.
+  const [forcedSub, setForcedSub] = useState<{ idx: number } | null>(null)
   const aiKeyRef = useRef<string | null>(null)
   const rawStreamUrl = (stream as any)?.raw || (stream as any)?.url || null
   const streamHeaders = (stream as any)?.headers || null
@@ -284,7 +289,11 @@ export default function Watch() {
   // Reset + probe the cache when the stream changes.
   useEffect(() => {
     setAiSubsState({ status: 'idle' })
+    setAiPendingSelect(false)
     aiKeyRef.current = null
+    // The AI track is per (title,ep,type) — a dub-generated track must not
+    // bleed into a sub stream (different audio → different cue timing).
+    setWyzieFallbackSubs((prev) => prev.filter((s) => !/AI \(English\)/i.test(s.label)))
     if (!rawStreamUrl) return
     let cancelled = false
     ;(async () => {
@@ -310,6 +319,9 @@ export default function Watch() {
               const backend = getBackendOrigin()
               return [...prev, { src: `${backend}${r.url}`, label: 'AI (English)', default: true, lang: 'en' }]
             })
+            // Cached track = captions ON as the page loads — the same
+            // pending-select path a manual click uses, so no extra click.
+            setAiPendingSelect(true)
           } else if (r.status === 'running') {
             // Reload mid-job: resume the progress UI (polling effect keys off
             // status==='running'; without this the job finishes unseen).
@@ -369,10 +381,38 @@ export default function Watch() {
     })()
   }, [rawStreamUrl, anime?.title_english, anime?.title, streamHeaders, currentEp, streamType])
 
+  // One-click 'AI (English)': select the track when it exists, otherwise
+  // kick off generation and auto-select when it lands.
+  const selectAiTrack = useCallback(() => {
+    const idx = allPlayerSubtitles.findIndex((s) => /AI \(English\)/i.test(s.label))
+    if (idx >= 0) {
+      setForcedSub({ idx })
+      setAiPendingSelect(false)
+    } else {
+      setAiPendingSelect(true)
+      requestAiSubs()
+    }
+  }, [allPlayerSubtitles, requestAiSubs])
+
+  // Fulfil the pending selection as soon as the AI track appears (done via
+  // polling OR probe-on-reload — both append the track through
+  // wyzieFallbackSubs, so watching that list covers every path).
+  useEffect(() => {
+    if (!aiPendingSelect) return
+    const idx = allPlayerSubtitles.findIndex((s) => /AI \(English\)/i.test(s.label))
+    if (idx >= 0) {
+      setForcedSub({ idx })
+      setAiPendingSelect(false)
+    }
+  }, [aiPendingSelect, allPlayerSubtitles])
+
   const aiSubsUi = useMemo(() => ({
     ...aiSubsState,
+    hasTrack: allPlayerSubtitles.some((s) => /AI \(English\)/i.test(s.label)),
+    pending: aiPendingSelect,
     onRequest: requestAiSubs,
-  }), [aiSubsState, requestAiSubs])
+    onSelect: selectAiTrack,
+  }), [aiSubsState, aiPendingSelect, allPlayerSubtitles, requestAiSubs, selectAiTrack])
 
   // Filler detection — deferred 2.5s to prioritize critical content (hero, episodes, stream)
   const [loadFiller, setLoadFiller] = useState(false)
@@ -1893,6 +1933,7 @@ export default function Watch() {
                 episodeTitle={currentEpisodeMeta?.title?.en || currentEpisodeMeta?.title?.['x-jat'] || `Episode ${currentEp}`}
                 subtitles={allPlayerSubtitles}
                 aiSubs={aiSubsUi}
+                forcedSub={forcedSub}
                 streamType={streamType}
               />
               </Suspense>
